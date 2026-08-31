@@ -154,6 +154,34 @@
 				అన్ని రకాల ప్రభుత్వ పథకాలు, పౌర మరియు ఆన్‌లైన్ దరఖాస్తు సేవలను సులభంగా పొందండి.
 			</p>
 		</div>
+        <!-- Main NS News Hero Banner -->
+<section class="max-w-6xl mx-auto px-4 pt-6 pb-2">
+    <a 
+        href="/news" 
+        class="block relative overflow-hidden rounded-3xl bg-gradient-to-r from-red-700 via-rose-600 to-orange-600 p-6 sm:p-10 text-white shadow-xl hover:shadow-2xl transition-all group border border-red-500/30"
+    >
+        <div class="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+            <div class="text-center md:text-left space-y-2">
+                <div class="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+                    <i class="fa-solid fa-satellite-dish animate-pulse text-yellow-300"></i>
+                    లైవ్ డిజిటల్ మీడియా వింగ్
+                </div>
+                <h2 class="text-3xl sm:text-5xl font-black tracking-tight text-white flex items-center justify-center md:justify-start gap-3">
+                    NS NEWS <span class="text-yellow-300 text-2xl sm:text-3xl font-bold">ఎక్స్‌ప్రెస్</span>
+                </h2>
+                <p class="text-red-100 text-sm sm:text-base max-w-xl">
+                    రాష్ట్ర, జాతీయ, అంతర్జాతీయ తాజా వార్తలు, పథకాల సమాచారం, నోటిఫికేషన్ల సమగ్ర విశ్లేషణ.
+                </p>
+            </div>
+            <div class="shrink-0">
+                <span class="inline-flex items-center gap-3 bg-white text-red-700 font-bold px-6 py-3.5 rounded-2xl shadow-lg group-hover:scale-105 transition-all">
+                    న్యూస్ పోర్టల్ ఓపెన్ చేయండి
+                    <i class="fa-solid fa-arrow-right"></i>
+                </span>
+            </div>
+        </div>
+    </a>
+</section>
 
 		<!-- NS News Cards Section -->
 		<div class="mb-14">
