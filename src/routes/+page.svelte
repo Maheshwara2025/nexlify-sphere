@@ -1,176 +1,366 @@
 <script>
-  import { supabase } from '$lib/supabaseClient';
+	import { supabase } from '$lib/supabaseClient';
 
-  let name = '';
-  let phone = '';
-  let service_type = 'ఆధార్ & గుర్తింపు సేవలు';
-  let message = '';
-  let loading = false;
-  let statusMessage = '';
-  let isSuccess = false;
+	let name = '';
+	let phone = '';
+	let service_type = 'ఆధార్ & గుర్తింపు సేవలు';
+	let message = '';
+	let statusMsg = '';
+	let isSubmitting = false;
 
-  const services = [
-    { title: 'ఆధార్ & గుర్తింపు సేవలు', icon: '🆔', desc: 'అప్‌డేట్స్, డౌన్‌లోడ్ మరియు కరెక్షన్స్' },
-    { title: 'రైతు సేవలు & వ్యవసాయం', icon: '🌾', desc: 'PM-కిసాన్, ఈ-క్రాప్, సబ్సిడీ అప్లికేషన్లు' },
-    { title: 'భూభారతి & రెవెన్యూ', icon: '📜', desc: 'పహాణీ, 1B, రిజిస్ట్రేషన్ స్లాట్ బుకింగ్' },
-    { title: 'విద్యార్థి & ప్రభుత్వ పథకాలు', icon: '🎓', desc: 'స్కాలర్‌షిప్‌లు, ప్రవేశ పరీక్షల దరఖాస్తులు' },
-    { title: 'ఇన్సూరెన్స్ & హెల్త్ సేవలు', icon: '🛡️', desc: 'జీవిత, వాహన బీమా మరియు ఆయుష్మాన్ భారత్' },
-    { title: 'డిజిటల్ పేమెంట్స్ & ప్రింటింగ్', icon: '🖨️', desc: 'జెరాక్స్, కలర్ ప్రింట్స్, బిల్ చెల్లింపులు' }
-  ];
+	// NS News Updates List
+	const newsUpdates = [
+		{ id: 1, tag: 'తాజా వార్త', title: 'రైతు భరోసా నిధుల జమ ప్రారంభం - స్టేటస్ చెక్ చేసుకోండి', date: 'ఆగస్టు 2026' },
+		{ id: 2, tag: 'విద్యార్థి అప్‌డేట్', title: 'పోస్ట్ మెట్రిక్ స్కాలర్‌షిప్ దరఖాస్తు గడువు పొడిగింపు', date: 'ఆగస్టు 2026' },
+		{ id: 3, tag: 'ప్రభుత్వ సేవ', title: 'ఆధార్ - రేషన్ కార్డు ఈ-కేవైసీ (e-KYC) ఉచిత అప్‌డేట్ అందుబాటులో ఉంది', date: 'ఆగస్టు 2026' },
+		{ id: 4, tag: 'ఉద్యోగ సమాచారం', title: 'కొత్త ఉద్యోగ నోటిఫికేషన్ల ఆన్‌లైన్ అప్లికేషన్లు ప్రారంభం', date: 'ఆగస్టు 2026' }
+	];
 
-  async function handleSubmit() {
-    if (!name || !phone) {
-      statusMessage = 'దయచేసి పేరు మరియు ఫోన్ నంబర్ నమోదు చేయండి.';
-      isSuccess = false;
-      return;
-    }
+	// Available Services Data
+	const services = [
+		{
+			icon: 'fa-id-card',
+			iconBg: 'bg-indigo-100 text-indigo-700',
+			title: 'ఆధార్ & గుర్తింపు సేవలు',
+			desc: 'అప్‌డేట్స్, డౌన్‌లోడ్ మరియు కరెక్షన్స్'
+		},
+		{
+			icon: 'fa-wheat-awn',
+			iconBg: 'bg-emerald-100 text-emerald-700',
+			title: 'రైతు సేవలు & వ్యవసాయం',
+			desc: 'PM-కిసాన్, ఈ-క్రాప్, సబ్సిడీ అప్లికేషన్లు'
+		},
+		{
+			icon: 'fa-scroll',
+			iconBg: 'bg-amber-100 text-amber-700',
+			title: 'భూభారతి & రెవెన్యూ',
+			desc: 'పహణీ, 1B, రిజిస్ట్రేషన్ స్లాట్ బుకింగ్'
+		},
+		{
+			icon: 'fa-graduation-cap',
+			iconBg: 'bg-blue-100 text-blue-700',
+			title: 'విద్యార్థి & ప్రభుత్వ పథకాలు',
+			desc: 'స్కాలర్‌షిప్‌లు, ప్రవేశ పరీక్షల దరఖాస్తులు'
+		},
+		{
+			icon: 'fa-shield-halved',
+			iconBg: 'bg-rose-100 text-rose-700',
+			title: 'ఇన్సూరెన్స్ & హెల్త్ సేవలు',
+			desc: 'జీవిత, వాహన బీమా మరియు ఆయుష్మాన్ భారత్'
+		},
+		{
+			icon: 'fa-print',
+			iconBg: 'bg-teal-100 text-teal-700',
+			title: 'డిజిటల్ పేమెంట్స్ & ప్రింటింగ్',
+			desc: 'జెరాక్స్, కలర్ ప్రింట్స్, బిల్ చెల్లింపులు'
+		}
+	];
 
-    loading = true;
-    statusMessage = '';
+	async function handleSubmit() {
+		if (!name || !phone) {
+			statusMsg = 'దయచేసి పేరు మరియు మొబైల్ నంబర్ నమోదు చేయండి.';
+			return;
+		}
 
-    const { error } = await supabase.from('service_requests').insert([
-      { name, phone, service_type, message }
-    ]);
+		isSubmitting = true;
+		statusMsg = '';
 
-    loading = false;
+		try {
+			const { data, error } = await supabase
+				.from('service_requests')
+				.insert([{ name, phone, service_type, message }]);
 
-    if (error) {
-      statusMessage = 'సమస్య ఎదురైంది: ' + error.message;
-      isSuccess = false;
-    } else {
-      statusMessage = 'మీ అభ్యర్థన విజయవంతంగా నమోదైంది! మేము త్వరలోనే సంప్రదిస్తాము.';
-      isSuccess = true;
-      name = '';
-      phone = '';
-      message = '';
-    }
-  }
+			if (error) {
+				console.error('Supabase error:', error);
+				statusMsg = 'లోపం జరిగింది. దయచేసి మళ్లీ ప్రయత్నించండి.';
+			} else {
+				statusMsg = 'మీ అభ్యర్థన విజయవంతంగా నమోదైంది! మేము త్వరలోనే సంప్రదిస్తాము.';
+				name = '';
+				phone = '';
+				message = '';
+			}
+		} catch (err) {
+			console.error('Submit error:', err);
+			statusMsg = 'సర్వర్ ఎర్రర్ ఏర్పడింది. దయచేసి మళ్లీ ప్రయత్నించండి.';
+		} finally {
+			isSubmitting = false;
+		}
+	}
 </script>
 
-<div class="min-h-screen bg-slate-50 text-slate-800">
-  <!-- Header -->
-  <header class="bg-white shadow-sm sticky top-0 z-50">
-    <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-orange-600 text-white font-bold flex items-center justify-center text-xl shadow-md">
-          N
-        </div>
-        <div>
-          <h1 class="font-bold text-lg leading-none text-slate-900">Nexlify Nucleus</h1>
-          <p class="text-xs text-slate-500 mt-0.5">డిజిటల్ సర్వీసెస్ పోర్టల్</p>
-        </div>
-      </div>
-      <a 
-        href="#apply-form" 
-        class="bg-orange-600 hover:bg-orange-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition shadow-sm"
-      >
-        సర్వీస్ బుకింగ్
-      </a>
-    </div>
-  </header>
+<svelte:head>
+	<title>Nexlify Sphere Digital Express | డిజిటల్ సర్వీసెస్ పోర్టల్</title>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+</svelte:head>
 
-  <!-- Hero Section -->
-  <section class="max-w-4xl mx-auto px-4 py-12 text-center">
-    <span class="bg-orange-100 text-orange-800 text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider">
-      గ్రామీణ & డిజిటల్ సేవలు
-    </span>
-    <h2 class="text-3xl sm:text-4xl font-extrabold text-slate-900 mt-4 leading-tight">
-      మీ డిజిటల్ & ప్రభుత్వ సేవల అవసరాలు <br class="hidden sm:inline" />
-      <span class="text-orange-600">అన్నీ ఒకే చోట</span>
-    </h2>
-    <p class="text-slate-600 mt-3 text-base sm:text-lg max-w-2xl mx-auto">
-      అన్ని రకాల ప్రభుత్వ పథకాలు, పౌర మరియు ఆన్‌లైన్ దరఖాస్తు సేవలను సులభంగా పొందండి.
-    </p>
-  </section>
+<div class="min-h-screen bg-slate-50 text-slate-800 flex flex-col justify-between font-sans">
+	<!-- Top Navigation -->
+	<header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+		<div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+			<div class="flex items-center gap-3">
+				<div class="w-11 h-11 bg-orange-600 text-white rounded-xl flex items-center justify-center font-bold text-2xl shadow-md shadow-orange-200">
+					N
+				</div>
+				<div>
+					<h1 class="text-xl font-bold text-slate-900 tracking-tight leading-none">
+						Nexlify Sphere
+					</h1>
+					<p class="text-xs font-semibold text-orange-600 mt-1">Digital Express</p>
+				</div>
+			</div>
 
-  <!-- Services Grid -->
-  <section class="max-w-6xl mx-auto px-4 pb-12">
-    <h3 class="text-xl font-bold text-slate-900 mb-6 text-center">అందుబాటులో ఉన్న సేవలు</h3>
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-      {#each services as service}
-        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition">
-          <div class="text-3xl mb-3">{service.icon}</div>
-          <h4 class="font-bold text-lg text-slate-900">{service.title}</h4>
-          <p class="text-sm text-slate-600 mt-1">{service.desc}</p>
-        </div>
-      {/each}
-    </div>
-  </section>
+			<div class="flex items-center gap-3">
+				<a
+					href="#booking-form"
+					class="bg-orange-600 hover:bg-orange-700 text-white px-5 py-2 rounded-xl text-sm font-semibold transition-all shadow-sm hover:shadow active:scale-95"
+				>
+					సర్వీస్ బుకింగ్
+				</a>
+			</div>
+		</div>
+	</header>
 
-  <!-- Application / Booking Form -->
-  <section id="apply-form" class="max-w-xl mx-auto px-4 pb-16">
-    <div class="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-sm">
-      <h3 class="text-xl font-bold text-slate-900 text-center mb-2">సేవ కోసం అభ్యర్థించండి</h3>
-      <p class="text-sm text-slate-500 text-center mb-6">మీ వివరాలను ఇక్కడ నమోదు చేయండి</p>
+	<!-- NS News Ticker & Wing -->
+	<section class="bg-slate-900 text-white py-2.5 border-b border-slate-800">
+		<div class="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center gap-3">
+			<div class="flex items-center gap-2 bg-red-600 text-white text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-md shrink-0">
+				<i class="fa-solid fa-bolt animate-pulse"></i>
+				<span>NS News</span>
+			</div>
+			<div class="overflow-x-auto whitespace-nowrap text-sm text-slate-300 w-full flex items-center gap-6 no-scrollbar">
+				{#each newsUpdates as news}
+					<div class="flex items-center gap-2 shrink-0">
+						<span class="bg-slate-800 text-orange-400 text-xs px-2 py-0.5 rounded font-medium">{news.tag}</span>
+						<span>{news.title}</span>
+						<span class="text-slate-600">•</span>
+					</div>
+				{/each}
+			</div>
+		</div>
+	</section>
 
-      <form on:submit|preventDefault={handleSubmit} class="space-y-4">
-        <div>
-          <label class="block text-sm font-semibold text-slate-700 mb-1" for="name">పూర్తి పేరు</label>
-          <input 
-            id="name"
-            type="text" 
-            bind:value={name} 
-            placeholder="మీ పేరు నమోదు చేయండి" 
-            class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
-            required
-          />
-        </div>
+	<!-- Main Content Area -->
+	<main class="max-w-6xl mx-auto px-4 py-10 flex-grow w-full">
+		<!-- Hero Section -->
+		<div class="text-center max-w-3xl mx-auto mb-12">
+			<span class="inline-block bg-orange-50 text-orange-700 border border-orange-200 text-xs font-semibold px-3 py-1 rounded-full mb-4">
+				గ్రామీణ & డిజిటల్ సేవలు
+			</span>
+			<h2 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-900 tracking-tight leading-tight mb-3">
+				మీ డిజిటల్ & ప్రభుత్వ సేవల అవసరాలు <br />
+				<span class="text-orange-600">అన్నీ ఒకే చోట</span>
+			</h2>
+			<p class="text-slate-600 text-base sm:text-lg">
+				అన్ని రకాల ప్రభుత్వ పథకాలు, పౌర మరియు ఆన్‌లైన్ దరఖాస్తు సేవలను సులభంగా పొందండి.
+			</p>
+		</div>
 
-        <div>
-          <label class="block text-sm font-semibold text-slate-700 mb-1" for="phone">మొబైల్ నంబర్</label>
-          <input 
-            id="phone"
-            type="tel" 
-            bind:value={phone} 
-            placeholder="ఉదా: 9876543210" 
-            class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
-            required
-          />
-        </div>
+		<!-- NS News Cards Section -->
+		<div class="mb-14">
+			<div class="flex items-center justify-between mb-6">
+				<div class="flex items-center gap-2">
+					<div class="w-2.5 h-6 bg-orange-600 rounded-full"></div>
+					<h3 class="text-xl font-bold text-slate-900">NS News & తాజా అప్‌డేట్స్</h3>
+				</div>
+				<span class="text-xs text-slate-500 font-medium">లైవ్ సమాచారం</span>
+			</div>
 
-        <div>
-          <label class="block text-sm font-semibold text-slate-700 mb-1" for="service_type">కావలసిన సేవ</label>
-          <select 
-            id="service_type"
-            bind:value={service_type} 
-            class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
-          >
-            {#each services as service}
-              <option value={service.title}>{service.title}</option>
-            {/each}
-          </select>
-        </div>
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+				{#each newsUpdates as item}
+					<div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all flex items-start gap-4">
+						<div class="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center shrink-0 text-lg">
+							<i class="fa-solid fa-newspaper"></i>
+						</div>
+						<div class="flex-grow">
+							<div class="flex items-center justify-between mb-1">
+								<span class="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700">{item.tag}</span>
+								<span class="text-xs text-slate-400">{item.date}</span>
+							</div>
+							<p class="text-slate-800 font-medium text-sm sm:text-base leading-snug">{item.title}</p>
+						</div>
+					</div>
+				{/each}
+			</div>
+		</div>
 
-        <div>
-          <label class="block text-sm font-semibold text-slate-700 mb-1" for="message">అదనపు వివరాలు (ఐచ్ఛికం)</label>
-          <textarea 
-            id="message"
-            bind:value={message} 
-            rows="3" 
-            placeholder="మీకు అవసరమైన వివరాలు రాయండి..." 
-            class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
-          ></textarea>
-        </div>
+		<!-- Services Grid -->
+		<div class="mb-16">
+			<div class="text-center mb-8">
+				<h3 class="text-2xl font-bold text-slate-900">అందుబాటులో ఉన్న సేవలు</h3>
+				<p class="text-sm text-slate-500 mt-1">మీకు కావాల్సిన సేవను ఎంచుకోండి</p>
+			</div>
 
-        {#if statusMessage}
-          <div class={`p-3 rounded-lg text-sm text-center font-medium ${isSuccess ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
-            {statusMessage}
-          </div>
-        {/if}
+			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+				{#each services as s}
+					<div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all group">
+						<div class="w-12 h-12 rounded-xl {s.iconBg} flex items-center justify-center text-xl mb-4 group-hover:scale-105 transition-transform">
+							<i class="fa-solid {s.icon}"></i>
+						</div>
+						<h4 class="text-lg font-bold text-slate-900 mb-1">{s.title}</h4>
+						<p class="text-sm text-slate-500 leading-relaxed">{s.desc}</p>
+					</div>
+				{/each}
+			</div>
+		</div>
 
-        <button 
-          type="submit" 
-          disabled={loading}
-          class="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-3 rounded-lg shadow-sm transition disabled:opacity-50"
-        >
-          {loading ? 'సమర్పిస్తోంది...' : 'అభ్యర్థనను సమర్పించండి'}
-        </button>
-      </form>
-    </div>
-  </section>
+		<!-- Service Request / Booking Form -->
+		<div id="booking-form" class="max-w-xl mx-auto bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm">
+			<div class="text-center mb-6">
+				<h3 class="text-2xl font-bold text-slate-900">సేవ కోసం అభ్యర్థించండి</h3>
+				<p class="text-sm text-slate-500 mt-1">మీ వివరాలను ఇక్కడ నమోదు చేయండి</p>
+			</div>
 
-  <!-- Footer -->
-  <footer class="bg-slate-900 text-slate-400 py-8 text-center text-sm border-t border-slate-800">
-    <p>© {new Date().getFullYear()} Nexlify Nucleus. All rights reserved.</p>
-  </footer>
+			<form on:submit|preventDefault={handleSubmit} class="space-y-4">
+				<div>
+					<label for="name" class="block text-sm font-semibold text-slate-700 mb-1">పూర్తి పేరు</label>
+					<input
+						id="name"
+						type="text"
+						bind:value={name}
+						placeholder="మీ పేరు నమోదు చేయండి"
+						class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
+						required
+					/>
+				</div>
+
+				<div>
+					<label for="phone" class="block text-sm font-semibold text-slate-700 mb-1">మొబైల్ నంబర్</label>
+					<input
+						id="phone"
+						type="tel"
+						bind:value={phone}
+						placeholder="ఉదా: 9876543210"
+						class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
+						required
+					/>
+				</div>
+
+				<div>
+					<label for="service" class="block text-sm font-semibold text-slate-700 mb-1">కావలసిన సేవ</label>
+					<select
+						id="service"
+						bind:value={service_type}
+						class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm bg-white"
+					>
+						<option value="ఆధార్ & గుర్తింపు సేవలు">ఆధార్ & గుర్తింపు సేవలు</option>
+						<option value="రైతు సేవలు & వ్యవసాయం">రైతు సేవలు & వ్యవసాయం</option>
+						<option value="భూభారతి & రెవెన్యూ">భూభారతి & రెవెన్యూ</option>
+						<option value="విద్యార్థి & ప్రభుత్వ పథకాలు">విద్యార్థి & ప్రభుత్వ పథకాలు</option>
+						<option value="ఇన్సూరెన్స్ & హెల్త్ సేవలు">ఇన్సూరెన్స్ & హెల్త్ సేవలు</option>
+						<option value="డిజిటల్ పేమెంట్స్ & ప్రింటింగ్">డిజిటల్ పేమెంట్స్ & ప్రింటింగ్</option>
+						<option value="ఇతర సేవలు">ఇతర సేవలు</option>
+					</select>
+				</div>
+
+				<div>
+					<label for="message" class="block text-sm font-semibold text-slate-700 mb-1">అదనపు వివరాలు (ఐచ్ఛికం)</label>
+					<textarea
+						id="message"
+						bind:value={message}
+						rows="3"
+						placeholder="మీకు అవసరమైన వివరాలు రాయండి..."
+						class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
+					></textarea>
+				</div>
+
+				{#if statusMsg}
+					<div class="p-3 rounded-xl text-sm font-medium text-center {statusMsg.includes('విజయవంతంగా') ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}">
+						{statusMsg}
+					</div>
+				{/if}
+
+				<button
+					type="submit"
+					disabled={isSubmitting}
+					class="w-full bg-orange-600 hover:bg-orange-700 active:bg-orange-800 disabled:opacity-50 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-md shadow-orange-200"
+				>
+					{isSubmitting ? 'నమోదు అవుతోంది...' : 'అభ్యర్థనను సమర్పించండి'}
+				</button>
+			</form>
+		</div>
+	</main>
+
+	<!-- Footer with Social Media Links and A.S.V Enterprises Copyright -->
+	<footer class="bg-white border-t border-slate-200 mt-16 py-8 text-slate-600">
+		<div class="max-w-6xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-6">
+			<!-- Brand Info -->
+			<div class="text-center md:text-left">
+				<div class="flex items-center justify-center md:justify-start gap-2 mb-1">
+					<div class="w-6 h-6 bg-orange-600 text-white rounded-md flex items-center justify-center font-bold text-xs">
+						N
+					</div>
+					<span class="font-bold text-slate-900">Nexlify Sphere</span>
+				</div>
+				<p class="text-xs text-slate-500">Digital Express Services Portal</p>
+			</div>
+
+			<!-- Social Media Links -->
+			<div class="flex items-center gap-4">
+				<a
+					href="https://wa.me/919949122402"
+					target="_blank"
+					rel="noreferrer"
+					class="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white flex items-center justify-center transition-all shadow-sm"
+					title="WhatsApp"
+				>
+					<i class="fa-brands fa-whatsapp text-lg"></i>
+				</a>
+				<a
+					href="https://t.me"
+					target="_blank"
+					rel="noreferrer"
+					class="w-10 h-10 rounded-full bg-sky-50 text-sky-600 hover:bg-sky-600 hover:text-white flex items-center justify-center transition-all shadow-sm"
+					title="Telegram"
+				>
+					<i class="fa-brands fa-telegram text-lg"></i>
+				</a>
+				<a
+					href="https://youtube.com"
+					target="_blank"
+					rel="noreferrer"
+					class="w-10 h-10 rounded-full bg-red-50 text-red-600 hover:bg-red-600 hover:text-white flex items-center justify-center transition-all shadow-sm"
+					title="YouTube"
+				>
+					<i class="fa-brands fa-youtube text-lg"></i>
+				</a>
+				<a
+					href="https://instagram.com"
+					target="_blank"
+					rel="noreferrer"
+					class="w-10 h-10 rounded-full bg-pink-50 text-pink-600 hover:bg-pink-600 hover:text-white flex items-center justify-center transition-all shadow-sm"
+					title="Instagram"
+				>
+					<i class="fa-brands fa-instagram text-lg"></i>
+				</a>
+			</div>
+
+			<!-- Copyright Info -->
+			<div class="text-center md:text-right text-xs text-slate-500">
+				<p>© 2026 A.S.V Enterprises. All rights reserved.</p>
+				<p class="mt-0.5 text-slate-400">Powered by Nexlify Sphere Digital Express</p>
+			</div>
+		</div>
+	</footer>
+
+	<!-- Floating WhatsApp Quick Button -->
+	<a
+		href="https://wa.me/919949122402"
+		target="_blank"
+		rel="noreferrer"
+		class="fixed bottom-6 right-6 bg-emerald-600 hover:bg-emerald-700 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all z-50 hover:scale-110 active:scale-95"
+		title="WhatsApp లో చాట్ చేయండి"
+	>
+		<i class="fa-brands fa-whatsapp text-3xl"></i>
+	</a>
 </div>
+
+<style>
+	/* Hide horizontal scrollbar for news ticker */
+	.no-scrollbar::-webkit-scrollbar {
+		display: none;
+	}
+	.no-scrollbar {
+		-ms-overflow-style: none;
+		scrollbar-width: none;
+	}
+</style>
