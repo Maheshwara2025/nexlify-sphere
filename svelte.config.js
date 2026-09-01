@@ -9,13 +9,10 @@ const config = {
 		adapter: adapter({
 			pages: 'build',
 			assets: 'build',
-			fallback: '404.html',
+			fallback: 'index.html',
 			precompress: false,
 			strict: false
-		}),
-		prerender: {
-			handleUnseenRoutes: 'ignore'
-		}
+		})
 	}
 };
 
