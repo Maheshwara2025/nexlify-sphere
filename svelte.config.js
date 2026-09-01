@@ -9,7 +9,7 @@ const config = {
 		adapter: adapter({
 			pages: 'build',
 			assets: 'build',
-			fallback: '404.html', // 👈 Cloudflare Pages SPA కి ఇది ఖచ్చితంగా 404.html అయి ఉండాలి
+			fallback: '404.html',
 			precompress: false,
 			strict: false
 		})
