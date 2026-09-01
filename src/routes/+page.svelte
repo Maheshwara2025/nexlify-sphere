@@ -210,6 +210,46 @@
 				{/each}
 			</div>
 		</div>
+<!-- 📢 Main Home Page Advertisement & News Promotion Banner 📢 -->
+<div class="max-w-7xl mx-auto px-4 my-8">
+	<div class="bg-gradient-to-r from-orange-600 via-amber-500 to-rose-600 rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col md:flex-row items-center justify-between gap-6 border-2 border-orange-400/40">
+		<div class="space-y-2 text-center md:text-left">
+			<span class="text-[11px] font-black uppercase tracking-widest bg-black/30 px-3 py-1 rounded-full inline-block">
+				📢 లోకల్ అడ్వర్టైజింగ్ & ప్రమోషన్స్
+			</span>
+			<h3 class="text-xl sm:text-2xl font-black">మీ వ్యాపార ప్రకటనలు వేలాది మందికి చేరవేయండి!</h3>
+			<p class="text-xs sm:text-sm text-orange-100 max-w-xl">
+				షాపులు, రియల్ ఎస్టేట్, విద్యాసంస్థలు మరియు శుభకార్యాల ప్రకటనలు NS News మరియు డిజిటల్ నెట్‌వర్క్‌లో ప్రచారం చేసుకోండి.
+			</p>
+		</div>
+		<div class="flex flex-wrap items-center gap-3 shrink-0">
+			<a
+				href="/news"
+				class="bg-white hover:bg-slate-100 text-slate-900 font-black text-xs sm:text-sm px-5 py-3 rounded-2xl shadow transition-all active:scale-95 flex items-center gap-2"
+			>
+				<i class="fa-solid fa-newspaper text-red-600"></i>
+				<span>NS News పోర్టల్</span>
+			</a>
+			<a
+				href="https://wa.me/919502336495?text=Hello,%20I%20want%20to%20give%20an%20Ad%20in%20NS%20News%20Portal"
+				target="_blank"
+				rel="noreferrer"
+				class="bg-slate-950 hover:bg-black text-white font-bold text-xs sm:text-sm px-5 py-3 rounded-2xl shadow transition-all active:scale-95 flex items-center gap-2"
+			>
+				<i class="fa-brands fa-whatsapp text-emerald-400 text-base"></i>
+				<span>యాడ్ బుకింగ్ (WhatsApp)</span>
+			</a>
+		</div>
+	</div>
+</div>
+
+
+
+
+
+
+
+
 
 		<!-- Services Grid -->
 		<div class="mb-16">
@@ -279,6 +319,7 @@
 						<option value="ఇతర సేవలు">ఇతర సేవలు</option>
 					</select>
 				</div>
+				
 
 				<div>
 					<label for="message" class="block text-sm font-semibold text-slate-700 mb-1">అదనపు వివరాలు (ఐచ్ఛికం)</label>
