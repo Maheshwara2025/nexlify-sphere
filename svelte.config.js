@@ -9,7 +9,7 @@ const config = {
 		adapter: adapter({
 			pages: 'build',
 			assets: 'build',
-			fallback: '404.html', // 👈 ఈ లైన్ Cloudflare SPA రూటింగ్ ఎర్రర్‌ను పూర్తిగా ఫిక్స్ చేస్తుంది
+			fallback: 'index.html',
 			precompress: false,
 			strict: false
 		})
