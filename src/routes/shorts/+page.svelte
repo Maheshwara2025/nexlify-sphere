@@ -1,15 +1,29 @@
 <script>
-  export let data;
-  let activeLang = 'all'; // 'all', 'te', 'en', 'hi'
+  import { onMount } from 'svelte';
+  import { supabase } from '$lib/supabaseClient';
 
-  // భాష ఆధారంగా వార్తలను ఫిల్టర్ చేయడం
+  let shorts = [];
+  let loading = true;
+  let activeLang = 'all';
+
+  onMount(async () => {
+    const { data, error } = await supabase
+      .from('shorts')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!error && data) {
+      shorts = data;
+    }
+    loading = false;
+  });
+
   $: filteredShorts = activeLang === 'all' 
-    ? data.shorts 
-    : data.shorts.filter(s => s.language === activeLang);
+    ? shorts 
+    : shorts.filter(s => s.language === activeLang);
 
-  // WhatsApp డైరెక్ట్ షేరింగ్ ఫంక్షన్
   function shareToWhatsApp(item) {
-    const text = `*${item.title}*\n\n${item.summary}\n\nపూర్తి వివరాల కోసం క్లిక్ చేయండి: https://nexlifynucleus.in/shorts#${item.id}`;
+    const text = `*${item.title}*\n\n${item.summary}\n\nపూర్తి వివరాల కోసం: https://nexlifynucleus.in/shorts#${item.id}`;
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
   }
 </script>
@@ -19,7 +33,6 @@
 </svelte:head>
 
 <div class="max-w-md mx-auto min-h-screen bg-gray-100 flex flex-col pb-16">
-  <!-- టాప్ హెడర్ & లాంగ్వేజ్ ఫిల్టర్స్ -->
   <header class="sticky top-0 z-30 bg-white border-b shadow-sm">
     <div class="flex items-center justify-between px-4 py-3">
       <h1 class="text-lg font-black tracking-tight text-red-600 flex items-center gap-1">
@@ -30,7 +43,6 @@
       </a>
     </div>
 
-    <!-- భాషల ఎంపిక ట్యాబ్‌లు -->
     <div class="flex border-t text-xs font-medium text-center">
       <button 
         class="flex-1 py-2 border-b-2 {activeLang === 'all' ? 'border-red-600 text-red-600 font-bold' : 'border-transparent text-gray-500'}"
@@ -55,16 +67,18 @@
     </div>
   </header>
 
-  <!-- షార్ట్స్ ఫీడ్ (Way2News తరహా కార్డ్స్) -->
   <main class="flex-1 p-3 space-y-4">
-    {#if filteredShorts.length === 0}
+    {#if loading}
+      <div class="text-center py-20 text-gray-500 text-sm font-medium">
+        వార్తలు లోడ్ అవుతున్నాయి...
+      </div>
+    {:else if filteredShorts.length === 0}
       <div class="text-center py-20 text-gray-500 text-sm">
         ఈ విభాగంలో వార్తలు లేవు.
       </div>
     {:else}
       {#each filteredShorts as item (item.id)}
         <article id="{item.id}" class="bg-white rounded-xl shadow border border-gray-200 overflow-hidden flex flex-col">
-          <!-- ఇమేజ్ & రిపోర్టర్ బ్యాడ్జ్ -->
           <div class="relative w-full aspect-video bg-gray-200">
             <img 
               src={item.image_url} 
@@ -79,7 +93,6 @@
             </div>
           </div>
 
-          <!-- వార్త బాడీ -->
           <div class="p-4 flex-1 flex flex-col justify-between">
             <div>
               <h2 class="text-base font-bold text-gray-900 leading-snug mb-2">
@@ -90,7 +103,6 @@
               </p>
             </div>
 
-            <!-- షేరింగ్ బటన్స్ -->
             <div class="mt-4 pt-3 border-t flex items-center justify-between gap-2">
               <span class="text-[11px] text-gray-400">
                 {new Date(item.created_at).toLocaleDateString('te-IN', { month: 'short', day: 'numeric' })}

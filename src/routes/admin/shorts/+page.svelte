@@ -1,4 +1,6 @@
 <script>
+  import { supabase } from '$lib/supabaseClient';
+
   let title = '';
   let fullText = '';
   let summary = '';
@@ -18,6 +20,7 @@
     }
   }
 
+  // AI సారాంశం (బ్రౌజర్ క్లయింట్ నుంచే నేరుగా)
   async function generateAiSummary() {
     if (!fullText) {
       alert('దయచేసి ముందుగా పూర్తి వార్తను పేస్ట్ చేయండి.');
@@ -26,26 +29,46 @@
 
     isAiGenerating = true;
     try {
-      const response = await fetch('/api/ai/summarize', {
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      if (!apiKey) {
+        // API కీ లేకపోతే బేసిక్ సారాంశం
+        summary = fullText.slice(0, 250) + '...';
+        if (!title) title = fullText.slice(0, 40) + '...';
+        return;
+      }
+
+      const langMap = { te: 'Telugu', en: 'English', hi: 'Hindi' };
+      const prompt = `You are a mobile news editor for an app like Way2News. Summarize the following news text strictly into:
+1. A catchy headline (max 10-12 words).
+2. A crisp news summary strictly 50 to 70 words in ${langMap[language] || 'Telugu'}.
+Respond strictly in JSON format: {"suggestedTitle": "...", "summary": "..."}
+
+News content:
+${fullText}`;
+
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: fullText, language })
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: "application/json" }
+        })
       });
 
-      const result = await response.json();
+      const data = await res.json();
+      const result = JSON.parse(data.candidates?.[0]?.content?.parts?.[0]?.text);
       if (result.summary) {
         summary = result.summary;
-        if (result.suggestedTitle && !title) {
-          title = result.suggestedTitle;
-        }
+        if (result.suggestedTitle && !title) title = result.suggestedTitle;
       }
-    } catch (err) {
-      alert('AI సారాంశం పొందడంలో లోపం ఏర్పడింది.');
+    } catch (e) {
+      alert('AI తో సారాంశం చేయడంలో లోపం వచ్చింది.');
     } finally {
       isAiGenerating = false;
     }
   }
 
+  // నేరుగా Supabase లోకి సేవ్ చేయడం
   async function handleSubmit() {
     if (!title || !summary || !imageFile) {
       alert('దయచేసి శీర్షిక, సారాంశం మరియు ఫోటోను అందించండి.');
@@ -53,33 +76,48 @@
     }
 
     isSubmitting = true;
-    const formData = new FormData();
-    formData.append('title', title);
-    formData.append('summary', summary);
-    formData.append('location', location);
-    formData.append('reporterName', reporterName);
-    formData.append('language', language);
-    formData.append('image', imageFile);
-
     try {
-      const res = await fetch('/api/shorts/create', {
-        method: 'POST',
-        body: formData
-      });
+      // 1. Supabase Storage కి ఇమేజ్ అప్‌లోడ్
+      const fileExt = imageFile.name ? imageFile.name.split('.').pop() : 'jpg';
+      const filePath = `shorts/${Date.now()}-${Math.random().toString(36).substring(2, 6)}.${fileExt}`;
 
-      const data = await res.json();
-      if (res.ok && data.success) {
-        alert('షార్ట్ న్యూస్ విజయవంతంగా పబ్లిష్ అయింది!');
+      const { error: uploadErr } = await supabase.storage
+        .from('news-images')
+        .upload(filePath, imageFile, { upsert: true });
+
+      let imageUrl = '';
+      if (!uploadErr) {
+        const { data } = supabase.storage.from('news-images').getPublicUrl(filePath);
+        imageUrl = data.publicUrl;
+      } else {
+        // బకెట్ లేకపోతే Base64 ఫాల్‌బ్యాక్
+        const buffer = await imageFile.arrayBuffer();
+        const base64 = btoa(new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), ''));
+        imageUrl = `data:${imageFile.type};base64,${base64}`;
+      }
+
+      // 2. Supabase టేబుల్‌లోకి ఇన్సర్ట్
+      const { error: insertErr } = await supabase.from('shorts').insert([{
+        title,
+        summary,
+        image_url: imageUrl,
+        reporter_name: reporterName,
+        location,
+        language
+      }]);
+
+      if (!insertErr) {
+        alert('షార్ట్ న్యూస్ విజయవంతంగా పోస్ట్ అయింది!');
         title = '';
         fullText = '';
         summary = '';
         previewUrl = '';
         imageFile = null;
       } else {
-        alert('ఎర్రర్: ' + (data.error || 'సేవ్ కాలేదు'));
+        alert('సేవ్ కాలేదు: ' + insertErr.message);
       }
-    } catch (e) {
-      alert('నెట్‌వర్క్ లోపం ఏర్పడింది.');
+    } catch (err) {
+      alert('ఎర్రర్ వచ్చింది.');
     } finally {
       isSubmitting = false;
     }
@@ -134,7 +172,7 @@
         on:click={generateAiSummary} 
         disabled={isAiGenerating} 
         class="text-xs bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700 disabled:opacity-50">
-        {isAiGenerating ? 'AI సారాంశం రాస్తోంది...' : 'AI సారాంశం చేయి'}
+        {isAiGenerating ? 'AI రాస్తోంది...' : 'AI సారాంశం చేయి'}
       </button>
     </div>
     <textarea 
