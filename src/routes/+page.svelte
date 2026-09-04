@@ -433,3 +433,8 @@
 		scrollbar-width: none;
 	}
 </style>
+<a 
+  href="/admin/shorts" 
+  class="inline-flex items-center gap-2 bg-gradient-to-r from-red-600 to-indigo-600 text-white font-bold px-4 py-2 rounded-lg shadow hover:opacity-90 mb-4">
+  ⚡ మొబైల్ షార్ట్ న్యూస్ పోస్ట్ చేయండి (Way2News Model)
+</a>
