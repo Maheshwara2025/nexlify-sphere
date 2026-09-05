@@ -421,6 +421,14 @@
 	>
 		<i class="fa-brands fa-whatsapp text-3xl"></i>
 	</a>
+	<!-- ⚡ NS Shorts యూజర్ బటన్ -->
+<a 
+  href="/shorts" 
+  class="inline-flex items-center gap-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-extrabold text-xs uppercase px-4 py-2 rounded-full shadow-lg transition transform hover:scale-105 active:scale-95">
+  <span class="animate-pulse text-amber-300">⚡</span>
+  <span>NS Shorts</span>
+  <span class="w-2 h-2 rounded-full bg-white animate-ping"></span>
+</a>
 </div>
 
 <style>
@@ -433,8 +441,4 @@
 		scrollbar-width: none;
 	}
 </style>
-<a 
-  href="/admin/shorts" 
-  class="inline-flex items-center gap-2 bg-gradient-to-r from-red-600 to-indigo-600 text-white font-bold px-4 py-2 rounded-lg shadow hover:opacity-90 mb-4">
-  ⚡ మొబైల్ షార్ట్ న్యూస్ పోస్ట్ చేయండి (Way2News Model)
-</a>
+<
