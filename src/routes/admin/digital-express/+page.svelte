@@ -41,7 +41,7 @@
       name: 'పాన్ కార్డ్ (UTIITSL / NSDL)',
       category: 'citizen',
       desc: 'కొత్త పాన్ దరఖాస్తు, కరెక్షన్లు & రీప్రింట్',
-      url: 'https://www.pan.utiitsl.com/',
+      url: 'https://onlineservices.proteantech.in/paam/endUserRegisterContact.html',
       icon: '💳',
       color: 'from-cyan-600 to-blue-600',
       badge: 'PAN'
@@ -79,7 +79,7 @@
       name: 'ధరణి / భూభారతి',
       category: 'land',
       desc: 'పట్టాదారు పాస్‌బుక్, ROR 1B, పహాణీ & స్లాట్ బుకింగ్',
-      url: 'https://dharani.telangana.gov.in/',
+      url: 'https://bhubharati.telangana.gov.in/homePage?lang=en',
       icon: '🌾',
       color: 'from-emerald-700 to-green-800',
       badge: 'Land TG'
@@ -199,10 +199,10 @@
       badge: 'RTA'
     },
     {
-      name: 'TGSPDCL / TSNPDCL',
+      name: 'TGNPDCL',
       category: 'travel',
       desc: 'కరెంట్ బిల్లుల చెల్లింపు & నూతన సర్వీస్ కనెక్షన్లు',
-      url: 'https://www.tssouthernpower.com/',
+      url: 'https://www.tgnpdcl.com/',
       icon: '⚡',
       color: 'from-amber-500 to-yellow-600',
       badge: 'Electricity'
