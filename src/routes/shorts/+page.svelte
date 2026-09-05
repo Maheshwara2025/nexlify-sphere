@@ -123,15 +123,22 @@
         <article class="bg-white text-slate-900 rounded-2xl overflow-hidden shadow-xl border border-slate-200 flex flex-col h-auto my-auto">
           
           <!-- ఫోటో బ్యానర్ -->
-          <div class="relative w-full aspect-[16/10] bg-slate-100 overflow-hidden shrink-0">
-            <img 
-              src={currentItem.image_url} 
-              alt={currentItem.title} 
-              class="w-full h-full object-cover" 
-            />
-            <div class="absolute top-3 left-3 bg-red-600 text-white px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider shadow">
-              NS LIVE
-            </div>
+          <!-- ఫోటో బ్యానర్: ఫోటో కట్ కాకుండా పూర్తిగా కనిపించే సెటప్ -->
+<div class="relative w-full bg-slate-900 overflow-hidden shrink-0 flex items-center justify-center">
+  <img 
+    src={currentItem.image_url} 
+    alt={currentItem.title} 
+    class="w-full max-h-72 sm:max-h-80 object-contain bg-slate-950" 
+  />
+  <div class="absolute top-3 left-3 bg-red-600 text-white px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider shadow">
+    NS LIVE
+  </div>
+  <div class="absolute bottom-2.5 left-3 bg-black/75 backdrop-blur text-white px-2.5 py-1 rounded-md text-[11px] font-medium flex items-center gap-1.5 shadow">
+    <span class="text-yellow-400 font-bold">📍 {currentItem.location || 'తెలంగాణ'}</span>
+    <span>•</span>
+    <span>{currentItem.reporter_name || 'NS Reporter'}</span>
+  </div>
+</div>
             <div class="absolute bottom-2.5 left-3 bg-black/75 backdrop-blur text-white px-2.5 py-1 rounded-md text-[11px] font-medium flex items-center gap-1.5">
               <span class="text-yellow-400 font-bold">📍 {currentItem.location || 'తెలంగాణ'}</span>
               <span>•</span>
