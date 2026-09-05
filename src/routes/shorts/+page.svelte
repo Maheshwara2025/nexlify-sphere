@@ -123,11 +123,12 @@
         <article class="bg-white text-slate-900 rounded-2xl overflow-hidden shadow-xl border border-slate-200 flex flex-col h-auto my-auto">
           
           <!-- ఫోటో బ్యానర్: object-contain తో ఫోటో కట్ అవ్వకుండా సహజంగా కనిపిస్తుంది -->
-          <div class="relative w-full bg-slate-950 overflow-hidden shrink-0 flex items-center justify-center">
+          <!-- ఫోటో బ్యానర్: సైడ్స్ ఖాళీ లేకుండా కార్డ్ వెడల్పు మొత్తం కవర్ అయ్యేలా -->
+          <div class="relative w-full overflow-hidden shrink-0 bg-slate-950">
             <img 
               src={currentItem.image_url} 
               alt={currentItem.title} 
-              class="w-full max-h-72 sm:max-h-80 object-contain bg-slate-950" 
+              class="w-full aspect-[4/3] sm:aspect-[16/10] object-cover object-top" 
             />
             <div class="absolute top-3 left-3 bg-red-600 text-white px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider shadow">
               NS LIVE
