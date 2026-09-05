@@ -123,20 +123,27 @@
         <article class="bg-white text-slate-900 rounded-2xl overflow-hidden shadow-xl border border-slate-200 flex flex-col h-auto my-auto">
           
           <!-- ఫోటో బ్యానర్: object-contain తో ఫోటో కట్ అవ్వకుండా సహజంగా కనిపిస్తుంది -->
-          <!-- ఫోటో బ్యానర్: సైడ్స్ ఖాళీ లేకుండా కార్డ్ వెడల్పు మొత్తం కవర్ అయ్యేలా -->
+          <!-- ఫోటో బ్యానర్: ఆటో-హైట్ తో ఫోటో సైడ్స్ ఖాళీ లేకుండా, తలలు కట్ కాకుండా 100% ఫిట్ అవుతుంది -->
           <div class="relative w-full overflow-hidden shrink-0 bg-slate-950">
-            <img 
-              src={currentItem.image_url} 
-              alt={currentItem.title} 
-              class="w-full aspect-[4/3] sm:aspect-[16/10] object-cover object-top" 
-            />
+            {#if currentItem?.image_url}
+              <img 
+                src={currentItem.image_url} 
+                alt={currentItem?.title || 'News'} 
+                class="w-full h-auto block object-contain" 
+              />
+            {:else}
+              <div class="w-full h-48 bg-slate-900 flex items-center justify-center text-slate-500 text-xs">
+                చిత్రం అందుబాటులో లేదు
+              </div>
+            {/if}
+
             <div class="absolute top-3 left-3 bg-red-600 text-white px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider shadow">
               NS LIVE
             </div>
             <div class="absolute bottom-2.5 left-3 bg-black/75 backdrop-blur text-white px-2.5 py-1 rounded-md text-[11px] font-medium flex items-center gap-1.5 shadow">
-              <span class="text-yellow-400 font-bold">📍 {currentItem.location || 'తెలంగాణ'}</span>
+              <span class="text-yellow-400 font-bold">📍 {currentItem?.location || 'తెలంగాణ'}</span>
               <span>•</span>
-              <span>{currentItem.reporter_name || 'NS Reporter'}</span>
+              <span>{currentItem?.reporter_name || 'NS Reporter'}</span>
             </div>
           </div>
 
