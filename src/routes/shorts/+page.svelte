@@ -84,7 +84,7 @@
   <title>NS Shorts - స్పీడ్ న్యూస్</title>
 </svelte:head>
 
-<!-- మెయిన్ కంటైనర్: స్క్రోలింగ్ మరియు ఆటో హైట్ సపోర్ట్ -->
+<!-- మెయిన్ కంటైనర్ -->
 <div class="w-full min-h-screen bg-slate-950 flex flex-col items-center p-0 sm:p-4 font-sans text-slate-100">
   
   <div class="w-full max-w-lg flex flex-col h-full sm:min-h-[90vh]">
@@ -106,7 +106,7 @@
       </div>
     </header>
 
-    <!-- కార్డ్ ఏరియా: h-auto ద్వారా కంటెంట్ ఎంత ఉంటే అంతే ఎత్తు తీసుకుంటుంది -->
+    <!-- కార్డ్ ఏరియా -->
     <main class="flex-1 p-2.5 sm:p-0 flex flex-col justify-start">
       {#if loading}
         <div class="py-32 flex flex-col items-center justify-center space-y-3">
@@ -119,27 +119,20 @@
         </div>
       {:else}
         
-        <!-- AUTO-FIT CARD: ఎటువంటి అనవసరమైన ఖాళీ స్పేస్ లేకుండా ఆటో అడ్జస్ట్ అవుతుంది -->
+        <!-- AUTO-FIT CARD -->
         <article class="bg-white text-slate-900 rounded-2xl overflow-hidden shadow-xl border border-slate-200 flex flex-col h-auto my-auto">
           
-          <!-- ఫోటో బ్యానర్ -->
-          <!-- ఫోటో బ్యానర్: ఫోటో కట్ కాకుండా పూర్తిగా కనిపించే సెటప్ -->
-<div class="relative w-full bg-slate-900 overflow-hidden shrink-0 flex items-center justify-center">
-  <img 
-    src={currentItem.image_url} 
-    alt={currentItem.title} 
-    class="w-full max-h-72 sm:max-h-80 object-contain bg-slate-950" 
-  />
-  <div class="absolute top-3 left-3 bg-red-600 text-white px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider shadow">
-    NS LIVE
-  </div>
-  <div class="absolute bottom-2.5 left-3 bg-black/75 backdrop-blur text-white px-2.5 py-1 rounded-md text-[11px] font-medium flex items-center gap-1.5 shadow">
-    <span class="text-yellow-400 font-bold">📍 {currentItem.location || 'తెలంగాణ'}</span>
-    <span>•</span>
-    <span>{currentItem.reporter_name || 'NS Reporter'}</span>
-  </div>
-</div>
-            <div class="absolute bottom-2.5 left-3 bg-black/75 backdrop-blur text-white px-2.5 py-1 rounded-md text-[11px] font-medium flex items-center gap-1.5">
+          <!-- ఫోటో బ్యానర్: object-contain తో ఫోటో కట్ అవ్వకుండా సహజంగా కనిపిస్తుంది -->
+          <div class="relative w-full bg-slate-950 overflow-hidden shrink-0 flex items-center justify-center">
+            <img 
+              src={currentItem.image_url} 
+              alt={currentItem.title} 
+              class="w-full max-h-72 sm:max-h-80 object-contain bg-slate-950" 
+            />
+            <div class="absolute top-3 left-3 bg-red-600 text-white px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider shadow">
+              NS LIVE
+            </div>
+            <div class="absolute bottom-2.5 left-3 bg-black/75 backdrop-blur text-white px-2.5 py-1 rounded-md text-[11px] font-medium flex items-center gap-1.5 shadow">
               <span class="text-yellow-400 font-bold">📍 {currentItem.location || 'తెలంగాణ'}</span>
               <span>•</span>
               <span>{currentItem.reporter_name || 'NS Reporter'}</span>
@@ -153,14 +146,14 @@
             </h2>
           </div>
 
-          <!-- వార్త బాడీ: ఖచ్చితమైన ప్యాడింగ్‌తో కంటెంట్ ముగిసిన వెంటనే ముగుస్తుంది -->
+          <!-- వార్త బాడీ -->
           <div class="px-4 py-3">
             <p class="text-[14px] sm:text-[14.5px] text-slate-800 leading-relaxed font-normal whitespace-pre-line text-justify">
               {currentItem.summary}
             </p>
           </div>
 
-          <!-- ఫుటర్: వార్త ముగిసిన వెంటనే అతుక్కుని వస్తుంది -->
+          <!-- ఫుటర్ -->
           <div class="px-4 py-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between shrink-0">
             <span class="text-xs font-semibold text-slate-400">
               {new Date(currentItem.created_at).toLocaleDateString('te-IN', { month: 'short', day: 'numeric', year: 'numeric' })}
