@@ -268,34 +268,43 @@
 	<div class="min-h-screen bg-slate-100 py-8 px-4 sm:px-6 font-sans">
 		<div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
 			<!-- Master Header with Logout -->
-			<div class="bg-slate-950 px-6 py-4 flex items-center justify-between text-white border-b-2 border-red-600">
-				<div class="flex items-center gap-3">
-					<div class="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center font-black text-xl shadow">
-						NS
-					</div>
-					<div>
-						<h1 class="text-lg font-bold">NS News Smart Control Desk</h1>
-						<p class="text-xs text-slate-400">తెలుగు దినపత్రిక డిజిటల్ నెట్‌వర్క్ • A.S.V Enterprises</p>
-					</div>
-				</div>
-				<div class="flex items-center gap-2">
-					<a
-						href="/news"
-						target="_blank"
-						class="bg-slate-800 hover:bg-slate-700 text-xs px-3 py-2 rounded-xl font-bold transition-all border border-slate-700"
-					>
-						పోర్టల్
-					</a>
-					<button
-						type="button"
-						on:click={handleLogout}
-						class="bg-red-600 hover:bg-red-700 text-xs px-3 py-2 rounded-xl font-bold transition-all shadow"
-					>
-						లాగౌట్
-					</button>
-				</div>
-			</div>
+			<!-- Master Header with Logout & Shorts -->
+            <div class="bg-slate-950 px-6 py-4 flex items-center justify-between text-white border-b-2 border-red-600">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center font-black text-xl shadow">
+                        NS
+                    </div>
+                    <div>
+                        <h1 class="text-lg font-bold">NS News Smart Control Desk</h1>
+                        <p class="text-xs text-slate-400">తెలుగు దినపత్రిక డిజిటల్ నెట్‌వర్క్ • A.S.V Enterprises</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <!-- ⚡ NS Shorts అడ్మిన్ బటన్ -->
+                    <a
+                        href="/admin/shorts"
+                        class="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white text-xs px-3 py-2 rounded-xl font-extrabold transition-all shadow flex items-center gap-1.5"
+                    >
+                        <span class="text-amber-300 animate-pulse">⚡</span>
+                        <span>NS Shorts</span>
+                    </a>
 
+                    <a
+                        href="/news"
+                        target="_blank"
+                        class="bg-slate-800 hover:bg-slate-700 text-xs px-3 py-2 rounded-xl font-bold transition-all border border-slate-700"
+                    >
+                        పోర్టల్
+                    </a>
+                    <button
+                        type="button"
+                        on:click={handleLogout}
+                        class="bg-slate-800 hover:bg-red-600 text-xs px-3 py-2 rounded-xl font-bold transition-all border border-slate-700 hover:border-red-600"
+                    >
+                        లాగౌట్
+                    </button>
+                </div>
+            </div>
 			<div class="p-6 sm:p-8 space-y-6">
 				{#if statusMsg}
 					<div class="p-4 rounded-xl text-sm font-semibold {statusType === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}">
