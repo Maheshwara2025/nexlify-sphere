@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { browser } from '$app/environment';
   import { supabase } from '$lib/supabaseClient';
 
   let shorts = [];
@@ -19,7 +20,7 @@
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (!error && data) {
+      if (!error && Array.isArray(data)) {
         shorts = data;
       }
     } catch (e) {
@@ -61,27 +62,23 @@
     return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
   }
 
-  // బ్రౌజర్ నేటివ్ కాన్వాస్ ఇంజిన్ ద్వారా హై-రిజల్యూషన్ పోస్టర్ మేకింగ్ (క్రాష్ అవ్వదు)
   async function downloadCardPoster() {
-    if (!currentItem) return;
+    if (!browser || !currentItem) return;
     isGeneratingPoster = true;
 
     try {
       const targetImgUrl = (activeMediaIndex === 2 && currentItem.image_url_2) ? currentItem.image_url_2 : currentItem.image_url;
-      
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       const width = 1080;
-      const height = 1350; // ఇన్‌స్టాగ్రామ్ / వాట్సాప్ స్టేటస్ సైజ్
+      const height = 1350;
 
       canvas.width = width;
       canvas.height = height;
 
-      // బ్యాక్‌గ్రౌండ్
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, width, height);
 
-      // హెడర్ బార్
       ctx.fillStyle = '#0f172a';
       ctx.fillRect(0, 0, width, 90);
 
@@ -96,15 +93,14 @@
       ctx.font = 'bold 34px sans-serif';
       ctx.fillText('NEXLIFY SHORTS', 125, 57);
 
-      // ఇమేజ్ లోడ్ చేయడం
-      let bannerHeight = 580;
+      const bannerHeight = 580;
       if (targetImgUrl) {
         try {
           const img = new Image();
           img.crossOrigin = 'anonymous';
-          await new Promise((resolve, reject) => {
+          await new Promise((resolve) => {
             img.onload = resolve;
-            img.onerror = resolve; // ఇమేజ్ లోడ్ కాకపోయినా ఆగిపోకుండా
+            img.onerror = resolve;
             img.src = targetImgUrl;
           });
           if (img.complete && img.naturalWidth > 0) {
@@ -115,7 +111,6 @@
         }
       }
 
-      // లొకేషన్ బ్యాడ్జ్
       ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
       ctx.fillRect(40, 90 + bannerHeight - 70, 360, 50);
 
@@ -123,12 +118,10 @@
       ctx.font = 'bold 24px sans-serif';
       ctx.fillText(`📍 ${currentItem.location || 'తెలంగాణ'}`, 55, 90 + bannerHeight - 37);
 
-      // హెడ్‌లైన్
       ctx.fillStyle = '#0f172a';
-      ctx.font = 'bold 44px sans-serif';
+      ctx.font = 'bold 42px sans-serif';
       
-      // హెడ్‌లైన్ లైన్ బ్రేకింగ్
-      const titleWords = currentItem.title.split(' ');
+      const titleWords = (currentItem.title || '').split(' ');
       let line = '';
       let textY = 90 + bannerHeight + 65;
 
@@ -138,14 +131,13 @@
         if (metrics.width > 980 && n > 0) {
           ctx.fillText(line, 45, textY);
           line = titleWords[n] + ' ';
-          textY += 56;
+          textY += 54;
         } else {
           line = testLine;
         }
       }
       ctx.fillText(line, 45, textY);
 
-      // సెపరేటర్ లైన్
       textY += 20;
       ctx.strokeStyle = '#e2e8f0';
       ctx.lineWidth = 3;
@@ -154,12 +146,11 @@
       ctx.lineTo(1035, textY);
       ctx.stroke();
 
-      // వార్త వివరాలు (సారాంశం)
       textY += 50;
       ctx.fillStyle = '#334155';
-      ctx.font = '32px sans-serif';
+      ctx.font = '30px sans-serif';
 
-      const summaryWords = currentItem.summary.split(' ');
+      const summaryWords = (currentItem.summary || '').split(' ');
       let sumLine = '';
       for (let n = 0; n < summaryWords.length; n++) {
         const testLine = sumLine + summaryWords[n] + ' ';
@@ -167,25 +158,23 @@
         if (metrics.width > 980 && n > 0) {
           ctx.fillText(sumLine, 45, textY);
           sumLine = summaryWords[n] + ' ';
-          textY += 46;
+          textY += 44;
         } else {
           sumLine = testLine;
         }
       }
       ctx.fillText(sumLine, 45, textY);
 
-      // ఫుటర్
       ctx.fillStyle = '#f8fafc';
       ctx.fillRect(0, height - 90, width, 90);
 
       ctx.fillStyle = '#94a3b8';
       ctx.font = 'bold 24px sans-serif';
-      ctx.fillText(new Date(currentItem.created_at).toLocaleDateString('te-IN', { month: 'short', day: 'numeric', year: 'numeric' }), 45, height - 38);
+      ctx.fillText(currentItem.created_at ? new Date(currentItem.created_at).toLocaleDateString('te-IN', { month: 'short', day: 'numeric', year: 'numeric' }) : '', 45, height - 38);
 
       ctx.fillStyle = '#dc2626';
       ctx.fillText('⚡ nexlifynucleus.in/shorts', 690, height - 38);
 
-      // డౌన్‌లోడ్ చేయడం
       const a = document.createElement('a');
       a.download = `NS_Shorts_${Date.now()}.jpg`;
       a.href = canvas.toDataURL('image/jpeg', 0.95);
@@ -198,12 +187,12 @@
     }
   }
 
-  // వాట్సాప్ షేర్
   async function shareWhatsApp(item) {
-    const shareText = `*${item.title}*\n\n${item.summary}\n\n📍 *${item.location || 'తెలంగాణ'}* | NS LIVE\nపూర్తి వివరాలు: https://nexlifynucleus.in/shorts`;
+    if (!item) return;
+    const shareText = `*${item.title || ''}*\n\n${item.summary || ''}\n\n📍 *${item.location || 'తెలంగాణ'}* | NS LIVE\nపూర్తి వివరాలు: https://nexlifynucleus.in/shorts`;
     const targetUrl = item.image_url;
 
-    if (navigator.share && targetUrl) {
+    if (browser && navigator.share && targetUrl) {
       try {
         const response = await fetch(targetUrl);
         const blob = await response.blob();
@@ -220,22 +209,24 @@
         console.log('Mobile share fallback');
       }
     }
-    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`, '_blank');
+    if (browser) {
+      window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`, '_blank');
+    }
   }
 
-  // Twitter (X)
   function shareTwitter(item) {
+    if (!browser || !item) return;
     const tweet = `${item.title}\n\nhttps://nexlifynucleus.in/shorts`;
     window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}`, '_blank');
   }
 
-  // Facebook
   function shareFacebook() {
+    if (!browser) return;
     window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent('https://nexlifynucleus.in/shorts')}`, '_blank');
   }
 
-  // కాపీ
   function copyLink(item) {
+    if (!browser || !item) return;
     const textToCopy = `${item.title}\nhttps://nexlifynucleus.in/shorts`;
     navigator.clipboard.writeText(textToCopy).then(() => {
       copySuccess = true;
@@ -246,9 +237,6 @@
 
 <svelte:head>
   <title>NS Shorts - స్పీడ్ న్యూస్</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Mandali&family=Noto+Sans+Devanagari:wght@400;700&family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet">
 </svelte:head>
 
 <div class="w-full min-h-screen bg-slate-200/70 flex flex-col items-center p-0 sm:p-4 font-sans text-slate-900">
@@ -287,15 +275,13 @@
         </div>
       {:else}
         
-        <!-- AUTO-FIT CARD -->
         <article class="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-200 flex flex-col h-auto relative">
           
-          <!-- మీడియా సెక్షన్ -->
           {#if currentItem.youtube_url && getYouTubeEmbedUrl(currentItem.youtube_url)}
             <div class="relative w-full aspect-video bg-black shrink-0">
               <iframe 
                 src={getYouTubeEmbedUrl(currentItem.youtube_url)} 
-                title={currentItem.title}
+                title={currentItem.title || 'Video'}
                 class="w-full h-full border-0"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
                 allowfullscreen
@@ -305,7 +291,7 @@
             <div class="relative w-full overflow-hidden shrink-0 bg-slate-950">
               <img 
                 src={activeMediaIndex === 2 && currentItem.image_url_2 ? currentItem.image_url_2 : currentItem.image_url} 
-                alt={currentItem.title} 
+                alt={currentItem.title || 'News'} 
                 class="w-full h-auto block object-contain" 
               />
               
@@ -338,33 +324,26 @@
             </div>
           {/if}
 
-          <!-- శీర్షిక -->
           <div class="px-4 pt-3.5 pb-2 border-b border-slate-100">
-            <h2 class="text-base sm:text-[17px] font-black text-slate-900 leading-snug tracking-tight"
-                style="font-family: {currentItem.language === 'te' ? `'Mandali', sans-serif` : currentItem.language === 'hi' ? `'Noto Sans Devanagari', sans-serif` : `'Plus Jakarta Sans', sans-serif`};">
-              {currentItem.title}
+            <h2 class="text-base sm:text-[17px] font-black text-slate-900 leading-snug tracking-tight">
+              {currentItem.title || ''}
             </h2>
           </div>
 
-          <!-- వార్త బాడీ -->
           <div class="px-4 py-3">
-            <p class="text-[14px] sm:text-[14.5px] text-slate-800 leading-relaxed font-normal whitespace-pre-line text-justify"
-               style="font-family: {currentItem.language === 'te' ? `'Mandali', sans-serif` : currentItem.language === 'hi' ? `'Noto Sans Devanagari', sans-serif` : `'Plus Jakarta Sans', sans-serif`};">
-              {currentItem.summary}
+            <p class="text-[14px] sm:text-[14.5px] text-slate-800 leading-relaxed font-normal whitespace-pre-line text-justify">
+              {currentItem.summary || ''}
             </p>
           </div>
 
-          <!-- ఫుటర్ వాటర్‌మార్క్ -->
           <div class="px-4 py-1.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 font-semibold">
-            <span>{new Date(currentItem.created_at).toLocaleDateString('te-IN', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+            <span>{currentItem.created_at ? new Date(currentItem.created_at).toLocaleDateString('te-IN', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}</span>
             <span class="text-red-600 font-bold">⚡ Nexlify Sphere News</span>
           </div>
 
         </article>
 
-        <!-- యాక్షన్ బటన్ల బార్ -->
         <div class="mt-2.5 bg-white rounded-xl p-2 shadow-sm border border-slate-200 flex items-center justify-between gap-1.5">
-          <!-- కార్డ్ పోస్టర్ బటన్ -->
           <button 
             type="button"
             on:click={downloadCardPoster}
@@ -374,7 +353,6 @@
             <span>{isGeneratingPoster ? 'డౌన్‌లోడ్ అవుతోంది...' : 'కార్డ్ పోస్టర్'}</span>
           </button>
 
-          <!-- వాట్సాప్ -->
           <button 
             type="button"
             on:click={() => shareWhatsApp(currentItem)}
@@ -383,7 +361,6 @@
             <span>వాట్సాప్</span>
           </button>
 
-          <!-- ఇతర ఆప్షన్లు -->
           <button 
             type="button"
             on:click={() => showShareModal = !showShareModal}
@@ -393,7 +370,6 @@
           </button>
         </div>
 
-        <!-- పాప్-అప్ సోషల్ మోడల్ -->
         {#if showShareModal}
           <div class="mt-2 bg-slate-900 text-white p-3 rounded-xl shadow-xl flex items-center justify-around gap-2 text-xs font-bold">
             <button type="button" on:click={() => shareTwitter(currentItem)} class="hover:text-sky-400 flex flex-col items-center gap-1">
@@ -417,7 +393,7 @@
       {/if}
     </main>
 
-    <!-- నావిగేషన్ బటన్లు -->
+    <!-- నావిగేషన్ -->
     <footer class="bg-white border-t border-slate-200 p-2.5 flex items-center justify-between shrink-0 sm:rounded-b-2xl shadow-sm mt-auto">
       <button 
         type="button"
