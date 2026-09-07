@@ -8,21 +8,25 @@
   let currentIndex = 0;
   let activeMediaIndex = 1;
 
-  let cardElement; // కార్డ్‌ను స్క్రీన్‌షాట్/పోస్టర్‌గా మార్చడానికి రిఫరెన్స్
   let isGeneratingPoster = false;
   let showShareModal = false;
   let copySuccess = false;
 
   onMount(async () => {
-    const { data, error } = await supabase
-      .from('shorts')
-      .select('*')
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('shorts')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-    if (!error && data) {
-      shorts = data;
+      if (!error && data) {
+        shorts = data;
+      }
+    } catch (e) {
+      console.error('Fetch shorts error:', e);
+    } finally {
+      loading = false;
     }
-    loading = false;
   });
 
   $: filteredShorts = (shorts || []).filter(s => activeLang === 'all' || s.language === activeLang);
@@ -57,34 +61,144 @@
     return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
   }
 
-  // 1. కార్డ్‌ను పూర్తి పోస్టర్ ఇమేజ్‌గా మార్చి డౌన్‌లోడ్ చేయడం
-  // కార్డ్‌ను పూర్తి పోస్టర్ ఇమేజ్‌గా మార్చి డౌన్‌లోడ్ చేయడం (Client-side dynamic import)
+  // బ్రౌజర్ నేటివ్ కాన్వాస్ ఇంజిన్ ద్వారా హై-రిజల్యూషన్ పోస్టర్ మేకింగ్ (క్రాష్ అవ్వదు)
   async function downloadCardPoster() {
-    if (!cardElement) return;
+    if (!currentItem) return;
     isGeneratingPoster = true;
+
     try {
-      // సర్వర్ క్రాష్ అవ్వకుండా బ్రౌజర్ లో మాత్రమే డైనమిక్ గా ఇంపోర్ట్ అవుతుంది
-      const { toJpeg } = await import('html-to-image');
+      const targetImgUrl = (activeMediaIndex === 2 && currentItem.image_url_2) ? currentItem.image_url_2 : currentItem.image_url;
       
-      const dataUrl = await toJpeg(cardElement, { 
-        quality: 0.95, 
-        backgroundColor: '#ffffff',
-        pixelRatio: 2
-      });
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const width = 1080;
+      const height = 1350; // ఇన్‌స్టాగ్రామ్ / వాట్సాప్ స్టేటస్ సైజ్
+
+      canvas.width = width;
+      canvas.height = height;
+
+      // బ్యాక్‌గ్రౌండ్
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, height);
+
+      // హెడర్ బార్
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(0, 0, width, 90);
+
+      ctx.fillStyle = '#dc2626';
+      ctx.fillRect(40, 22, 65, 46);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 30px sans-serif';
+      ctx.fillText('NS', 52, 56);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 34px sans-serif';
+      ctx.fillText('NEXLIFY SHORTS', 125, 57);
+
+      // ఇమేజ్ లోడ్ చేయడం
+      let bannerHeight = 580;
+      if (targetImgUrl) {
+        try {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = resolve; // ఇమేజ్ లోడ్ కాకపోయినా ఆగిపోకుండా
+            img.src = targetImgUrl;
+          });
+          if (img.complete && img.naturalWidth > 0) {
+            ctx.drawImage(img, 0, 90, width, bannerHeight);
+          }
+        } catch (imgErr) {
+          console.log('Image render bypass');
+        }
+      }
+
+      // లొకేషన్ బ్యాడ్జ్
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+      ctx.fillRect(40, 90 + bannerHeight - 70, 360, 50);
+
+      ctx.fillStyle = '#fbbf24';
+      ctx.font = 'bold 24px sans-serif';
+      ctx.fillText(`📍 ${currentItem.location || 'తెలంగాణ'}`, 55, 90 + bannerHeight - 37);
+
+      // హెడ్‌లైన్
+      ctx.fillStyle = '#0f172a';
+      ctx.font = 'bold 44px sans-serif';
+      
+      // హెడ్‌లైన్ లైన్ బ్రేకింగ్
+      const titleWords = currentItem.title.split(' ');
+      let line = '';
+      let textY = 90 + bannerHeight + 65;
+
+      for (let n = 0; n < titleWords.length; n++) {
+        const testLine = line + titleWords[n] + ' ';
+        const metrics = ctx.measureText(testLine);
+        if (metrics.width > 980 && n > 0) {
+          ctx.fillText(line, 45, textY);
+          line = titleWords[n] + ' ';
+          textY += 56;
+        } else {
+          line = testLine;
+        }
+      }
+      ctx.fillText(line, 45, textY);
+
+      // సెపరేటర్ లైన్
+      textY += 20;
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(45, textY);
+      ctx.lineTo(1035, textY);
+      ctx.stroke();
+
+      // వార్త వివరాలు (సారాంశం)
+      textY += 50;
+      ctx.fillStyle = '#334155';
+      ctx.font = '32px sans-serif';
+
+      const summaryWords = currentItem.summary.split(' ');
+      let sumLine = '';
+      for (let n = 0; n < summaryWords.length; n++) {
+        const testLine = sumLine + summaryWords[n] + ' ';
+        const metrics = ctx.measureText(testLine);
+        if (metrics.width > 980 && n > 0) {
+          ctx.fillText(sumLine, 45, textY);
+          sumLine = summaryWords[n] + ' ';
+          textY += 46;
+        } else {
+          sumLine = testLine;
+        }
+      }
+      ctx.fillText(sumLine, 45, textY);
+
+      // ఫుటర్
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillRect(0, height - 90, width, 90);
+
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = 'bold 24px sans-serif';
+      ctx.fillText(new Date(currentItem.created_at).toLocaleDateString('te-IN', { month: 'short', day: 'numeric', year: 'numeric' }), 45, height - 38);
+
+      ctx.fillStyle = '#dc2626';
+      ctx.fillText('⚡ nexlifynucleus.in/shorts', 690, height - 38);
+
+      // డౌన్‌లోడ్ చేయడం
       const a = document.createElement('a');
-      a.href = dataUrl;
       a.download = `NS_Shorts_${Date.now()}.jpg`;
-      document.body.appendChild(a);
+      a.href = canvas.toDataURL('image/jpeg', 0.95);
       a.click();
-      document.body.removeChild(a);
-    } catch (err) {
-      console.error('Poster generation failed', err);
+    } catch (e) {
+      console.error('Poster build error', e);
       alert('పోస్టర్ డౌన్‌లోడ్ చేయడంలో సమస్య వచ్చింది.');
     } finally {
       isGeneratingPoster = false;
     }
   }
-  // 2. వాట్సాప్ షేర్ (ఇమేజ్ లేదా టెక్స్ట్)
+
+  // వాట్సాప్ షేర్
   async function shareWhatsApp(item) {
     const shareText = `*${item.title}*\n\n${item.summary}\n\n📍 *${item.location || 'తెలంగాణ'}* | NS LIVE\nపూర్తి వివరాలు: https://nexlifynucleus.in/shorts`;
     const targetUrl = item.image_url;
@@ -109,18 +223,18 @@
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`, '_blank');
   }
 
-  // 3. X (Twitter) షేర్
+  // Twitter (X)
   function shareTwitter(item) {
     const tweet = `${item.title}\n\nhttps://nexlifynucleus.in/shorts`;
     window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}`, '_blank');
   }
 
-  // 4. Facebook షేర్
+  // Facebook
   function shareFacebook() {
     window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent('https://nexlifynucleus.in/shorts')}`, '_blank');
   }
 
-  // 5. లింక్ కాపీ
+  // కాపీ
   function copyLink(item) {
     const textToCopy = `${item.title}\nhttps://nexlifynucleus.in/shorts`;
     navigator.clipboard.writeText(textToCopy).then(() => {
@@ -150,9 +264,9 @@
       
       <div class="flex items-center gap-2">
         <div class="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[11px] font-bold">
-          <button on:click={() => { activeLang = 'all'; currentIndex = 0; }} class="px-2 py-0.5 rounded {activeLang === 'all' ? 'bg-white shadow text-red-600' : 'text-slate-600'}">అన్నీ</button>
-          <button on:click={() => { activeLang = 'te'; currentIndex = 0; }} class="px-2 py-0.5 rounded {activeLang === 'te' ? 'bg-white shadow text-red-600' : 'text-slate-600'}">తెలుగు</button>
-          <button on:click={() => { activeLang = 'en'; currentIndex = 0; }} class="px-2 py-0.5 rounded {activeLang === 'en' ? 'bg-white shadow text-red-600' : 'text-slate-600'}">EN</button>
+          <button type="button" on:click={() => { activeLang = 'all'; currentIndex = 0; }} class="px-2 py-0.5 rounded {activeLang === 'all' ? 'bg-white shadow text-red-600' : 'text-slate-600'}">అన్నీ</button>
+          <button type="button" on:click={() => { activeLang = 'te'; currentIndex = 0; }} class="px-2 py-0.5 rounded {activeLang === 'te' ? 'bg-white shadow text-red-600' : 'text-slate-600'}">తెలుగు</button>
+          <button type="button" on:click={() => { activeLang = 'en'; currentIndex = 0; }} class="px-2 py-0.5 rounded {activeLang === 'en' ? 'bg-white shadow text-red-600' : 'text-slate-600'}">EN</button>
         </div>
         <span class="text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded-full font-bold border border-slate-200">
           {filteredShorts.length > 0 ? `${currentIndex + 1}/${filteredShorts.length}` : '0'}
@@ -173,11 +287,9 @@
         </div>
       {:else}
         
-        <!-- AUTO-FIT CARD (bind:this తో కార్డ్‌ను క్యాప్చర్ చేయడానికి సిద్ధం) -->
-        <article 
-          bind:this={cardElement}
-          class="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-200 flex flex-col h-auto relative"
-        >
+        <!-- AUTO-FIT CARD -->
+        <article class="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-200 flex flex-col h-auto relative">
+          
           <!-- మీడియా సెక్షన్ -->
           {#if currentItem.youtube_url && getYouTubeEmbedUrl(currentItem.youtube_url)}
             <div class="relative w-full aspect-video bg-black shrink-0">
@@ -194,7 +306,6 @@
               <img 
                 src={activeMediaIndex === 2 && currentItem.image_url_2 ? currentItem.image_url_2 : currentItem.image_url} 
                 alt={currentItem.title} 
-                crossorigin="anonymous"
                 class="w-full h-auto block object-contain" 
               />
               
@@ -243,7 +354,7 @@
             </p>
           </div>
 
-          <!-- కార్డ్ బ్రాండింగ్ వాటర్‌మార్క్ (పోస్టర్‌లో సేవ్ అయినప్పుడు వస్తుంది) -->
+          <!-- ఫుటర్ వాటర్‌మార్క్ -->
           <div class="px-4 py-1.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 font-semibold">
             <span>{new Date(currentItem.created_at).toLocaleDateString('te-IN', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
             <span class="text-red-600 font-bold">⚡ Nexlify Sphere News</span>
@@ -251,16 +362,16 @@
 
         </article>
 
-        <!-- యాక్షన్ బటన్ల బార్ (కార్డ్ కింద క్లీన్‌గా ఉంటుంది) -->
+        <!-- యాక్షన్ బటన్ల బార్ -->
         <div class="mt-2.5 bg-white rounded-xl p-2 shadow-sm border border-slate-200 flex items-center justify-between gap-1.5">
-          <!-- కార్డ్ పోస్టర్ డౌన్‌లోడ్ -->
+          <!-- కార్డ్ పోస్టర్ బటన్ -->
           <button 
             type="button"
             on:click={downloadCardPoster}
             disabled={isGeneratingPoster}
             class="flex-1 flex items-center justify-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold py-2 px-2.5 rounded-lg transition disabled:opacity-50">
             <span>🖼️</span>
-            <span>{isGeneratingPoster ? 'పోస్టర్ తయారవుతోంది...' : 'కార్డ్ పోస్టర్'}</span>
+            <span>{isGeneratingPoster ? 'డౌన్‌లోడ్ అవుతోంది...' : 'కార్డ్ పోస్టర్'}</span>
           </button>
 
           <!-- వాట్సాప్ -->
@@ -272,7 +383,7 @@
             <span>వాట్సాప్</span>
           </button>
 
-          <!-- మరిన్ని షేరింగ్ ఆప్షన్లు (మోడల్ టోగుల్) -->
+          <!-- ఇతర ఆప్షన్లు -->
           <button 
             type="button"
             on:click={() => showShareModal = !showShareModal}
@@ -282,22 +393,22 @@
           </button>
         </div>
 
-        <!-- సోషల్ మీడియా పాప్-అప్ మోడల్ -->
+        <!-- పాప్-అప్ సోషల్ మోడల్ -->
         {#if showShareModal}
-          <div class="mt-2 bg-slate-900 text-white p-3 rounded-xl shadow-xl flex items-center justify-around gap-2 text-xs font-bold animate-in fade-in duration-200">
-            <button on:click={() => shareTwitter(currentItem)} class="hover:text-sky-400 flex flex-col items-center gap-1">
+          <div class="mt-2 bg-slate-900 text-white p-3 rounded-xl shadow-xl flex items-center justify-around gap-2 text-xs font-bold">
+            <button type="button" on:click={() => shareTwitter(currentItem)} class="hover:text-sky-400 flex flex-col items-center gap-1">
               <span class="text-base">𝕏</span>
               <span class="text-[10px]">Twitter</span>
             </button>
-            <button on:click={shareFacebook} class="hover:text-blue-400 flex flex-col items-center gap-1">
+            <button type="button" on:click={shareFacebook} class="hover:text-blue-400 flex flex-col items-center gap-1">
               <span class="text-base">📘</span>
               <span class="text-[10px]">Facebook</span>
             </button>
-            <button on:click={() => copyLink(currentItem)} class="hover:text-amber-400 flex flex-col items-center gap-1">
+            <button type="button" on:click={() => copyLink(currentItem)} class="hover:text-amber-400 flex flex-col items-center gap-1">
               <span class="text-base">📋</span>
               <span class="text-[10px]">{copySuccess ? 'కాపీ అయ్యింది!' : 'లింక్ కాపీ'}</span>
             </button>
-            <button on:click={() => showShareModal = false} class="text-slate-400 hover:text-white text-xs ml-2">
+            <button type="button" on:click={() => showShareModal = false} class="text-slate-400 hover:text-white text-xs ml-2">
               ✕
             </button>
           </div>
