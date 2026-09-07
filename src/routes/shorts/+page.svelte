@@ -62,38 +62,51 @@
     return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
   }
 
+  // క్రిస్ప్ HD కాన్వాస్ పోస్టర్ జెనరేటర్ (డల్ కలర్స్ లేకుండా ఒరిజినల్ డార్క్ బ్లాక్ టెక్స్ట్)
   async function downloadCardPoster() {
     if (!browser || !currentItem) return;
     isGeneratingPoster = true;
 
     try {
+      // ఫాంట్లు పూర్తిగా లోడ్ అయ్యేలా చూడటం
+      if (document.fonts) {
+        await document.fonts.ready;
+      }
+
       const targetImgUrl = (activeMediaIndex === 2 && currentItem.image_url_2) ? currentItem.image_url_2 : currentItem.image_url;
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       const width = 1080;
-      const height = 1350;
+      const height = 1440; // పర్ఫెక్ట్ 3:4 వర్టికల్ పోస్టర్ సైజ్
 
       canvas.width = width;
       canvas.height = height;
 
+      // బ్యాక్‌గ్రౌండ్ - ప్యూర్ వైట్
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, width, height);
 
+      // టాప్ బ్రాండింగ్ బార్
       ctx.fillStyle = '#0f172a';
-      ctx.fillRect(0, 0, width, 90);
+      ctx.fillRect(0, 0, width, 96);
 
       ctx.fillStyle = '#dc2626';
-      ctx.fillRect(40, 22, 65, 46);
+      ctx.fillRect(40, 24, 70, 48);
 
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 30px sans-serif';
-      ctx.fillText('NS', 52, 56);
+      ctx.font = '900 28px sans-serif';
+      ctx.fillText('NS', 56, 58);
 
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 34px sans-serif';
-      ctx.fillText('NEXLIFY SHORTS', 125, 57);
+      ctx.font = '800 32px sans-serif';
+      ctx.fillText('NEXLIFY SHORTS', 130, 58);
 
-      const bannerHeight = 580;
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = 'bold 22px sans-serif';
+      ctx.fillText('⚡ SPEED NEWS', 860, 58);
+
+      // ఇమేజ్ డ్రాయింగ్
+      const bannerHeight = 620;
       if (targetImgUrl) {
         try {
           const img = new Image();
@@ -104,51 +117,55 @@
             img.src = targetImgUrl;
           });
           if (img.complete && img.naturalWidth > 0) {
-            ctx.drawImage(img, 0, 90, width, bannerHeight);
+            ctx.drawImage(img, 0, 96, width, bannerHeight);
           }
         } catch (imgErr) {
-          console.log('Image render bypass');
+          console.log('Poster image bypass');
         }
       }
 
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
-      ctx.fillRect(40, 90 + bannerHeight - 70, 360, 50);
+      // లొకేషన్ బ్యాడ్జ్
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.82)';
+      ctx.fillRect(40, 96 + bannerHeight - 74, 380, 54);
 
       ctx.fillStyle = '#fbbf24';
       ctx.font = 'bold 24px sans-serif';
-      ctx.fillText(`📍 ${currentItem.location || 'తెలంగాణ'}`, 55, 90 + bannerHeight - 37);
+      ctx.fillText(`📍 ${currentItem.location || 'తెలంగాణ'} • ${currentItem.reporter_name || 'NS Reporter'}`, 55, 96 + bannerHeight - 38);
 
-      ctx.fillStyle = '#0f172a';
-      ctx.font = 'bold 42px sans-serif';
+      // శీర్షిక (హై-కాంట్రాస్ట్ జెట్ బ్లాక్)
+      ctx.fillStyle = '#050811';
+      ctx.font = "bold 46px 'Mandali', 'Noto Sans Telugu', sans-serif";
       
       const titleWords = (currentItem.title || '').split(' ');
       let line = '';
-      let textY = 90 + bannerHeight + 65;
+      let textY = 96 + bannerHeight + 70;
 
       for (let n = 0; n < titleWords.length; n++) {
         const testLine = line + titleWords[n] + ' ';
         const metrics = ctx.measureText(testLine);
         if (metrics.width > 980 && n > 0) {
-          ctx.fillText(line, 45, textY);
+          ctx.fillText(line, 48, textY);
           line = titleWords[n] + ' ';
-          textY += 54;
+          textY += 60;
         } else {
           line = testLine;
         }
       }
-      ctx.fillText(line, 45, textY);
+      ctx.fillText(line, 48, textY);
 
-      textY += 20;
+      // డివైడర్ లైన్
+      textY += 24;
       ctx.strokeStyle = '#e2e8f0';
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.moveTo(45, textY);
-      ctx.lineTo(1035, textY);
+      ctx.moveTo(48, textY);
+      ctx.lineTo(1032, textY);
       ctx.stroke();
 
-      textY += 50;
-      ctx.fillStyle = '#334155';
-      ctx.font = '30px sans-serif';
+      // వార్త బాడీ (క్రిస్ప్ డార్క్ చార్‌కోల్ బ్లాక్ - నో డల్ కలర్)
+      textY += 56;
+      ctx.fillStyle = '#111827';
+      ctx.font = "600 32px 'Mandali', 'Noto Sans Telugu', sans-serif";
 
       const summaryWords = (currentItem.summary || '').split(' ');
       let sumLine = '';
@@ -156,37 +173,61 @@
         const testLine = sumLine + summaryWords[n] + ' ';
         const metrics = ctx.measureText(testLine);
         if (metrics.width > 980 && n > 0) {
-          ctx.fillText(sumLine, 45, textY);
+          ctx.fillText(sumLine, 48, textY);
           sumLine = summaryWords[n] + ' ';
-          textY += 44;
+          textY += 48;
         } else {
           sumLine = testLine;
         }
       }
-      ctx.fillText(sumLine, 45, textY);
+      ctx.fillText(sumLine, 48, textY);
 
+      // ఫుటర్ బ్యానర్
       ctx.fillStyle = '#f8fafc';
       ctx.fillRect(0, height - 90, width, 90);
 
-      ctx.fillStyle = '#94a3b8';
+      ctx.fillStyle = '#64748b';
       ctx.font = 'bold 24px sans-serif';
-      ctx.fillText(currentItem.created_at ? new Date(currentItem.created_at).toLocaleDateString('te-IN', { month: 'short', day: 'numeric', year: 'numeric' }) : '', 45, height - 38);
+      ctx.fillText(currentItem.created_at ? new Date(currentItem.created_at).toLocaleDateString('te-IN', { month: 'short', day: 'numeric', year: 'numeric' }) : '', 48, height - 38);
 
       ctx.fillStyle = '#dc2626';
-      ctx.fillText('⚡ nexlifynucleus.in/shorts', 690, height - 38);
+      ctx.font = '800 24px sans-serif';
+      ctx.fillText('⚡ పూర్తి వార్తలు: nexlifynucleus.in/shorts', 520, height - 38);
 
-      const a = document.createElement('a');
-      a.download = `NS_Shorts_${Date.now()}.jpg`;
-      a.href = canvas.toDataURL('image/jpeg', 0.95);
-      a.click();
+      // మొబైల్ అయితే నేరుగా షేర్ లేదా గ్యాలరీ డౌన్‌లోడ్
+      canvas.toBlob(async (blob) => {
+        if (!blob) return;
+        const file = new File([blob], `NS_Poster_${Date.now()}.jpg`, { type: 'image/jpeg' });
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({
+              files: [file],
+              title: currentItem.title,
+              text: `${currentItem.title}\nhttps://nexlifynucleus.in/shorts`
+            });
+            return;
+          } catch (e) {
+            console.log('Fallback to file download');
+          }
+        }
+
+        const a = document.createElement('a');
+        a.download = `NS_Poster_${Date.now()}.jpg`;
+        a.href = URL.createObjectURL(blob);
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }, 'image/jpeg', 0.98);
+
     } catch (e) {
-      console.error('Poster build error', e);
+      console.error('Poster generation error', e);
       alert('పోస్టర్ డౌన్‌లోడ్ చేయడంలో సమస్య వచ్చింది.');
     } finally {
       isGeneratingPoster = false;
     }
   }
 
+  // వాట్సాప్ షేర్
   async function shareWhatsApp(item) {
     if (!item) return;
     const shareText = `*${item.title || ''}*\n\n${item.summary || ''}\n\n📍 *${item.location || 'తెలంగాణ'}* | NS LIVE\nపూర్తి వివరాలు: https://nexlifynucleus.in/shorts`;
@@ -206,7 +247,7 @@
           return;
         }
       } catch (err) {
-        console.log('Mobile share fallback');
+        console.log('Fallback');
       }
     }
     if (browser) {
@@ -214,17 +255,20 @@
     }
   }
 
+  // X (Twitter) షేర్
   function shareTwitter(item) {
     if (!browser || !item) return;
-    const tweet = `${item.title}\n\nhttps://nexlifynucleus.in/shorts`;
+    const tweet = `${item.title}\n\nపూర్తి వివరాలు చూడండి:\nhttps://nexlifynucleus.in/shorts`;
     window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}`, '_blank');
   }
 
+  // Facebook
   function shareFacebook() {
     if (!browser) return;
     window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent('https://nexlifynucleus.in/shorts')}`, '_blank');
   }
 
+  // కాపీ లింక్
   function copyLink(item) {
     if (!browser || !item) return;
     const textToCopy = `${item.title}\nhttps://nexlifynucleus.in/shorts`;
@@ -236,10 +280,21 @@
 </script>
 
 <svelte:head>
-  <title>NS Shorts - స్పీడ్ న్యూస్</title>
+  <title>{currentItem ? `${currentItem.title} - NS Shorts` : 'NS Shorts - స్పీడ్ న్యూస్'}</title>
+  
+  <!-- X (Twitter) & Open Graph Social Media Cards -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content={currentItem?.title || 'NS Shorts'} />
+  <meta name="twitter:description" content={currentItem?.summary || 'తాజా వార్తలు మరియు ముఖ్యాంశాలు'} />
+  <meta name="twitter:image" content={currentItem?.image_url || 'https://nexlifynucleus.in/favicon.png'} />
+
+  <meta property="og:type" content="article" />
+  <meta property="og:title" content={currentItem?.title || 'NS Shorts'} />
+  <meta property="og:description" content={currentItem?.summary || 'తాజా వార్తలు మరియు ముఖ్యాంశాలు'} />
+  <meta property="og:image" content={currentItem?.image_url || 'https://nexlifynucleus.in/favicon.png'} />
+  <meta property="og:url" content="https://nexlifynucleus.in/shorts" />
 </svelte:head>
 
-<!-- మెయిన్ కంటైనర్: గరిష్ట వెడల్పు 480px (Mobile Format) వద్ద లాక్ చేయబడింది -->
 <div class="w-full min-h-screen bg-slate-900 flex justify-center items-center py-0 sm:py-6 px-0 sm:px-4 font-sans">
   
   <div class="w-full max-w-[480px] bg-slate-100 min-h-screen sm:min-h-0 sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-700/50">
@@ -276,7 +331,6 @@
         </div>
       {:else}
         
-        <!-- AUTO-FIT CARD -->
         <article class="w-full bg-white rounded-2xl overflow-hidden shadow-md border border-slate-200 flex flex-col">
           
           <!-- మీడియా సెక్షన్ -->
@@ -291,7 +345,6 @@
               ></iframe>
             </div>
           {:else}
-            <!-- ఇమేజ్ ఎత్తు గరిష్టంగా 280px మాత్రమే ఉండేలా లాక్ చేయబడింది -->
             <div class="relative w-full h-[240px] sm:h-[280px] bg-slate-950 overflow-hidden shrink-0 flex items-center justify-center">
               <img 
                 src={activeMediaIndex === 2 && currentItem.image_url_2 ? currentItem.image_url_2 : currentItem.image_url} 
@@ -350,7 +403,7 @@
 
         </article>
 
-        <!-- యాక్షన్ బటన్ల బార్ -->
+        <!-- యాక్షన్ బటన్లు -->
         <div class="mt-2.5 bg-white rounded-xl p-2 shadow-sm border border-slate-200 flex items-center justify-between gap-1.5">
           <button 
             type="button"
@@ -358,7 +411,7 @@
             disabled={isGeneratingPoster}
             class="flex-1 flex items-center justify-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold py-2 px-2.5 rounded-lg transition disabled:opacity-50 border border-slate-200">
             <span>🖼️</span>
-            <span>{isGeneratingPoster ? 'డౌన్‌లోడ్...' : 'కార్డ్ పోస్టర్'}</span>
+            <span>{isGeneratingPoster ? 'పోస్టర్ రెడీ...' : 'కార్డ్ పోస్టర్'}</span>
           </button>
 
           <button 
@@ -401,7 +454,7 @@
       {/if}
     </main>
 
-    <!-- నావిగేషన్ బటన్లు -->
+    <!-- నావిగేషన్ -->
     <footer class="bg-white border-t border-slate-200 p-2.5 flex items-center justify-between shrink-0 shadow-sm">
       <button 
         type="button"
