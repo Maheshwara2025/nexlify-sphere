@@ -1,7 +1,6 @@
 <script>
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
-  import { toJpeg } from 'html-to-image';
 
   let shorts = [];
   let loading = true;
@@ -59,14 +58,18 @@
   }
 
   // 1. కార్డ్‌ను పూర్తి పోస్టర్ ఇమేజ్‌గా మార్చి డౌన్‌లోడ్ చేయడం
+  // కార్డ్‌ను పూర్తి పోస్టర్ ఇమేజ్‌గా మార్చి డౌన్‌లోడ్ చేయడం (Client-side dynamic import)
   async function downloadCardPoster() {
     if (!cardElement) return;
     isGeneratingPoster = true;
     try {
+      // సర్వర్ క్రాష్ అవ్వకుండా బ్రౌజర్ లో మాత్రమే డైనమిక్ గా ఇంపోర్ట్ అవుతుంది
+      const { toJpeg } = await import('html-to-image');
+      
       const dataUrl = await toJpeg(cardElement, { 
         quality: 0.95, 
         backgroundColor: '#ffffff',
-        pixelRatio: 2 // క్లియర్ HD రిజల్యూషన్ కోసం
+        pixelRatio: 2
       });
       const a = document.createElement('a');
       a.href = dataUrl;
@@ -81,7 +84,6 @@
       isGeneratingPoster = false;
     }
   }
-
   // 2. వాట్సాప్ షేర్ (ఇమేజ్ లేదా టెక్స్ట్)
   async function shareWhatsApp(item) {
     const shareText = `*${item.title}*\n\n${item.summary}\n\n📍 *${item.location || 'తెలంగాణ'}* | NS LIVE\nపూర్తి వివరాలు: https://nexlifynucleus.in/shorts`;
