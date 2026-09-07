@@ -239,44 +239,47 @@
   <title>NS Shorts - స్పీడ్ న్యూస్</title>
 </svelte:head>
 
-<div class="w-full min-h-screen bg-slate-200/70 flex flex-col items-center p-0 sm:p-4 font-sans text-slate-900">
+<!-- మెయిన్ కంటైనర్: గరిష్ట వెడల్పు 480px (Mobile Format) వద్ద లాక్ చేయబడింది -->
+<div class="w-full min-h-screen bg-slate-900 flex justify-center items-center py-0 sm:py-6 px-0 sm:px-4 font-sans">
   
-  <div class="w-full max-w-md flex flex-col h-full sm:min-h-[92vh]">
+  <div class="w-full max-w-[480px] bg-slate-100 min-h-screen sm:min-h-0 sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-700/50">
     
     <!-- హెడర్ -->
-    <header class="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shrink-0 sm:rounded-t-2xl shadow-sm">
+    <header class="bg-slate-950 px-4 py-3 flex items-center justify-between shrink-0 text-white border-b border-slate-800">
       <div class="flex items-center gap-2">
-        <span class="bg-red-600 text-white font-black text-xs px-2 py-0.5 rounded shadow-sm">NS</span>
-        <span class="text-sm font-black tracking-wider text-slate-900">SHORTS</span>
+        <span class="bg-red-600 text-white font-black text-xs px-2 py-0.5 rounded shadow">NS</span>
+        <span class="text-sm font-black tracking-wider text-white">SHORTS</span>
       </div>
       
       <div class="flex items-center gap-2">
-        <div class="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[11px] font-bold">
-          <button type="button" on:click={() => { activeLang = 'all'; currentIndex = 0; }} class="px-2 py-0.5 rounded {activeLang === 'all' ? 'bg-white shadow text-red-600' : 'text-slate-600'}">అన్నీ</button>
-          <button type="button" on:click={() => { activeLang = 'te'; currentIndex = 0; }} class="px-2 py-0.5 rounded {activeLang === 'te' ? 'bg-white shadow text-red-600' : 'text-slate-600'}">తెలుగు</button>
-          <button type="button" on:click={() => { activeLang = 'en'; currentIndex = 0; }} class="px-2 py-0.5 rounded {activeLang === 'en' ? 'bg-white shadow text-red-600' : 'text-slate-600'}">EN</button>
+        <div class="flex bg-slate-800 p-0.5 rounded-lg border border-slate-700 text-[11px] font-bold">
+          <button type="button" on:click={() => { activeLang = 'all'; currentIndex = 0; }} class="px-2 py-0.5 rounded {activeLang === 'all' ? 'bg-red-600 text-white' : 'text-slate-400'}">అన్నీ</button>
+          <button type="button" on:click={() => { activeLang = 'te'; currentIndex = 0; }} class="px-2 py-0.5 rounded {activeLang === 'te' ? 'bg-red-600 text-white' : 'text-slate-400'}">తెలుగు</button>
+          <button type="button" on:click={() => { activeLang = 'en'; currentIndex = 0; }} class="px-2 py-0.5 rounded {activeLang === 'en' ? 'bg-red-600 text-white' : 'text-slate-400'}">EN</button>
         </div>
-        <span class="text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded-full font-bold border border-slate-200">
+        <span class="text-xs bg-slate-800 text-slate-300 px-2 py-1 rounded-full font-bold border border-slate-700">
           {filteredShorts.length > 0 ? `${currentIndex + 1}/${filteredShorts.length}` : '0'}
         </span>
       </div>
     </header>
 
     <!-- కార్డ్ ఏరియా -->
-    <main class="flex-1 p-2 sm:p-0 flex flex-col justify-start my-auto">
+    <main class="flex-1 flex flex-col p-3 justify-center">
       {#if loading}
         <div class="py-32 flex flex-col items-center justify-center space-y-3">
           <div class="w-8 h-8 border-3 border-red-600 border-t-transparent rounded-full animate-spin"></div>
           <p class="text-xs text-slate-500 font-bold">వార్త లోడ్ అవుతోంది...</p>
         </div>
       {:else if !currentItem}
-        <div class="py-32 text-center text-slate-500 text-sm font-bold bg-white rounded-2xl shadow-sm border border-slate-200 m-2">
+        <div class="py-32 text-center text-slate-500 text-sm font-bold bg-white rounded-2xl shadow-sm border border-slate-200">
           వార్తలు అందుబాటులో లేవు.
         </div>
       {:else}
         
-        <article class="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-200 flex flex-col h-auto relative">
+        <!-- AUTO-FIT CARD -->
+        <article class="w-full bg-white rounded-2xl overflow-hidden shadow-md border border-slate-200 flex flex-col">
           
+          <!-- మీడియా సెక్షన్ -->
           {#if currentItem.youtube_url && getYouTubeEmbedUrl(currentItem.youtube_url)}
             <div class="relative w-full aspect-video bg-black shrink-0">
               <iframe 
@@ -288,11 +291,12 @@
               ></iframe>
             </div>
           {:else}
-            <div class="relative w-full overflow-hidden shrink-0 bg-slate-950">
+            <!-- ఇమేజ్ ఎత్తు గరిష్టంగా 280px మాత్రమే ఉండేలా లాక్ చేయబడింది -->
+            <div class="relative w-full h-[240px] sm:h-[280px] bg-slate-950 overflow-hidden shrink-0 flex items-center justify-center">
               <img 
                 src={activeMediaIndex === 2 && currentItem.image_url_2 ? currentItem.image_url_2 : currentItem.image_url} 
                 alt={currentItem.title || 'News'} 
-                class="w-full h-auto block object-contain" 
+                class="w-full h-full object-contain bg-slate-950" 
               />
               
               <div class="absolute top-3 left-3 bg-red-600 text-white px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider shadow">
@@ -324,33 +328,37 @@
             </div>
           {/if}
 
+          <!-- శీర్షిక -->
           <div class="px-4 pt-3.5 pb-2 border-b border-slate-100">
             <h2 class="text-base sm:text-[17px] font-black text-slate-900 leading-snug tracking-tight">
               {currentItem.title || ''}
             </h2>
           </div>
 
+          <!-- వార్త బాడీ -->
           <div class="px-4 py-3">
-            <p class="text-[14px] sm:text-[14.5px] text-slate-800 leading-relaxed font-normal whitespace-pre-line text-justify">
+            <p class="text-[13.5px] sm:text-[14.5px] text-slate-800 leading-relaxed font-normal whitespace-pre-line text-justify">
               {currentItem.summary || ''}
             </p>
           </div>
 
-          <div class="px-4 py-1.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 font-semibold">
+          <!-- ఫుటర్ వాటర్‌మార్క్ -->
+          <div class="px-4 py-2 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 font-semibold">
             <span>{currentItem.created_at ? new Date(currentItem.created_at).toLocaleDateString('te-IN', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}</span>
             <span class="text-red-600 font-bold">⚡ Nexlify Sphere News</span>
           </div>
 
         </article>
 
+        <!-- యాక్షన్ బటన్ల బార్ -->
         <div class="mt-2.5 bg-white rounded-xl p-2 shadow-sm border border-slate-200 flex items-center justify-between gap-1.5">
           <button 
             type="button"
             on:click={downloadCardPoster}
             disabled={isGeneratingPoster}
-            class="flex-1 flex items-center justify-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold py-2 px-2.5 rounded-lg transition disabled:opacity-50">
+            class="flex-1 flex items-center justify-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold py-2 px-2.5 rounded-lg transition disabled:opacity-50 border border-slate-200">
             <span>🖼️</span>
-            <span>{isGeneratingPoster ? 'డౌన్‌లోడ్ అవుతోంది...' : 'కార్డ్ పోస్టర్'}</span>
+            <span>{isGeneratingPoster ? 'డౌన్‌లోడ్...' : 'కార్డ్ పోస్టర్'}</span>
           </button>
 
           <button 
@@ -393,8 +401,8 @@
       {/if}
     </main>
 
-    <!-- నావిగేషన్ -->
-    <footer class="bg-white border-t border-slate-200 p-2.5 flex items-center justify-between shrink-0 sm:rounded-b-2xl shadow-sm mt-auto">
+    <!-- నావిగేషన్ బటన్లు -->
+    <footer class="bg-white border-t border-slate-200 p-2.5 flex items-center justify-between shrink-0 shadow-sm">
       <button 
         type="button"
         on:click={prevNews} 
