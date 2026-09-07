@@ -1,12 +1,18 @@
 <script>
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
+  import { toJpeg } from 'html-to-image';
 
   let shorts = [];
   let loading = true;
   let activeLang = 'all';
   let currentIndex = 0;
-  let activeMediaIndex = 1; // మల్టిపుల్ ఇమేజెస్ స్విచ్ చేయడానికి (1 or 2)
+  let activeMediaIndex = 1;
+
+  let cardElement; // కార్డ్‌ను స్క్రీన్‌షాట్/పోస్టర్‌గా మార్చడానికి రిఫరెన్స్
+  let isGeneratingPoster = false;
+  let showShareModal = false;
+  let copySuccess = false;
 
   onMount(async () => {
     const { data, error } = await supabase
@@ -23,7 +29,6 @@
   $: filteredShorts = (shorts || []).filter(s => activeLang === 'all' || s.language === activeLang);
   $: currentItem = filteredShorts.length > 0 && currentIndex < filteredShorts.length ? filteredShorts[currentIndex] : null;
 
-  // వార్త మారినప్పుడల్లా మొదటి ఫోటోకు రీసెట్ చేయడం
   $: if (currentItem) {
     activeMediaIndex = 1;
   }
@@ -40,7 +45,6 @@
     }
   }
 
-  // యూట్యూబ్ లింక్ నుండి ఎంబెడ్ URL పొందడం
   function getYouTubeEmbedUrl(url) {
     if (!url) return null;
     let videoId = '';
@@ -54,27 +58,32 @@
     return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
   }
 
-  async function downloadNewsImage(item) {
-    const targetUrl = (activeMediaIndex === 2 && item.image_url_2) ? item.image_url_2 : item.image_url;
-    if (!targetUrl) return;
-
+  // 1. కార్డ్‌ను పూర్తి పోస్టర్ ఇమేజ్‌గా మార్చి డౌన్‌లోడ్ చేయడం
+  async function downloadCardPoster() {
+    if (!cardElement) return;
+    isGeneratingPoster = true;
     try {
-      const response = await fetch(targetUrl);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
+      const dataUrl = await toJpeg(cardElement, { 
+        quality: 0.95, 
+        backgroundColor: '#ffffff',
+        pixelRatio: 2 // క్లియర్ HD రిజల్యూషన్ కోసం
+      });
       const a = document.createElement('a');
-      a.href = url;
-      a.download = `NS-News-${Date.now()}.jpg`;
+      a.href = dataUrl;
+      a.download = `NS_Shorts_${Date.now()}.jpg`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-    } catch (e) {
-      window.open(targetUrl, '_blank');
+    } catch (err) {
+      console.error('Poster generation failed', err);
+      alert('పోస్టర్ డౌన్‌లోడ్ చేయడంలో సమస్య వచ్చింది.');
+    } finally {
+      isGeneratingPoster = false;
     }
   }
 
-  async function shareWithImage(item) {
+  // 2. వాట్సాప్ షేర్ (ఇమేజ్ లేదా టెక్స్ట్)
+  async function shareWhatsApp(item) {
     const shareText = `*${item.title}*\n\n${item.summary}\n\n📍 *${item.location || 'తెలంగాణ'}* | NS LIVE\nపూర్తి వివరాలు: https://nexlifynucleus.in/shorts`;
     const targetUrl = item.image_url;
 
@@ -95,20 +104,37 @@
         console.log('Mobile share fallback');
       }
     }
-
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`, '_blank');
+  }
+
+  // 3. X (Twitter) షేర్
+  function shareTwitter(item) {
+    const tweet = `${item.title}\n\nhttps://nexlifynucleus.in/shorts`;
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}`, '_blank');
+  }
+
+  // 4. Facebook షేర్
+  function shareFacebook() {
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent('https://nexlifynucleus.in/shorts')}`, '_blank');
+  }
+
+  // 5. లింక్ కాపీ
+  function copyLink(item) {
+    const textToCopy = `${item.title}\nhttps://nexlifynucleus.in/shorts`;
+    navigator.clipboard.writeText(textToCopy).then(() => {
+      copySuccess = true;
+      setTimeout(() => copySuccess = false, 2500);
+    });
   }
 </script>
 
 <svelte:head>
   <title>NS Shorts - స్పీడ్ న్యూస్</title>
-  <!-- విభిన్న భాషల Google Fonts లోడింగ్ -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Mandali&family=Noto+Sans+Devanagari:wght@400;700&family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet">
 </svelte:head>
 
-<!-- మెయిన్ కంటైనర్ (ఆహ్లాదకరమైన లైట్ బ్యాక్‌గ్రౌండ్) -->
 <div class="w-full min-h-screen bg-slate-200/70 flex flex-col items-center p-0 sm:p-4 font-sans text-slate-900">
   
   <div class="w-full max-w-md flex flex-col h-full sm:min-h-[92vh]">
@@ -120,7 +146,6 @@
         <span class="text-sm font-black tracking-wider text-slate-900">SHORTS</span>
       </div>
       
-      <!-- భాషల ఫిల్టర్ & సంఖ్య -->
       <div class="flex items-center gap-2">
         <div class="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[11px] font-bold">
           <button on:click={() => { activeLang = 'all'; currentIndex = 0; }} class="px-2 py-0.5 rounded {activeLang === 'all' ? 'bg-white shadow text-red-600' : 'text-slate-600'}">అన్నీ</button>
@@ -146,10 +171,12 @@
         </div>
       {:else}
         
-        <!-- AUTO-FIT CARD -->
-        <article class="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-200 flex flex-col h-auto">
-          
-          <!-- మీడియా సెక్షన్ (యూట్యూబ్ వీడియో లేదా ఫోటోలు) -->
+        <!-- AUTO-FIT CARD (bind:this తో కార్డ్‌ను క్యాప్చర్ చేయడానికి సిద్ధం) -->
+        <article 
+          bind:this={cardElement}
+          class="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-200 flex flex-col h-auto relative"
+        >
+          <!-- మీడియా సెక్షన్ -->
           {#if currentItem.youtube_url && getYouTubeEmbedUrl(currentItem.youtube_url)}
             <div class="relative w-full aspect-video bg-black shrink-0">
               <iframe 
@@ -161,11 +188,11 @@
               ></iframe>
             </div>
           {:else}
-            <!-- ఫోటో వ్యూవర్ (కట్ అవ్వకుండా 100% ఆటో-హైట్) -->
             <div class="relative w-full overflow-hidden shrink-0 bg-slate-950">
               <img 
                 src={activeMediaIndex === 2 && currentItem.image_url_2 ? currentItem.image_url_2 : currentItem.image_url} 
                 alt={currentItem.title} 
+                crossorigin="anonymous"
                 class="w-full h-auto block object-contain" 
               />
               
@@ -173,7 +200,6 @@
                 NS LIVE
               </div>
 
-              <!-- రెండవ ఫోటో ఉంటే స్విచ్ బటన్లు -->
               {#if currentItem.image_url_2}
                 <div class="absolute top-3 right-3 flex items-center gap-1.5 bg-black/60 backdrop-blur px-2 py-1 rounded-full">
                   <button 
@@ -199,7 +225,7 @@
             </div>
           {/if}
 
-          <!-- శీర్షిక (భాషను బట్టి ప్రత్యేక ఫాంట్) -->
+          <!-- శీర్షిక -->
           <div class="px-4 pt-3.5 pb-2 border-b border-slate-100">
             <h2 class="text-base sm:text-[17px] font-black text-slate-900 leading-snug tracking-tight"
                 style="font-family: {currentItem.language === 'te' ? `'Mandali', sans-serif` : currentItem.language === 'hi' ? `'Noto Sans Devanagari', sans-serif` : `'Plus Jakarta Sans', sans-serif`};">
@@ -215,30 +241,65 @@
             </p>
           </div>
 
-          <!-- ఫుటర్ & షేరింగ్ బటన్లు -->
-          <div class="px-4 py-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between shrink-0">
-            <span class="text-xs font-semibold text-slate-400">
-              {currentItem.created_at ? new Date(currentItem.created_at).toLocaleDateString('te-IN', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
-            </span>
-
-            <div class="flex items-center gap-2">
-              <button 
-                type="button"
-                on:click={() => downloadNewsImage(currentItem)}
-                class="flex items-center gap-1 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 text-xs font-bold px-3 py-1.5 rounded-full transition shadow-sm">
-                <span>📥 ఫోటో</span>
-              </button>
-
-              <button 
-                type="button"
-                on:click={() => shareWithImage(currentItem)}
-                class="flex items-center gap-1.5 bg-[#25D366] hover:bg-[#20ba59] text-white text-xs font-black px-3.5 py-1.5 rounded-full shadow transition active:scale-95">
-                <span>📲 వాట్సాప్</span>
-              </button>
-            </div>
+          <!-- కార్డ్ బ్రాండింగ్ వాటర్‌మార్క్ (పోస్టర్‌లో సేవ్ అయినప్పుడు వస్తుంది) -->
+          <div class="px-4 py-1.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 font-semibold">
+            <span>{new Date(currentItem.created_at).toLocaleDateString('te-IN', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+            <span class="text-red-600 font-bold">⚡ Nexlify Sphere News</span>
           </div>
 
         </article>
+
+        <!-- యాక్షన్ బటన్ల బార్ (కార్డ్ కింద క్లీన్‌గా ఉంటుంది) -->
+        <div class="mt-2.5 bg-white rounded-xl p-2 shadow-sm border border-slate-200 flex items-center justify-between gap-1.5">
+          <!-- కార్డ్ పోస్టర్ డౌన్‌లోడ్ -->
+          <button 
+            type="button"
+            on:click={downloadCardPoster}
+            disabled={isGeneratingPoster}
+            class="flex-1 flex items-center justify-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold py-2 px-2.5 rounded-lg transition disabled:opacity-50">
+            <span>🖼️</span>
+            <span>{isGeneratingPoster ? 'పోస్టర్ తయారవుతోంది...' : 'కార్డ్ పోస్టర్'}</span>
+          </button>
+
+          <!-- వాట్సాప్ -->
+          <button 
+            type="button"
+            on:click={() => shareWhatsApp(currentItem)}
+            class="flex items-center justify-center gap-1 bg-[#25D366] hover:bg-[#20ba59] text-white text-xs font-black py-2 px-3.5 rounded-lg shadow-sm transition active:scale-95">
+            <span>📲</span>
+            <span>వాట్సాప్</span>
+          </button>
+
+          <!-- మరిన్ని షేరింగ్ ఆప్షన్లు (మోడల్ టోగుల్) -->
+          <button 
+            type="button"
+            on:click={() => showShareModal = !showShareModal}
+            class="flex items-center justify-center gap-1 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold py-2 px-2.5 rounded-lg transition">
+            <span>🔗</span>
+            <span>ఇతర</span>
+          </button>
+        </div>
+
+        <!-- సోషల్ మీడియా పాప్-అప్ మోడల్ -->
+        {#if showShareModal}
+          <div class="mt-2 bg-slate-900 text-white p-3 rounded-xl shadow-xl flex items-center justify-around gap-2 text-xs font-bold animate-in fade-in duration-200">
+            <button on:click={() => shareTwitter(currentItem)} class="hover:text-sky-400 flex flex-col items-center gap-1">
+              <span class="text-base">𝕏</span>
+              <span class="text-[10px]">Twitter</span>
+            </button>
+            <button on:click={shareFacebook} class="hover:text-blue-400 flex flex-col items-center gap-1">
+              <span class="text-base">📘</span>
+              <span class="text-[10px]">Facebook</span>
+            </button>
+            <button on:click={() => copyLink(currentItem)} class="hover:text-amber-400 flex flex-col items-center gap-1">
+              <span class="text-base">📋</span>
+              <span class="text-[10px]">{copySuccess ? 'కాపీ అయ్యింది!' : 'లింక్ కాపీ'}</span>
+            </button>
+            <button on:click={() => showShareModal = false} class="text-slate-400 hover:text-white text-xs ml-2">
+              ✕
+            </button>
+          </div>
+        {/if}
 
       {/if}
     </main>
