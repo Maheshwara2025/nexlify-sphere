@@ -3,8 +3,6 @@
   import { browser } from '$app/environment';
   import { supabase } from '$lib/supabaseClient';
 
-  export let data;
-
   let shorts = [];
   let loading = true;
   let activeLang = 'all';
@@ -25,13 +23,15 @@
       if (!error && Array.isArray(shortsData)) {
         shorts = shortsData;
 
-        // ఒకవేళ URL లో ?id= ఉంటే ఆ నిర్దిష్ట వార్తను ముందు చూపించడం
-        const urlParams = new URLSearchParams(window.location.search);
-        const targetId = urlParams.get('id');
-        if (targetId) {
-          const foundIdx = shorts.findIndex(s => String(s.id) === String(targetId));
-          if (foundIdx !== -1) {
-            currentIndex = foundIdx;
+        // URL లో ?id= ఉంటే ఆ వార్తను ముందు చూపించడం
+        if (browser) {
+          const urlParams = new URLSearchParams(window.location.search);
+          const targetId = urlParams.get('id');
+          if (targetId) {
+            const foundIdx = shorts.findIndex(s => String(s.id) === String(targetId));
+            if (foundIdx !== -1) {
+              currentIndex = foundIdx;
+            }
           }
         }
       }
@@ -43,7 +43,7 @@
   });
 
   $: filteredShorts = (shorts || []).filter(s => activeLang === 'all' || s.language === activeLang);
-  $: currentItem = filteredShorts.length > 0 && currentIndex < filteredShorts.length ? filteredShorts[currentIndex] : data?.metaItem;
+  $: currentItem = filteredShorts.length > 0 && currentIndex < filteredShorts.length ? filteredShorts[currentIndex] : null;
 
   $: if (currentItem) {
     activeMediaIndex = 1;
@@ -74,7 +74,6 @@
     return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
   }
 
-  // క్రిస్ప్ HD కాన్వాస్ పోస్టర్ జెనరేటర్ (జెట్ బ్లాక్ టెక్స్ట్ & షార్ప్ కాంట్రాస్ట్)
   async function downloadCardPoster() {
     if (!browser || !currentItem) return;
     isGeneratingPoster = true;
@@ -93,11 +92,9 @@
       canvas.width = width;
       canvas.height = height;
 
-      // ప్యూర్ వైట్ బ్యాక్‌గ్రౌండ్
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, width, height);
 
-      // టాప్ బ్రాండింగ్ బార్
       ctx.fillStyle = '#0f172a';
       ctx.fillRect(0, 0, width, 96);
 
@@ -116,7 +113,6 @@
       ctx.font = 'bold 22px sans-serif';
       ctx.fillText('⚡ SPEED NEWS', 860, 58);
 
-      // ఇమేజ్ డ్రాయింగ్
       const bannerHeight = 620;
       if (targetImgUrl) {
         try {
@@ -135,7 +131,6 @@
         }
       }
 
-      // లొకేషన్ బ్యాడ్జ్
       ctx.fillStyle = 'rgba(0, 0, 0, 0.82)';
       ctx.fillRect(40, 96 + bannerHeight - 74, 400, 54);
 
@@ -143,7 +138,6 @@
       ctx.font = 'bold 24px sans-serif';
       ctx.fillText(`📍 ${currentItem.location || 'తెలంగాణ'} • ${currentItem.reporter_name || 'NS Reporter'}`, 55, 96 + bannerHeight - 38);
 
-      // హెడ్‌లైన్ (డీప్ జెట్ బ్లాక్)
       ctx.fillStyle = '#050811';
       ctx.font = "bold 46px 'Mandali', 'Noto Sans Telugu', sans-serif";
       
@@ -164,7 +158,6 @@
       }
       ctx.fillText(line, 48, textY);
 
-      // డివైడర్ లైన్
       textY += 24;
       ctx.strokeStyle = '#e2e8f0';
       ctx.lineWidth = 3;
@@ -173,7 +166,6 @@
       ctx.lineTo(1032, textY);
       ctx.stroke();
 
-      // వార్త సారాంశం (డార్క్ చార్‌కోల్ బ్లాక్)
       textY += 56;
       ctx.fillStyle = '#111827';
       ctx.font = "600 32px 'Mandali', 'Noto Sans Telugu', sans-serif";
@@ -193,7 +185,6 @@
       }
       ctx.fillText(sumLine, 48, textY);
 
-      // ఫుటర్ బ్రాండింగ్
       ctx.fillStyle = '#f8fafc';
       ctx.fillRect(0, height - 90, width, 90);
 
@@ -205,7 +196,6 @@
       ctx.font = '800 24px sans-serif';
       ctx.fillText('⚡ పూర్తి వార్తలు: nexlifynucleus.in/shorts', 520, height - 38);
 
-      // మొబైల్ షేరింగ్ లేదా డౌన్‌లోడ్
       canvas.toBlob(async (blob) => {
         if (!blob) return;
         const file = new File([blob], `NS_Poster_${Date.now()}.jpg`, { type: 'image/jpeg' });
@@ -238,7 +228,6 @@
     }
   }
 
-  // వాట్సాప్ షేర్
   async function shareWhatsApp(item) {
     if (!item) return;
     const shareText = `*${item.title || ''}*\n\n${item.summary || ''}\n\n📍 *${item.location || 'తెలంగాణ'}* | NS LIVE\nపూర్తి వివరాలు: https://nexlifynucleus.in/shorts?id=${item.id}`;
@@ -266,7 +255,6 @@
     }
   }
 
-  // X (Twitter) షేర్
   function shareTwitter(item) {
     if (!browser || !item) return;
     const shareUrl = `https://nexlifynucleus.in/shorts?id=${item.id}`;
@@ -274,14 +262,12 @@
     window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}`, '_blank');
   }
 
-  // Facebook షేర్
   function shareFacebook(item) {
     if (!browser || !item) return;
     const shareUrl = `https://nexlifynucleus.in/shorts?id=${item.id}`;
     window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, '_blank');
   }
 
-  // కాపీ లింక్
   function copyLink(item) {
     if (!browser || !item) return;
     const textToCopy = `${item.title}\nhttps://nexlifynucleus.in/shorts?id=${item.id}`;
@@ -294,22 +280,6 @@
 
 <svelte:head>
   <title>{currentItem ? `${currentItem.title} - NS Shorts` : 'NS Shorts - స్పీడ్ న్యూస్'}</title>
-  
-  <!-- Twitter Card మెటా ట్యాగ్‌లు -->
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:site" content="@NexlifyNews" />
-  <meta name="twitter:title" content={currentItem?.title || 'NS Shorts - స్పీడ్ న్యూస్'} />
-  <meta name="twitter:description" content={currentItem?.summary || 'తాజా వార్తలు మరియు ముఖ్యాంశాలు'} />
-  <meta name="twitter:image" content={currentItem?.image_url || 'https://nexlifynucleus.in/favicon.png'} />
-
-  <!-- Open Graph (Facebook, WhatsApp) మెటా ట్యాగ్‌లు -->
-  <meta property="og:type" content="article" />
-  <meta property="og:title" content={currentItem?.title || 'NS Shorts - స్పీడ్ న్యూస్'} />
-  <meta property="og:description" content={currentItem?.summary || 'తాజా వార్తలు మరియు ముఖ్యాంశాలు'} />
-  <meta property="og:image" content={currentItem?.image_url || 'https://nexlifynucleus.in/favicon.png'} />
-  <meta property="og:image:width" content="1200" />
-  <meta property="og:image:height" content="630" />
-  <meta property="og:url" content={`https://nexlifynucleus.in/shorts${currentItem?.id ? `?id=${currentItem.id}` : ''}`} />
 </svelte:head>
 
 <div class="w-full min-h-screen bg-slate-900 flex justify-center items-center py-0 sm:py-6 px-0 sm:px-4 font-sans">
@@ -454,7 +424,7 @@
               <span class="text-base">𝕏</span>
               <span class="text-[10px]">Twitter</span>
             </button>
-            <button type="button" on:click={() => shareFacebook(currentItem)} class="hover:text-blue-400 flex flex-col items-center gap-1">
+            <button type="button" on:click={shareFacebook} class="hover:text-blue-400 flex flex-col items-center gap-1">
               <span class="text-base">📘</span>
               <span class="text-[10px]">Facebook</span>
             </button>
