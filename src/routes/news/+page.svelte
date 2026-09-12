@@ -196,32 +196,31 @@
                     </div>
                 {/if}
 
-                <!-- ఫోటో గ్యాలరీ సెక్షన్ (తలలు కట్ అవ్వకుండా సరిచేసిన సెటప్) -->
+                <!-- ఫోటో గ్యాలరీ సెక్షన్ (కట్ అవ్వకుండా పూర్తి ఫోటోను సహజంగా చూపే సెటప్) -->
                 {#if article.image_url || article.image_url_2}
                     <div class="grid grid-cols-1 {article.image_url_2 ? 'md:grid-cols-2' : ''} gap-4 mb-6">
                         {#if article.image_url}
-                            <div class="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-950 shadow-xs flex items-center justify-center">
-                                <!-- object-cover object-top తో పైభాగం/తలలు ఖచ్చితంగా కనిపిస్తాయి -->
+                            <div class="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-950 shadow-xs flex items-center justify-center p-1">
+                                <!-- h-auto మరియు object-contain తో ఫోటో ఏమాత్రం కట్ అవ్వదు -->
                                 <img
                                     src={article.image_url}
                                     alt={article.headline}
-                                    class="w-full h-64 sm:h-80 md:h-96 object-cover object-top"
+                                    class="w-full h-auto max-h-[500px] object-contain rounded-xl"
                                 />
-                                <div class="absolute bottom-2.5 right-2.5 bg-black/75 backdrop-blur text-white text-[10px] font-black px-2 py-0.5 rounded shadow uppercase">
+                                <div class="absolute bottom-3 right-3 bg-black/80 backdrop-blur text-white text-[10px] font-black px-2 py-0.5 rounded shadow uppercase">
                                     NS NEWS
                                 </div>
                             </div>
                         {/if}
 
                         {#if article.image_url_2}
-                            <div class="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-950 shadow-xs flex items-center justify-center">
-                                <!-- object-cover object-top తో రెండవ ఫోటోలో కూడా తలలు కట్ కావు -->
+                            <div class="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-950 shadow-xs flex items-center justify-center p-1">
                                 <img
                                     src={article.image_url_2}
                                     alt={article.headline}
-                                    class="w-full h-64 sm:h-80 md:h-96 object-cover object-top"
+                                    class="w-full h-auto max-h-[500px] object-contain rounded-xl"
                                 />
-                                <div class="absolute bottom-2.5 right-2.5 bg-black/75 backdrop-blur text-white text-[10px] font-black px-2 py-0.5 rounded shadow uppercase">
+                                <div class="absolute bottom-3 right-3 bg-black/80 backdrop-blur text-white text-[10px] font-black px-2 py-0.5 rounded shadow uppercase">
                                     NS NEWS
                                 </div>
                             </div>
