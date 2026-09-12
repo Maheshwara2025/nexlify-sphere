@@ -1,59 +1,59 @@
 <script>
     import { page } from '$app/stores';
-    import { onMount } from 'svelte';
     import { supabase } from '$lib/supabaseClient';
 
     let article = null;
     let loading = true;
     let errorMsg = '';
-    let fontSizeLevel = 1; // 0: చిన్నది, 1: సాధారణం, 2: పెద్దది
+    let fontSizeLevel = 1;
 
-    // అక్షరాల పరిమాణం తరగతులు
     const fontSizes = [
         'text-[15px] sm:text-[16px] leading-relaxed',
         'text-[17px] sm:text-[18px] leading-loose',
         'text-[19px] sm:text-[21px] leading-loose'
     ];
 
-    $: articleId = $page.params.id;
+    // URL నుండి ID మారినప్పుడల్లా రియాక్టివ్‌గా డేటా తీసుకురావడం
+    $: if ($page.params.id) {
+        fetchArticle($page.params.id);
+    }
 
-    async function fetchArticle() {
+    async function fetchArticle(id) {
         loading = true;
         errorMsg = '';
         try {
+            // .single() ఫెయిల్ కాకుండా .limit(1) వాడటం అత్యంత సురక్షితం
             const { data, error } = await supabase
                 .from('news_articles')
                 .select('*')
-                .eq('id', articleId)
-                .single();
+                .eq('id', id)
+                .limit(1);
 
             if (error) throw error;
-            article = data;
+            
+            if (data && data.length > 0) {
+                article = data[0];
+            } else {
+                errorMsg = 'వార్త లభించలేదు.';
+            }
         } catch (err) {
             console.error('Error fetching article:', err);
-            errorMsg = 'వార్తను లోడ్ చేయడంలో సమస్య ఏర్పడింది లేదా వార్త అందుబాటులో లేదు.';
+            errorMsg = 'వార్తను లోడ్ చేయడంలో సమస్య ఏర్పడింది.';
         } finally {
             loading = false;
         }
     }
 
-    onMount(() => {
-        fetchArticle();
-    });
-
-    // ప్రింట్ / ఈ-పేపర్ క్లిప్పింగ్ డౌన్‌లోడ్
     function handlePrint() {
         window.print();
     }
 
-    // వాట్సాప్ షేరింగ్
     function shareWhatsApp() {
         if (!article) return;
         const text = `*${article.headline}*\n\n${article.subline_1 || ''}\n\nపూర్తి వివరాలు చదవండి:\nhttps://nexlifynucleus.in/news/${article.id}`;
         window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
     }
 </script>
-
 <svelte:head>
     <title>{article ? `${article.headline} | NS News` : 'NS News | వార్తా వివరాలు'}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
