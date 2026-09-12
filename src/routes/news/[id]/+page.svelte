@@ -1,94 +1,27 @@
 <script>
-	import { page } from '$app/stores';
-	import { goto } from '$app/navigation';
-	import { onMount } from 'svelte';
-	import { supabase } from '$lib/supabaseClient';
-	import html2canvas from 'html2canvas';
+    export let data;
 
-	/** @type {any} */
-	let article = null;
-	/** @type {any[]} */
-	let tickerNews = [];
-	let loading = true;
-	let isClipping = false;
-	let fontSizeLevel = 1; // 0: Small, 1: Normal, 2: Large
+    // సర్వర్ / లోడర్ నుండి నేరుగా ఆర్టికల్ డేటా
+    $: article = data?.article;
+    $: loadError = data?.loadError;
 
-	/** @type {HTMLElement} */
-	let articleElement;
+    let fontSizeLevel = 1;
 
-	const fontSizes = ['text-base leading-relaxed', 'text-lg leading-loose', 'text-xl leading-loose'];
+    const fontSizes = [
+        'text-[15px] sm:text-[16px] leading-relaxed',
+        'text-[17px] sm:text-[18px] leading-loose',
+        'text-[19px] sm:text-[21px] leading-loose'
+    ];
 
-	// Reactive auto-fetch when news ticker item is clicked
-	$: if ($page.params.id) {
-		loadArticleData($page.params.id);
-	}
+    function handlePrint() {
+        window.print();
+    }
 
-	async function loadArticleData(id) {
-		loading = true;
-		try {
-			const { data: artData, error: artError } = await supabase
-				.from('news_articles')
-				.select('*')
-				.eq('id', id)
-				.single();
-
-			if (artError) throw artError;
-			article = artData;
-		} catch (err) {
-			console.error('Error loading article:', err);
-		} finally {
-			loading = false;
-		}
-	}
-
-	async function fetchTickerNews() {
-		try {
-			const { data: tickData } = await supabase
-				.from('news_articles')
-				.select('id, headline, category, location_town, show_in_ticker')
-				.eq('show_in_ticker', true)
-				.order('created_at', { ascending: false });
-
-			tickerNews = tickData || [];
-		} catch (err) {
-			console.error('Error fetching ticker:', err);
-		}
-	}
-
-	onMount(() => {
-		fetchTickerNews();
-	});
-
-	function navigateToArticle(id) {
-		goto(`/news/${id}`);
-	}
-
-	async function downloadEpaperClipping() {
-		if (!articleElement) return;
-		isClipping = true;
-
-		try {
-			const canvas = await html2canvas(articleElement, {
-				scale: 2,
-				useCORS: true,
-				allowTaint: true,
-				backgroundColor: '#fefefe'
-			});
-
-			const image = canvas.toDataURL('image/png');
-			const link = document.createElement('a');
-			link.href = image;
-			link.download = `NS_News_${article.location_town || 'Clipping'}_${Date.now()}.png`;
-			link.click();
-		} catch (error) {
-			console.error('Clipping error:', error);
-			alert('క్లిప్పింగ్ డౌన్‌లోడ్ చేయడంలో సమస్య వచ్చింది. మళ్లీ ప్రయత్నించండి.');
-		} finally {
-			isClipping = false;
-		}
-	}
-
-	$: contentParagraphs = article && article.content ? article.content.split('\n\n').filter(p => p.trim()) : [];
+    function shareWhatsApp() {
+        if (!article) return;
+        const text = `*${article.headline}*\n\n${article.subline_1 || ''}\n\nపూర్తి వివరాలు చదవండి:\nhttps://nexlifynucleus.in/news/${article.id}`;
+        window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+    }
 </script>
 
 <svelte:head>
@@ -166,208 +99,166 @@
 		</div>
 	{/if}
 
-	<main class="max-w-4xl mx-auto px-4 py-8 flex-grow w-full">
-		{#if loading}
-			<div class="text-center py-24 bg-white rounded-3xl border border-slate-200 shadow-sm">
-				<i class="fa-solid fa-circle-notch fa-spin text-4xl text-red-600 mb-3"></i>
-				<p class="text-base text-slate-600 font-bold">వార్త లోడ్ అవుతోంది...</p>
-			</div>
-		{:else if !article}
-			<div class="text-center py-24 bg-white rounded-3xl border border-slate-200 shadow-sm space-y-3">
-				<i class="fa-regular fa-newspaper text-5xl text-slate-300"></i>
-				<h3 class="text-xl font-bold text-slate-800">వార్త లభించలేదు</h3>
-				<a href="/news" class="inline-block bg-red-600 text-white font-bold text-xs px-4 py-2 rounded-xl">
-					← న్యూస్ హోమ్‌కి వెళ్లండి
-				</a>
-			</div>
-		{:else}
-			
-			<!-- Controls Bar (Font Zoom + e-Paper Clipping) -->
-			<div class="flex flex-wrap items-center justify-between gap-3 mb-4 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm">
-				<div class="flex items-center gap-3">
-					<span class="text-xs font-bold text-slate-500">అక్షరాల పరిమాణం:</span>
-					<div class="flex items-center bg-slate-100 rounded-xl p-0.5 border border-slate-200">
-						<button
-							type="button"
-							on:click={() => fontSizeLevel = 0}
-							class="px-3 py-1.5 text-xs font-bold rounded-lg transition-all {fontSizeLevel === 0 ? 'bg-white shadow text-red-600' : 'text-slate-600 hover:text-black'}"
-							title="చిన్న అక్షరాలు"
-						>A-</button>
-						<button
-							type="button"
-							on:click={() => fontSizeLevel = 1}
-							class="px-3 py-1.5 text-xs font-bold rounded-lg transition-all {fontSizeLevel === 1 ? 'bg-white shadow text-red-600' : 'text-slate-600 hover:text-black'}"
-							title="సాధారణ సైజు"
-						>A</button>
-						<button
-							type="button"
-							on:click={() => fontSizeLevel = 2}
-							class="px-3 py-1.5 text-xs font-bold rounded-lg transition-all {fontSizeLevel === 2 ? 'bg-white shadow text-red-600' : 'text-slate-600 hover:text-black'}"
-							title="పెద్ద అక్షరాలు"
-						>A+</button>
-					</div>
-				</div>
+	<!-- మెయిన్ కంటెంట్ -->
+    <main class="max-w-4xl mx-auto px-4 py-6 sm:py-8 flex-grow w-full">
+        {#if !article}
+            <div class="text-center py-20 bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-3">
+                <i class="fa-solid fa-triangle-exclamation text-4xl text-amber-500"></i>
+                <h3 class="text-lg font-bold text-slate-800">వార్త అందుబాటులో లేదు లేదా తొలగించబడింది.</h3>
+                {#if loadError}
+                    <p class="text-xs text-rose-500">{loadError}</p>
+                {/if}
+                <a href="/news" class="inline-block bg-red-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl hover:bg-red-700 transition">
+                    న్యూస్ హోమ్ పేజీకి వెళ్లండి
+                </a>
+            </div>
+        {:else}
 
-				<button
-					type="button"
-					on:click={downloadEpaperClipping}
-					disabled={isClipping}
-					class="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold text-xs sm:text-sm px-4 py-2 rounded-xl flex items-center gap-2 shadow-md transition-all active:scale-95"
-				>
-					<i class="fa-solid {isClipping ? 'fa-circle-notch fa-spin' : 'fa-camera'}"></i>
-					<span>{isClipping ? 'తయారవుతోంది...' : 'e-Paper క్లిప్పింగ్ డౌన్‌లోడ్'}</span>
-				</button>
-			</div>
+            <!-- టూల్‌బార్ (ఫాంట్ సైజ్ & ప్రింట్ బటన్లు) -->
+            <div class="flex items-center justify-between bg-white px-4 py-2.5 rounded-2xl border border-slate-200 shadow-xs mb-4 print:hidden">
+                <div class="flex items-center gap-1.5 text-xs font-bold text-slate-600">
+                    <span>అక్షరాల పరిమాణం:</span>
+                    <button 
+                        type="button" 
+                        on:click={() => fontSizeLevel = 0} 
+                        class="w-7 h-7 rounded-lg border flex items-center justify-center transition {fontSizeLevel === 0 ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-100 hover:bg-slate-200 border-slate-200'}">
+                        A-
+                    </button>
+                    <button 
+                        type="button" 
+                        on:click={() => fontSizeLevel = 1} 
+                        class="w-7 h-7 rounded-lg border flex items-center justify-center transition {fontSizeLevel === 1 ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-100 hover:bg-slate-200 border-slate-200'}">
+                        A
+                    </button>
+                    <button 
+                        type="button" 
+                        on:click={() => fontSizeLevel = 2} 
+                        class="w-7 h-7 rounded-lg border flex items-center justify-center transition {fontSizeLevel === 2 ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-100 hover:bg-slate-200 border-slate-200'}">
+                        A+
+                    </button>
+                </div>
 
-			<!-- 📰 Authentic Newspaper Canvas 📰 -->
-			<div
-				bind:this={articleElement}
-				class="bg-[#fffdfa] rounded-2xl border-2 border-red-950/20 p-6 sm:p-10 shadow-lg space-y-6 text-[#111827]"
-			>
-				<!-- Newspaper Header Banner -->
-				<div class="border-b-4 border-double border-red-950 pb-3 flex items-center justify-between">
-					<div>
-						<h1 class="text-2xl sm:text-3xl font-black font-['Ramabhadra'] text-red-950 tracking-tight leading-none">
-							NS NEWS
-						</h1>
-						<p class="text-[11px] font-bold text-slate-600 uppercase tracking-widest mt-1">తెలుగు దినపత్రిక డిజిటల్ నెట్‌వర్క్</p>
-					</div>
-					<div class="text-right text-xs font-bold text-slate-700">
-						<span class="block text-red-700">{article.location_town || 'తెలంగాణ'}</span>
-						<span>{new Date(article.created_at).toLocaleDateString('te-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
-					</div>
-				</div>
+                <button
+                    type="button"
+                    on:click={handlePrint}
+                    class="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow transition active:scale-95"
+                >
+                    <i class="fa-solid fa-camera"></i>
+                    <span>e-Paper క్లిప్పింగ్ డౌన్‌లోడ్</span>
+                </button>
+            </div>
 
-				<!-- Headline -->
-				<h2 class="text-2xl sm:text-3xl lg:text-4xl font-black text-[#881337] leading-snug tracking-tight font-['Ramabhadra']">
-					{article.headline}
-				</h2>
+            <!-- న్యూస్ పేపర్ స్టైల్ ఆర్టికల్ కార్డ్ -->
+            <article class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-6 sm:p-8 print:p-0 print:border-none print:shadow-none">
+                
+                <!-- పత్రిక మస్త్‌హెడ్ బ్యానర్ -->
+                <div class="border-b-2 border-slate-900 pb-3 mb-5 flex items-end justify-between">
+                    <div>
+                        <h1 class="text-2xl sm:text-3xl font-black text-slate-950 font-['Ramabhadra'] tracking-tight">
+                            NS NEWS
+                        </h1>
+                        <span class="text-[11px] text-slate-500 font-bold block">తెలుగు దినపత్రిక డిజిటల్ నెట్‌వర్క్</span>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-xs font-bold text-slate-900 block">{article.location_town || 'ముత్తారం'}</span>
+                        <span class="text-[11px] text-slate-500 font-medium">
+                            {new Date(article.created_at).toLocaleDateString('te-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                        </span>
+                    </div>
+                </div>
 
-				<!-- Sublines -->
-				{#if article.subline_1}
-					<div class="bg-rose-50/70 border-l-4 border-rose-600 p-4 rounded-r-xl space-y-1">
-						<p class="text-sm sm:text-base font-bold text-rose-950 flex items-start gap-2">
-							<span class="text-rose-600 font-black">•</span> {article.subline_1}
-						</p>
-						{#if article.subline_2}
-							<p class="text-xs sm:text-sm font-semibold text-rose-900 flex items-start gap-2 pl-4">
-								<span class="text-rose-400">•</span> {article.subline_2}
-							</p>
-						{/if}
-						{#if article.subline_3}
-							<p class="text-xs sm:text-sm font-semibold text-rose-900 flex items-start gap-2 pl-4">
-								<span class="text-rose-400">•</span> {article.subline_3}
-							</p>
-						{/if}
-					</div>
-				{/if}
+                <!-- ప్రధాన హెడ్‌లైన్ -->
+                <h2 class="text-xl sm:text-2xl md:text-3xl font-black text-slate-950 leading-snug tracking-tight mb-4 font-['Noto_Sans_Telugu']">
+                    {article.headline}
+                </h2>
 
-				<!-- Dual Images -->
-				{#if article.image_url || article.image_url_2}
-					<div class="grid grid-cols-1 {article.image_url && article.image_url_2 ? 'sm:grid-cols-2' : ''} gap-4 pt-2">
-						{#if article.image_url}
-							<div class="space-y-1.5">
-								<div class="relative overflow-hidden rounded-xl border border-slate-300 bg-slate-100">
-									<img src={article.image_url} alt="News 1" class="w-full h-56 sm:h-64 object-cover" />
-									<span class="absolute bottom-2 right-2 bg-red-600 text-white font-black text-[10px] px-2 py-0.5 rounded shadow">NS NEWS</span>
-								</div>
-								{#if article.image_caption_1}
-									<p class="text-xs text-slate-600 font-semibold bg-slate-100 p-2 rounded-lg border border-slate-200">
-										📷 <strong>చిత్రం:</strong> {article.image_caption_1}
-									</p>
-								{/if}
-							</div>
-						{/if}
+                <!-- సబ్‌లైన్స్ (బుల్లెట్ పాయింట్లు) -->
+                {#if article.subline_1}
+                    <div class="bg-rose-50/60 border-l-4 border-red-600 p-3.5 rounded-r-xl mb-6 space-y-1.5">
+                        <p class="text-sm sm:text-base font-bold text-red-950 flex items-start gap-2">
+                            <span class="text-red-600">•</span> <span>{article.subline_1}</span>
+                        </p>
+                        {#if article.subline_2}
+                            <p class="text-xs sm:text-sm font-semibold text-slate-700 flex items-start gap-2">
+                                <span class="text-red-500">•</span> <span>{article.subline_2}</span>
+                            </p>
+                        {/if}
+                        {#if article.subline_3}
+                            <p class="text-xs sm:text-sm font-semibold text-slate-600 flex items-start gap-2">
+                                <span class="text-red-500">•</span> <span>{article.subline_3}</span>
+                            </p>
+                        {/if}
+                    </div>
+                {/if}
 
-						{#if article.image_url_2}
-							<div class="space-y-1.5">
-								<div class="relative overflow-hidden rounded-xl border border-slate-300 bg-slate-100">
-									<img src={article.image_url_2} alt="News 2" class="w-full h-56 sm:h-64 object-cover" />
-									<span class="absolute bottom-2 right-2 bg-red-600 text-white font-black text-[10px] px-2 py-0.5 rounded shadow">NS NEWS</span>
-								</div>
-								{#if article.image_caption_2}
-									<p class="text-xs text-slate-600 font-semibold bg-slate-100 p-2 rounded-lg border border-slate-200">
-										📷 <strong>చిత్రం:</strong> {article.image_caption_2}
-									</p>
-								{/if}
-							</div>
-						{/if}
-					</div>
-				{/if}
+                <!-- ఫోటో గ్యాలరీ సెక్షన్ (తలలు కట్ అవ్వకుండా స్పష్టమైన డిస్‌ప్లే) -->
+                {#if article.image_url || article.image_url_2}
+                    <div class="grid grid-cols-1 {article.image_url_2 ? 'md:grid-cols-2' : ''} gap-4 mb-6">
+                        {#if article.image_url}
+                            <div class="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-950 shadow-xs flex items-center justify-center p-1">
+                                <img
+                                    src={article.image_url}
+                                    alt={article.headline}
+                                    class="w-full h-auto max-h-[460px] object-contain rounded-xl"
+                                />
+                                <div class="absolute bottom-3 right-3 bg-black/80 backdrop-blur text-white text-[10px] font-black px-2 py-0.5 rounded shadow uppercase">
+                                    NS NEWS
+                                </div>
+                            </div>
+                        {/if}
 
-				<!-- Main News Body with In-Article Ad Box -->
-				<div class="pt-2 {fontSizes[fontSizeLevel]} text-slate-900 font-medium space-y-4 whitespace-pre-line text-justify">
-					{#if contentParagraphs.length > 0}
-						<p>
-							{#if article.location_town}
-								<span class="bg-red-50 text-red-800 border border-red-300 font-black px-2.5 py-1 rounded-md text-sm mr-2 inline-block shadow-2xs">
-									{article.location_town} (NS News):
-								</span>
-							{/if}
-							{contentParagraphs[0]}
-						</p>
+                        {#if article.image_url_2}
+                            <div class="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-950 shadow-xs flex items-center justify-center p-1">
+                                <img
+                                    src={article.image_url_2}
+                                    alt={article.headline}
+                                    class="w-full h-auto max-h-[460px] object-contain rounded-xl"
+                                />
+                                <div class="absolute bottom-3 right-3 bg-black/80 backdrop-blur text-white text-[10px] font-black px-2 py-0.5 rounded shadow uppercase">
+                                    NS NEWS
+                                </div>
+                            </div>
+                        {/if}
+                    </div>
+                {/if}
 
-						<!-- In-Article Sponsor Ad -->
-						<div class="my-6 bg-gradient-to-r from-orange-50 via-amber-50 to-orange-50 border-2 border-orange-400 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm not-prose">
-							<div class="flex items-center gap-3.5">
-								<div class="w-11 h-11 bg-orange-600 text-white rounded-xl flex items-center justify-center font-black text-xl shrink-0 shadow">
-									<i class="fa-solid fa-bullhorn"></i>
-								</div>
-								<div>
-									<span class="text-[10px] font-black uppercase tracking-wider text-orange-800 bg-orange-200/80 px-2 py-0.5 rounded">
-										ప్రకటన / Local Sponsor
-									</span>
-									<h4 class="text-sm sm:text-base font-black text-slate-900 mt-0.5">మీ వ్యాపార ప్రకటన ఇక్కడ ఇవ్వండి!</h4>
-									<p class="text-xs text-slate-600">అతి తక్కువ ధరకు వేలాది మంది పాఠకులకు మీ షాప్ లేదా సర్వీస్ ప్రచారం చేసుకోండి.</p>
-								</div>
-							</div>
-							<a
-								href="https://wa.me/919502336495?text=Hello,%20I%20want%20to%20place%20an%20Ad%20in%20NS%20News"
-								target="_blank"
-								rel="noreferrer"
-								class="shrink-0 bg-slate-950 hover:bg-black text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow flex items-center gap-2 transition-all active:scale-95"
-							>
-								<i class="fa-brands fa-whatsapp text-emerald-400 text-base"></i>
-								<span>WhatsApp బుకింగ్</span>
-							</a>
-						</div>
+                <!-- లొకేషన్ & రిపోర్టర్ బైలైన్ -->
+                <div class="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100 text-xs sm:text-sm font-bold text-slate-700">
+                    <span class="bg-red-100 text-red-800 px-2.5 py-0.5 rounded-md">
+                        {article.location_town || 'ముత్తారం'} (NS News)
+                    </span>
+                    <span>:</span>
+                    <span class="text-slate-500 font-medium">
+                        {article.reporter_name ? `${article.reporter_name} ప్రతినిధి` : 'ముత్తారం ప్రతినిధి'}, {new Date(article.created_at).toLocaleDateString('te-IN', { day: 'numeric', month: 'long' })}
+                    </span>
+                </div>
 
-						{#each contentParagraphs.slice(1) as para}
-							<p>{para}</p>
-						{/each}
-					{:else}
-						<p>{article.content}</p>
-					{/if}
-				</div>
+                <!-- వార్త పూర్తి సమాచారం (బాడీ టెక్స్ట్) -->
+                <div class="text-slate-900 font-normal whitespace-pre-line text-justify {fontSizes[fontSizeLevel]} font-['Noto_Sans_Telugu']">
+                    {article.content || article.summary}
+                </div>
 
-				<!-- Newspaper Clip Footer Credit -->
-				<div class="border-t-2 border-slate-300 pt-3 flex items-center justify-between text-[11px] font-bold text-slate-500">
-					<span>A.S.V Enterprises Digital Media Network</span>
-					<span>www.nexlify-sphere.pages.dev</span>
-				</div>
-			</div>
+                <!-- వార్త కింద సోషల్ షేరింగ్ బటన్ -->
+                <div class="mt-8 pt-4 border-t border-slate-200 flex items-center justify-between print:hidden">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold text-slate-500">ఈ వార్తను షేర్ చేయండి:</span>
+                        <button
+                            type="button"
+                            on:click={shareWhatsApp}
+                            class="bg-[#25D366] hover:bg-[#20ba59] text-white text-xs font-bold px-3.5 py-1.5 rounded-full flex items-center gap-1.5 shadow transition active:scale-95"
+                        >
+                            <i class="fa-brands fa-whatsapp text-sm"></i> <span>WhatsApp</span>
+                        </button>
+                    </div>
 
-			<!-- Bottom Sponsor Ad Box -->
-			<div class="mt-6 bg-gradient-to-r from-orange-500 via-amber-500 to-rose-600 rounded-2xl p-5 text-white shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
-				<div class="space-y-1 text-center sm:text-left">
-					<span class="text-[10px] font-black uppercase tracking-wider bg-black/30 px-2 py-0.5 rounded inline-block">
-						వాణిజ్య ప్రకటన / Sponsor Ad
-					</span>
-					<h4 class="text-base sm:text-lg font-black">మీ వ్యాపార ప్రకటనల కోసం సంప్రదించండి</h4>
-					<p class="text-xs text-orange-100">అతి తక్కువ ధరలో స్థానిక ప్రజలకు మీ వ్యాపారాన్ని చేరవేయండి.</p>
-				</div>
-				<a
-					href="https://wa.me/919502336495?text=Hello,%20I%20want%20to%20place%20an%20Advertisement%20in%20NS%20News"
-					target="_blank"
-					rel="noreferrer"
-					class="shrink-0 bg-slate-950 hover:bg-black text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow flex items-center gap-2 transition-all active:scale-95"
-				>
-					<i class="fa-brands fa-whatsapp text-emerald-400 text-base"></i>
-					<span>WhatsApp లో బుక్ చేయండి</span>
-				</a>
-			</div>
-		{/if}
-	</main>
+                    <a href="/news" class="text-xs font-bold text-red-600 hover:text-red-700 flex items-center gap-1">
+                        <span>ఇతర వార్తలు చూడండి</span> <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                    </a>
+                </div>
+
+            </article>
+        {/if}
+    </main>
 
 	<!-- Mobile Floating WhatsApp Share Bar -->
 	{#if article}
