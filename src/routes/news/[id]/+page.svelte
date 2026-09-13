@@ -200,12 +200,13 @@
         {/if}
 
         <!-- 🚀 ఐడియా 2 & 3: లేటెస్ట్ ఇంటరాక్టివ్ మీడియా స్లైడర్ (Portrait & Landscape రెండింటికీ సమతుల్యమైన పరిష్కారం) -->
+        <!-- 🚀 లేటెస్ట్ మీడియా వ్యూయర్: ఖాళీ స్పేస్ లేకుండా బ్లర్డ్ బ్యాక్‌గ్రౌండ్ & వాటర్‌మార్క్ కవర్ సెటప్ -->
         {#if mediaList.length > 0}
-          <div class="relative w-full rounded-2xl overflow-hidden border border-slate-200 bg-slate-950 shadow-md mb-6 flex items-center justify-center min-h-[320px] sm:min-h-[420px] max-h-[500px]">
+          <div class="relative w-full rounded-2xl overflow-hidden border border-slate-200 bg-slate-950 shadow-md mb-6 flex items-center justify-center h-[340px] sm:h-[440px] select-none">
             
             <!-- ఫోటో / వీడియో డిస్‌ప్లే -->
             {#if mediaList[activeMediaIndex].type === 'video'}
-              <div class="w-full aspect-video">
+              <div class="w-full h-full aspect-video z-10">
                 <iframe
                   src={mediaList[activeMediaIndex].url}
                   title={article.headline}
@@ -215,23 +216,29 @@
                 ></iframe>
               </div>
             {:else}
-              <!-- డైనమిక్ ఇమేజ్ వ్యూయర్: ఫుల్ ఫోటో ఏదీ కట్ కాకుండా object-contain లో కనిపిస్తుంది -->
-              <div class="w-full h-full flex items-center justify-center p-1 sm:p-2">
+              <!-- 1. వెనుక బ్లర్డ్ బ్యాక్‌గ్రౌండ్ (నల్లటి ఖాళీని నింపడానికి) -->
+              <div 
+                class="absolute inset-0 bg-cover bg-center blur-2xl scale-125 opacity-40 pointer-events-none"
+                style="background-image: url('{mediaList[activeMediaIndex].url}');"
+              ></div>
+
+              <!-- 2. ముందు అసలైన క్లియర్ ఫోటో (మనుషులు ఎవరూ కట్ అవ్వకుండా సెంటర్ డిస్‌ప్లే) -->
+              <div class="relative z-10 w-full h-full flex items-center justify-center p-1 sm:p-2 pb-6">
                 <img
                   src={mediaList[activeMediaIndex].url}
                   alt={article.headline}
-                  class="max-h-[460px] w-auto max-w-full object-contain cursor-zoom-in"
+                  class="max-h-full max-w-full object-contain cursor-zoom-in drop-shadow-2xl rounded-lg"
                   on:click={() => isLightboxOpen = true}
                 />
               </div>
             {/if}
 
-            <!-- యారో నావిగేషన్ బటన్లు (ఒకటి కంటే ఎక్కువ మీడియా ఉన్నప్పుడు మాత్రమే కనిపిస్తాయి) -->
+            <!-- యారో నావిగేషన్ బటన్లు (1 కంటే ఎక్కువ ఉన్నప్పుడు) -->
             {#if mediaList.length > 1}
               <button
                 type="button"
                 on:click={prevMedia}
-                class="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center backdrop-blur shadow-lg transition active:scale-95 border border-white/20 z-20"
+                class="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center backdrop-blur shadow-lg transition active:scale-95 border border-white/20 z-20"
                 aria-label="మునుపటి ఫోటో"
               >
                 <i class="fa-solid fa-chevron-left text-sm"></i>
@@ -240,28 +247,30 @@
               <button
                 type="button"
                 on:click={nextMedia}
-                class="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center backdrop-blur shadow-lg transition active:scale-95 border border-white/20 z-20"
+                class="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center backdrop-blur shadow-lg transition active:scale-95 border border-white/20 z-20"
                 aria-label="తర్వాతి ఫోటో"
               >
                 <i class="fa-solid fa-chevron-right text-sm"></i>
               </button>
 
-              <!-- మీడియా కౌంటర్ బ్యాడ్జ్ (ఉదా: 1/2, 2/2) -->
-              <div class="absolute top-3 right-3 bg-black/75 backdrop-blur text-white text-xs font-bold px-2.5 py-1 rounded-full border border-white/10 z-20">
+              <!-- మీడియా కౌంటర్ (1/2, 2/2) -->
+              <div class="absolute top-3 right-3 bg-black/75 backdrop-blur text-white text-xs font-bold px-2.5 py-1 rounded-full border border-white/10 z-20 shadow">
                 {activeMediaIndex + 1} / {mediaList.length}
               </div>
             {/if}
 
-            <!-- వాటర్‌మార్క్ మాస్క్ & బ్రాండింగ్ స్ట్రిప్ -->
-            <div class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent pt-4 pb-2 px-4 flex items-center justify-between text-white text-xs font-bold z-20">
-              <span class="text-amber-400">📍 {article.location_town || 'ముత్తారం'} • {article.reporter_name || 'NS ప్రతినిధి'}</span>
-              <div class="flex items-center gap-2">
+            <!-- 3. వాటర్‌మార్క్ మాస్క్ స్ట్రిప్ (కెమెరా పేరు దాచేస్తూ NS NEWS బ్రాండింగ్) -->
+            <div class="absolute bottom-0 inset-x-0 h-11 bg-gradient-to-t from-black via-black/90 to-transparent px-4 flex items-center justify-between text-white text-xs font-bold z-20">
+              <span class="text-amber-400 truncate max-w-[220px] sm:max-w-none">
+                📍 {article.location_town || 'ముత్తారం'} • {article.reporter_name || 'NS ప్రతినిధి'}
+              </span>
+              <div class="flex items-center gap-2 shrink-0">
                 {#if mediaList[activeMediaIndex].type === 'image'}
-                  <button type="button" on:click={() => isLightboxOpen = true} class="text-[10px] text-slate-300 hover:text-white underline">
+                  <button type="button" on:click={() => isLightboxOpen = true} class="text-[11px] text-slate-300 hover:text-white underline hidden sm:inline">
                     🔍 ఫుల్ స్క్రీన్
                   </button>
                 {/if}
-                <span class="bg-red-600 text-white text-[9px] px-2 py-0.5 rounded font-black tracking-wider uppercase">NS NEWS</span>
+                <span class="bg-red-600 text-white text-[10px] px-2 py-0.5 rounded font-black tracking-wider uppercase shadow">NS NEWS</span>
               </div>
             </div>
 
