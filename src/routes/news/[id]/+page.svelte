@@ -206,9 +206,9 @@
           </div>
         {/if}
 
-        <!-- 🚀 ఆటో-అడాప్టివ్ మీడియా వ్యూయర్ (ఫోటో ఆస్పెక్ట్ రేషియో ఎలాంటిదైనా పర్ఫెక్ట్ ఫిట్ అయ్యే లేఅవుట్) -->
+  <!-- 🚀 ఆటో-అడాప్టివ్ మీడియా వ్యూయర్ (పక్కా బ్లర్ బ్యాక్‌డ్రాప్ & 100% వాటర్‌మార్క్ మాస్క్) -->
         {#if mediaList.length > 0}
-          <div class="relative w-full rounded-2xl overflow-hidden border border-slate-200 bg-slate-950 shadow-md mb-6 flex items-center justify-center h-[340px] sm:h-[440px] select-none">
+          <div class="relative w-full rounded-2xl overflow-hidden border border-slate-300 bg-slate-900 shadow-md mb-6 flex items-center justify-center h-[360px] sm:h-[450px] select-none">
             
             {#if mediaList[activeMediaIndex].type === 'video'}
               <div class="w-full h-full aspect-video z-10">
@@ -221,31 +221,32 @@
                 ></iframe>
               </div>
             {:else}
-              <!-- 1. వెనుక బ్లర్డ్ బ్యాక్‌గ్రౌండ్ ఇమేజ్ -->
+              <!-- 1. ఇన్‌లైన్ బ్లర్ బ్యాక్‌గ్రౌండ్ (Tailwind క్లాస్ ఫెయిల్ అయినా 100% పని చేస్తుంది) -->
               <img
                 src={mediaList[activeMediaIndex].url}
                 alt=""
                 aria-hidden="true"
-                class="absolute inset-0 w-full h-full object-cover blur-2xl opacity-60 scale-125 pointer-events-none"
+                style="filter: blur(25px) brightness(0.65); transform: scale(1.25);"
+                class="absolute inset-0 w-full h-full object-cover pointer-events-none"
               />
 
-              <!-- 2. ముందు అసలైన ఫోటో (మనుషులు ఎవరూ కట్ అవ్వకుండా సెంటర్‌లో ఆటో ఫిట్) -->
-              <div class="relative z-10 w-full h-full flex items-center justify-center p-2">
+              <!-- 2. ముందు భాగం: అసలైన ఫోటో (మనుషులు ఎవరూ కట్ అవ్వకుండా సెంటర్ ఫిట్) -->
+              <div class="relative z-10 w-full h-full flex items-center justify-center p-2 pb-6">
                 <img
                   src={mediaList[activeMediaIndex].url}
                   alt={article.headline}
-                  class="max-h-full max-w-full object-contain cursor-zoom-in drop-shadow-2xl rounded-md"
+                  class="max-h-[300px] sm:max-h-[380px] max-w-full object-contain cursor-zoom-in drop-shadow-2xl rounded-md"
                   on:click={() => isLightboxOpen = true}
                 />
               </div>
             {/if}
 
-            <!-- యారో కంట్రోల్స్ (ఒకటి కంటే ఎక్కువ మీడియా ఉన్నప్పుడు) -->
+            <!-- యారో కంట్రోల్స్ (ఒకటి కంటే ఎక్కువ ఉన్నప్పుడు) -->
             {#if mediaList.length > 1}
               <button
                 type="button"
                 on:click={prevMedia}
-                class="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center backdrop-blur shadow-lg transition active:scale-95 border border-white/20 z-20"
+                class="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center shadow-lg transition active:scale-95 border border-white/20 z-30"
                 aria-label="మునుపటి ఫోటో"
               >
                 <i class="fa-solid fa-chevron-left text-sm"></i>
@@ -254,19 +255,19 @@
               <button
                 type="button"
                 on:click={nextMedia}
-                class="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center backdrop-blur shadow-lg transition active:scale-95 border border-white/20 z-20"
+                class="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center shadow-lg transition active:scale-95 border border-white/20 z-30"
                 aria-label="తర్వాతి ఫోటో"
               >
                 <i class="fa-solid fa-chevron-right text-sm"></i>
               </button>
 
-              <div class="absolute top-3 right-3 bg-black/80 backdrop-blur text-white text-xs font-bold px-2.5 py-1 rounded-full border border-white/10 z-20 shadow">
+              <div class="absolute top-3 right-3 bg-black/80 text-white text-xs font-bold px-2.5 py-1 rounded-full border border-white/20 z-30 shadow">
                 {activeMediaIndex + 1} / {mediaList.length}
               </div>
             {/if}
 
-            <!-- 3. వాటర్‌మార్క్ మాస్కింగ్ బాటమ్ బార్ -->
-            <div class="absolute bottom-0 inset-x-0 h-12 bg-black/95 border-t border-white/10 px-4 flex items-center justify-between text-white text-xs font-bold z-20 shadow-2xl">
+            <!-- 3. వాటర్‌మార్క్ మాస్కింగ్ ఘనమైన బార్ (హైట్ 48px, z-30 తో పక్కాగా కెమెరా పేరు కవర్ అవుతుంది) -->
+            <div class="absolute bottom-0 inset-x-0 h-12 bg-slate-950 border-t border-slate-700/80 px-4 flex items-center justify-between text-white text-xs font-bold z-30 shadow-2xl">
               <span class="text-amber-400 truncate max-w-[200px] sm:max-w-none">
                 📍 {article.location_town || 'ముత్తారం'} • {article.reporter_name || 'NS ప్రతినిధి'}
               </span>
