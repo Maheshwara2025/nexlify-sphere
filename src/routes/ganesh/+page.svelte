@@ -7,19 +7,23 @@
   let flowers = [];
   let isHarathiActive = false;
   let isBellRinging = false;
-  let isCoconutCracking = false;
+  let isCoconutBroken = false;
   let showCopied = false;
   let mantraPlaying = false;
-  let currentChantText = '';
+  let currentBlessing = '';
 
-  let shankhAudio;
-  let coconutAudio;
+  const blessingsList = [
+    'ఆయురారోగ్య ఐశ్వర్య సిద్ధిరస్తు! సర్వ కార్యములు నిర్విఘ్నంగా నెరవేరుగాక!',
+    'శ్రీ సిద్ధి బుద్ధి సమేత గణపతి కృపాకటాక్షాలతో మీ ఇంట సిరిసంపదలు వర్ధిల్లుగాక!',
+    'విఘ్నాలు తొలగి, చేపట్టిన ప్రతి పనిలోనూ విజయము, కీర్తి ప్రతిష్టలు లభించుగాక!',
+    'సకల విద్యా బుద్ధులు, వ్యాపార అభివృద్ధి, సంతోషకరమైన కుటుంబ జీవనం కలుగుగాక!'
+  ];
 
   // వాట్సాప్ షేరింగ్ లింక్ జనరేటర్
   $: targetName = senderName.trim() || 'శ్రీనివాస్';
   $: shareUrl = `https://nexlifynucleus.in/ganesh?from=${encodeURIComponent(targetName)}`;
   $: whatsappLink = `https://api.whatsapp.com/send?text=${encodeURIComponent(
-    `*🕉️ శ్రీ వినాయక చవితి మహోత్సవ శుభాకాంక్షలు!* 🐘🪔\n\nమీకు మరియు మీ కుటుంబ సభ్యులకు *${targetName}* పంపిన ప్రత్యేక దివ్య దర్శనం, వేద మంత్రోచ్ఛారణ & మహా హారతిని ఇక్కడ దర్శించుకోండి:\n👇 వెంటనే క్లిక్ చేసి గణపతి ఆశీస్సులు పొందండి:\n${shareUrl}\n\n_A.S.V. Enterprises, ముత్తారం (CSC ID: 514542450010)_`
+    `*🕉️ శ్రీ వినాయక చవితి మహోత్సవ శుభాకాంక్షలు!* 🐘🪔\n\nమీకు మరియు మీ కుటుంబ సభ్యులకు *${targetName}* పంపిన ప్రత్యేక దివ్య దర్శనం, వేద శ్లోకం, హారతి & కొబ్బరి పువ్వు ఆశీస్సులు ఇక్కడ పొందండి:\n👇 వెంటనే క్లిక్ చేయండి:\n${shareUrl}\n\n_A.S.V. Enterprises, ముత్తారం (CSC ID: 514542450010)_`
   )}`;
 
   const patralu = [
@@ -38,11 +42,11 @@
     }
   });
 
-  // పూల వర్షం (3D Confetti Flowers)
+  // పూల వర్షం
   function triggerFlowerShower() {
     const icons = ['🌺', '🌸', '🌼', '💐', '🍃', '✨', '🏵️'];
     const items = [];
-    for (let i = 0; i < 45; i++) {
+    for (let i = 0; i < 40; i++) {
       items.push({
         id: Math.random(),
         icon: icons[Math.floor(Math.random() * icons.length)],
@@ -55,77 +59,89 @@
     setTimeout(() => { flowers = []; }, 5000);
   }
 
-  // 🔔 నిజమైన ఆలయ కంచు గంట (Web Audio API డీప్ బ్రాస్ ఎకో)
+  // 🔔 ఆలయ కంచు గంట ధ్వని (Temple Brass Acoustics)
   function ringTempleBell() {
     isBellRinging = true;
-    if (navigator.vibrate) navigator.vibrate([120, 60, 120]);
+    if (navigator.vibrate) navigator.vibrate([150, 80, 150]);
 
     try {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      const ctx = new AudioContext();
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      const ctx = new AudioCtx();
 
-      // కంచు గంట ఫ్రీక్వెన్సీలు (Harmonics)
-      const freqs = [587.33, 880, 1174.66, 1760]; // D5, A5, D6, A6 నోట్స్
-      freqs.forEach((freq, idx) => {
+      // ఆలయ కంచు గంట హార్మోనిక్స్
+      const partials = [
+        { f: 520, gain: 0.5, decay: 3.5 },
+        { f: 1040, gain: 0.35, decay: 2.8 },
+        { f: 1560, gain: 0.25, decay: 2.0 },
+        { f: 2080, gain: 0.15, decay: 1.5 },
+        { f: 2600, gain: 0.08, decay: 1.0 }
+      ];
+
+      partials.forEach(p => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
 
-        osc.type = idx === 0 ? 'sine' : 'triangle';
-        osc.frequency.setValueAtTime(freq, ctx.currentTime);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(p.f, ctx.currentTime);
 
-        gain.gain.setValueAtTime(0.4 / (idx + 1), ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 2.5);
+        gain.gain.setValueAtTime(p.gain, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + p.decay);
 
         osc.connect(gain);
         gain.connect(ctx.destination);
 
         osc.start();
-        osc.stop(ctx.currentTime + 2.5);
+        osc.stop(ctx.currentTime + p.decay);
       });
-    } catch (e) {
-      console.log('AudioContext not supported');
+    } catch (err) {
+      console.log('Audio Context Error', err);
     }
 
     setTimeout(() => { isBellRinging = false; }, 2000);
   }
 
-  // 🥥 కొబ్బరికాయ కొట్టడం
-  function breakCoconut() {
-    isCoconutCracking = true;
-    if (navigator.vibrate) navigator.vibrate([150, 50, 150]);
-    if (coconutAudio) {
-      coconutAudio.currentTime = 0;
-      coconutAudio.play().catch(() => {});
-    }
+  // 🥥 కొబ్బరికాయ కొట్టడం -> 2 చెక్కలు + కొబ్బరి పువ్వు దర్శనం + ఆశీస్సులు
+  function handleBreakCoconut() {
+    isCoconutBroken = true;
+    currentBlessing = blessingsList[Math.floor(Math.random() * blessingsList.length)];
+    
+    if (navigator.vibrate) navigator.vibrate([200, 100, 300]);
+
+    // కొబ్బరికాయ పగిలే క్రాక్ శబ్దం
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(140, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(30, ctx.currentTime + 0.35);
+      gain.gain.setValueAtTime(0.8, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.35);
+    } catch (e) {}
+
     triggerFlowerShower();
-    setTimeout(() => { isCoconutCracking = false; }, 3500);
+    ringTempleBell();
   }
 
-  // 🪔 మహా హారతి + పవిత్ర శ్లోక పఠనం (Mantra Chanting)
-  function startMahaHarathi() {
+  // 🪔 హారతి పళ్లెం తిప్పడం + శ్లోక పఠనం
+  function startAartiWithShlokam() {
     isHarathiActive = true;
     mantraPlaying = true;
-    currentChantText = 'శుక్లాంబరధరం విష్ణుం శశివర్ణం చతుర్భుజం | ప్రసన్నవదనం ధ్యాయేత్ సర్వవిఘ్నోపశాంతయే ||';
 
-    if (navigator.vibrate) navigator.vibrate([80, 50, 80, 50, 200]);
-    
-    // ఆలయ గంట మోగించడం
     ringTempleBell();
     triggerFlowerShower();
 
-    // శంఖ నాదం
-    if (shankhAudio) {
-      shankhAudio.currentTime = 0;
-      shankhAudio.play().catch(() => {});
-    }
-
-    // వాయిస్ ఇంజిన్ ద్వారా శ్లోక పఠనం
     if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel(); // పాతది ఉంటే ఆపడం
-      const chant = new SpeechSynthesisUtterance("శుక్లాంబరధరం విష్ణుం, శశివర్ణం చతుర్భుజం. ప్రసన్నవదనం ధ్యాయేత్, సర్వవిఘ్నోపశాంతయే. ఓం శ్రీ మహాగణాధిపతయే నమః, కర్పూర నీరాజనం సమర్పయామి.");
+      window.speechSynthesis.cancel();
+      const chant = new SpeechSynthesisUtterance("శుక్లాంబరధరం విష్ణుం, శశివర్ణం చతుర్భుజం, ప్రసన్నవదనం ధ్యాయేత్, సర్వ విఘ్నోప శాంతయే. ఓం శ్రీ మహాగణాధిపతయే నమః, కర్పూర నీరాజనం సమర్పయామి.");
       chant.lang = 'te-IN';
-      chant.rate = 0.85; // గంభీరమైన వేద శైలి స్పీడ్
-      chant.pitch = 0.95;
+      chant.rate = 0.82;
+      chant.pitch = 0.92;
 
       chant.onend = () => {
         mantraPlaying = false;
@@ -142,9 +158,7 @@
   }
 
   function stopMantra() {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
     mantraPlaying = false;
     isHarathiActive = false;
   }
@@ -157,16 +171,12 @@
 </script>
 
 <svelte:head>
-  <title>{fromParam ? `${decodeURIComponent(fromParam)} గారి వినాయక చవితి శుభాకాంక్షలు` : 'శ్రీ వినాయక చవితి మహోత్సవం 2026 | దివ్య దర్శనం & మహా హారతి'}</title>
+  <title>{fromParam ? `${decodeURIComponent(fromParam)} గారి వినాయక చవితి శుభాకాంక్షలు` : 'శ్రీ వినాయక చవితి మహోత్సవం 2026 | దివ్య దర్శనం'}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Ramabhadra&family=Noto+Sans+Telugu:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 </svelte:head>
-
-<!-- ఆడియో ఎలిమెంట్స్ -->
-<audio bind:this={shankhAudio} src="https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3" preload="auto"></audio>
-<audio bind:this={coconutAudio} src="https://assets.mixkit.co/active_storage/sfx/2578/2578-preview.mp3" preload="auto"></audio>
 
 <!-- పూల వర్షం ఓవర్‌లే -->
 {#if flowers.length > 0}
@@ -204,7 +214,7 @@
 
   <main class="max-w-3xl mx-auto px-4 py-6 sm:py-8 flex-grow w-full space-y-8">
 
-    <!-- ప్రత్యేక విషెస్ కార్డ్ (వేరే వారు పంపిన లింక్ ద్వారా వస్తే) -->
+    <!-- ప్రత్యేక విషెస్ కార్డ్ (లింక్ ద్వారా వచ్చిన వారికి) -->
     {#if fromParam}
       <div class="bg-gradient-to-r from-red-950 via-amber-800 to-red-950 p-6 rounded-3xl text-center shadow-2xl border-2 border-yellow-400 animate-pulse">
         <span class="text-yellow-200 text-xs font-black uppercase tracking-widest block mb-1">ప్రత్యేక పండుగ సందేశం</span>
@@ -215,7 +225,7 @@
           </span> గారి నుండి
         </h2>
         <p class="text-amber-100 text-sm font-bold mt-2">
-          శ్రీ వినాయక చవితి శుభాకాంక్షలు! విఘ్నేశ్వరుని కృపాకటాక్షాలతో మీకు సకల కార్యసిద్ధి కలగాలని మనసారా కోరుకుంటున్నారు.
+          శ్రీ వినాయక చవితి శుభాకాంక్షలు! గణపతి కృపతో మీకు సకల కార్యసిద్ధి చేకూరాలని కోరుకుంటున్నారు.
         </p>
       </div>
     {/if}
@@ -224,28 +234,32 @@
     <section class="bg-gradient-to-b from-[#240a03] via-[#150401] to-[#0a0201] rounded-3xl p-6 sm:p-10 border-2 border-amber-500/60 shadow-2xl text-center relative overflow-hidden">
       
       <div class="inline-block bg-amber-500/20 border border-amber-400/50 px-4 py-1.5 rounded-full text-xs font-black text-amber-300 mb-3 shadow">
-        🕉️ సర్వవిఘ్నహరాయ నమః 🕉️
+        🕉️ శుక్లాంబరధరం విష్ణుం శశివర్ణం చతుర్భుజం 🕉️
       </div>
 
       <h1 class="text-2xl sm:text-4xl font-black text-amber-400 font-['Ramabhadra'] tracking-wide">
         శ్రీ సిద్ధి బుద్ధి సమేత గణపతి దివ్య దర్శనం
       </h1>
       <p class="text-xs sm:text-sm text-amber-200/90 mt-1 max-w-lg mx-auto">
-        ఆలయ కంచు గంట మోగించండి, పవిత్ర వేద శ్లోకంతో మహా హారతి సమర్పించండి!
+        ఆలయ కంచు గంట మోగించండి, పళ్లెంతో మహా హారతి సమర్పించండి, కొబ్బరి కొట్టి ఆశీస్సులు పొందండి!
       </p>
 
-      <!-- విగ్రహం & యానిమేటెడ్ ప్రభామండలం -->
+      <!-- విగ్రహం & సాంప్రదాయక హారతి పళ్లెం యానిమేషన్ కంటైనర్ -->
       <div class="relative w-72 h-72 sm:w-88 sm:h-88 mx-auto my-6 flex items-center justify-center">
         
+        <!-- దివ్య ప్రభామండలం -->
         <div class="absolute inset-0 border-2 border-dashed border-amber-400/40 rounded-full animate-spin pointer-events-none" style="animation-duration: 40s;"></div>
 
-        <!-- మహా హారతి జ్యోతి ప్రదక్షిణ -->
+        <!-- సాంప్రదాయక హారతి పళ్లెం (Aarti Thali Natural Clockwise Motion) -->
         {#if isHarathiActive}
-          <div class="absolute -inset-4 border-4 border-amber-400/80 rounded-full animate-spin pointer-events-none shadow-[0_0_50px_rgba(245,158,11,0.8)]" style="animation-duration: 3.5s;">
-            <div class="absolute -top-5 left-1/2 -translate-x-1/2 text-3xl drop-shadow-[0_0_15px_#f59e0b]">🪔</div>
-            <div class="absolute -bottom-5 left-1/2 -translate-x-1/2 text-3xl drop-shadow-[0_0_15px_#f59e0b]">🪔</div>
-            <div class="absolute top-1/2 -left-5 -translate-y-1/2 text-3xl drop-shadow-[0_0_15px_#f59e0b]">🪔</div>
-            <div class="absolute top-1/2 -right-5 -translate-y-1/2 text-3xl drop-shadow-[0_0_15px_#f59e0b]">🪔</div>
+          <div class="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+            <div class="aarti-thali-orbit">
+              <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-amber-300 via-yellow-500 to-amber-700 border-2 border-yellow-200 shadow-[0_0_35px_rgba(245,158,11,1)] flex items-center justify-center relative">
+                <span class="text-3xl sm:text-4xl drop-shadow-[0_0_15px_#ff0000] animate-pulse">🪔</span>
+                <span class="absolute -top-1 text-xs">✨</span>
+                <span class="absolute -bottom-1 text-xs">✨</span>
+              </div>
+            </div>
           </div>
         {/if}
 
@@ -269,16 +283,20 @@
             <circle cx="100" cy="95" r="85" fill="#4d1000" opacity="0.7" />
             <circle cx="100" cy="95" r="80" fill="none" stroke="url(#divineGold)" stroke-width="2.5" stroke-dasharray="8,4" />
 
+            <!-- కిరీటం -->
             <polygon points="100,15 75,55 125,55" fill="url(#crownShine)" stroke="#8B4513" stroke-width="1.5" />
             <circle cx="100" cy="35" r="5" fill="#DC2626" />
             <polygon points="100,5 93,18 107,18" fill="#FFF275" />
 
+            <!-- చెవులు -->
             <path d="M 65,75 C 25,60 20,110 58,120 C 65,120 68,112 70,105 Z" fill="url(#divineGold)" opacity="0.95" stroke="#8B4513" stroke-width="1" />
             <path d="M 135,75 C 175,60 180,110 142,120 C 135,120 132,112 130,105 Z" fill="url(#divineGold)" opacity="0.95" stroke="#8B4513" stroke-width="1" />
 
+            <!-- ముఖం & తొండం -->
             <path d="M 75,68 Q 100,55 125,68 Q 128,105 116,130 Q 105,152 126,156 Q 133,155 135,145 Q 122,138 123,122 Q 112,85 100,74" 
                   fill="none" stroke="url(#divineGold)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" />
             
+            <!-- నామాలు & తిలకం -->
             <line x1="88" y1="64" x2="112" y2="64" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" />
             <line x1="90" y1="69" x2="110" y2="69" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" />
             <circle cx="100" cy="66" r="3" fill="#DC2626" />
@@ -286,20 +304,20 @@
             <ellipse cx="86" cy="76" rx="2.5" ry="3.5" fill="#ffffff" />
             <circle cx="86" cy="76" r="1.3" fill="#000000" />
 
+            <!-- లడ్డు & దంతం -->
             <circle cx="135" cy="146" r="8" fill="#FBBF24" stroke="#D97706" stroke-width="1.5" />
             <circle cx="135" cy="144" r="2" fill="#DC2626" />
-
             <polygon points="82,106 74,116 86,111" fill="#ffffff" />
           </svg>
         </div>
 
       </div>
 
-      <!-- లైవ్ శ్లోక టెక్స్ట్ బ్యాడ్జ్ -->
+      <!-- శ్లోక పఠనం లైవ్ డిస్ప్లే -->
       {#if mantraPlaying}
         <div class="mb-4 bg-amber-500/20 border border-amber-400 p-3 rounded-2xl max-w-xl mx-auto animate-pulse">
-          <span class="text-amber-300 font-bold text-xs sm:text-sm block leading-relaxed">
-            {currentChantText}
+          <span class="text-amber-300 font-black text-xs sm:text-sm block leading-relaxed font-['Ramabhadra']">
+            శుక్లాంబరధరం విష్ణుం శశివర్ణం చతుర్భుజం | ప్రసన్నవదనం ధ్యాయేత్ సర్వవిఘ్నోపశాంతయే ||
           </span>
           <button type="button" on:click={stopMantra} class="text-[11px] text-red-400 underline font-bold mt-1">
             మంత్రం ఆపండి (Stop)
@@ -310,34 +328,34 @@
       <!-- పూజా కంట్రోల్స్ -->
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-xl mx-auto pt-2">
         
-        <!-- ఆలయ గంట -->
+        <!-- ఆలయ కంచు గంట -->
         <button
           type="button"
           on:click={ringTempleBell}
           class="bg-gradient-to-b from-amber-500 via-amber-600 to-amber-700 hover:from-amber-400 text-slate-950 font-black text-xs sm:text-sm py-3.5 px-2 rounded-2xl shadow-xl flex flex-col items-center gap-1 active:scale-90 transition border border-amber-300"
         >
           <span class="text-3xl {isBellRinging ? 'animate-bounce' : ''}">🔔</span>
-          <span>ఆలయ గంట</span>
+          <span>ఆలయ కంచు గంట</span>
         </button>
 
-        <!-- మహా హారతి & శ్లోకం -->
+        <!-- మహా హారతి పళ్లెం & శ్లోకం -->
         <button
           type="button"
-          on:click={startMahaHarathi}
-          class="bg-gradient-to-b from-red-600 via-rose-700 to-red-800 hover:from-red-500 text-white font-black text-xs sm:text-sm py-3.5 px-2 rounded-2xl shadow-xl flex flex-col items-center gap-1 active:scale-90 transition border border-yellow-300 {isHarathiActive ? 'ring-4 ring-yellow-400 animate-pulse' : ''}"
+          on:click={startAartiWithShlokam}
+          class="bg-gradient-to-b from-red-600 via-rose-700 to-red-800 hover:from-red-500 text-white font-black text-xs sm:text-sm py-3.5 px-2 rounded-2xl shadow-xl flex flex-col items-center gap-1 active:scale-90 transition border border-yellow-300 {isHarathiActive ? 'ring-4 ring-yellow-400' : ''}"
         >
-          <span class="text-3xl animate-spin" style="animation-duration: 4s;">🪔</span>
-          <span>మహా హారతి & శ్లోకం</span>
+          <span class="text-3xl animate-bounce">🪔</span>
+          <span>హారతి పళ్లెం & శ్లోకం</span>
         </button>
 
-        <!-- కొబ్బరికాయ -->
+        <!-- కొబ్బరికాయ కొట్టడం -->
         <button
           type="button"
-          on:click={breakCoconut}
+          on:click={handleBreakCoconut}
           class="bg-gradient-to-b from-[#5a2a18] to-[#2d1107] hover:from-[#6d341e] text-amber-200 font-black text-xs sm:text-sm py-3.5 px-2 rounded-2xl shadow-xl flex flex-col items-center gap-1 active:scale-90 transition border border-amber-600/40"
         >
-          <span class="text-3xl">{isCoconutCracking ? '🥥💦' : '🥥'}</span>
-          <span>{isCoconutCracking ? 'సమర్పించబడింది!' : 'కొబ్బరికాయ సమర్పణ'}</span>
+          <span class="text-3xl">{isCoconutBroken ? '🥥' : '🥥'}</span>
+          <span>కొబ్బరికాయ కొట్టండి</span>
         </button>
 
         <!-- పూల వర్షం -->
@@ -354,7 +372,31 @@
 
     </section>
 
-    <!-- 2. వైరల్ వాట్సాప్ గ్రీటింగ్ కార్డు మేకర్ -->
+    <!-- 2. కొబ్బరికాయ కొట్టాక కనిపించే కొబ్బరి పువ్వు & ఆశీర్వచనం కార్డ్ -->
+    {#if isCoconutBroken}
+      <section class="bg-gradient-to-r from-amber-950 via-[#3a1508] to-amber-950 rounded-3xl p-6 sm:p-7 border-2 border-yellow-400 shadow-2xl text-center space-y-3 animate-fade-in">
+        <span class="text-yellow-300 text-xs font-black uppercase tracking-wider block">గణపతి దివ్య ప్రసాదం & ఆశీస్సులు</span>
+        
+        <!-- కొబ్బరి రెండు చెక్కలు + మధ్యలో వికసించిన పువ్వు -->
+        <div class="flex items-center justify-center gap-3 py-2 text-4xl">
+          <span class="animate-pulse">🥥</span>
+          <div class="flex flex-col items-center">
+            <span class="text-5xl animate-bounce">🌸</span>
+            <span class="text-[10px] text-yellow-300 font-black tracking-widest mt-1">కొబ్బరి పువ్వు!</span>
+          </div>
+          <span class="animate-pulse">🥥</span>
+        </div>
+
+        <div class="bg-black/50 border border-amber-500/50 p-4 rounded-2xl max-w-xl mx-auto space-y-1">
+          <span class="text-amber-400 font-bold text-xs">స్వామివారి శుభాశీస్సులు:</span>
+          <p class="text-white font-extrabold text-sm leading-relaxed">
+            "{currentBlessing}"
+          </p>
+        </div>
+      </section>
+    {/if}
+
+    <!-- 3. వైరల్ వాట్సాప్ గ్రీటింగ్ కార్డు మేకర్ -->
     <section class="bg-gradient-to-r from-red-950 via-[#2b0c05] to-amber-950 rounded-3xl p-6 sm:p-8 border-2 border-amber-500/50 shadow-2xl space-y-4">
       <div class="text-center space-y-1">
         <span class="bg-red-600 text-white text-[10px] font-black px-3 py-0.5 rounded-full uppercase tracking-wider shadow">వైరల్ షేరింగ్ విడ్జెట్</span>
@@ -406,7 +448,7 @@
       </div>
     </section>
 
-    <!-- 3. ఏకవింశతి పత్ర పూజ (21 పవిత్ర పత్రాలు) -->
+    <!-- 4. ఏకవింశతి పత్ర పూజ -->
     <section class="bg-[#1a0803] rounded-3xl p-6 sm:p-7 border border-amber-600/30 shadow-md space-y-3">
       <div class="border-b border-amber-700/40 pb-2 flex items-center justify-between">
         <div>
@@ -430,7 +472,7 @@
       </div>
     </section>
 
-    <!-- 4. మండపాల కోసం వ్యాపార సేవలు -->
+    <!-- 5. మండపాల కోసం వ్యాపార సేవలు -->
     <section class="bg-gradient-to-br from-slate-950 via-[#1d0502] to-black rounded-3xl p-6 sm:p-8 border-2 border-red-600 shadow-2xl text-center space-y-3">
       <span class="bg-amber-400 text-slate-950 text-[10px] font-black px-3 py-0.5 rounded-full uppercase tracking-wider">మండపాల ప్రత్యేక సేవలు</span>
       <h3 class="text-xl sm:text-2xl font-black text-white font-['Ramabhadra']">
@@ -459,18 +501,21 @@
 </div>
 
 <style>
+  /* పూల వర్షం */
   @keyframes fall {
-    0% {
-      transform: translateY(-40px) rotate(0deg);
-      opacity: 1;
-    }
-    100% {
-      transform: translateY(105vh) rotate(360deg);
-      opacity: 0;
-    }
+    0% { transform: translateY(-40px) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(105vh) rotate(360deg); opacity: 0; }
   }
-
   .flower-item {
     animation: fall linear forwards;
+  }
+
+  /* హారతి పళ్లెం సహజమైన క్లాక్‌వైజ్ ప్రదక్షిణ */
+  @keyframes aartiOrbit {
+    0% { transform: rotate(0deg) translateX(95px) rotate(0deg); }
+    100% { transform: rotate(360deg) translateX(95px) rotate(-360deg); }
+  }
+  .aarti-thali-orbit {
+    animation: aartiOrbit 3.2s linear infinite;
   }
 </style>
