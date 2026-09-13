@@ -14,43 +14,32 @@
         'text-[19px] sm:text-[21px] leading-loose'
     ];
 
-    async function loadArticleData(id) {
-        if (!id) return;
-        loading = true;
-        errorMsg = '';
+    onMount(async () => {
+        const id = $page.params.id;
+        if (!id) {
+            loading = false;
+            return;
+        }
 
         try {
-            // టైమ్‌అవుట్ సేఫ్‌గార్డ్ (డేటాబేస్ స్పందించకపోయినా లోడింగ్ ఆగకుండా ఉండటానికి)
-            const fetchPromise = supabase
+            const { data, error } = await supabase
                 .from('news_articles')
                 .select('*')
-                .eq('id', id)
-                .limit(1);
-
-            const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('నెట్‌వర్క్ సమయం ముగిసింది. దయచేసి మళ్లీ ప్రయత్నించండి.')), 8000)
-            );
-
-            const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+                .eq('id', id);
 
             if (error) throw error;
 
             if (data && data.length > 0) {
                 article = data[0];
             } else {
-                errorMsg = 'ఈ వార్తా కథనం అందుబాటులో లేదు లేదా తొలగించబడింది.';
+                errorMsg = 'వార్త లభించలేదు.';
             }
         } catch (err) {
-            console.error('Fetch error:', err);
-            errorMsg = err.message || 'వార్తను లోడ్ చేయడంలో సమస్య ఏర్పడింది.';
+            console.error(err);
+            errorMsg = 'వార్తను లోడ్ చేయడంలో సమస్య ఏర్పడింది.';
         } finally {
             loading = false;
         }
-    }
-
-    onMount(() => {
-        const id = $page.params.id;
-        loadArticleData(id);
     });
 
     function handlePrint() {
@@ -74,7 +63,6 @@
 
 <div class="min-h-screen bg-[#f3f4f6] text-slate-800 flex flex-col font-['Noto_Sans_Telugu',sans-serif]">
     
-    <!-- హెడర్ బార్ -->
     <header class="bg-slate-950 text-white sticky top-0 z-50 border-b-2 border-red-600 shadow-md print:hidden">
         <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
             <div class="flex items-center gap-3 sm:gap-5">
@@ -112,7 +100,6 @@
         </div>
     </header>
 
-    <!-- మెయిన్ కంటెంట్ -->
     <main class="max-w-4xl mx-auto px-4 py-6 sm:py-8 flex-grow w-full">
         {#if loading}
             <div class="text-center py-24 bg-white rounded-2xl border border-slate-200 shadow-sm">
@@ -129,7 +116,6 @@
             </div>
         {:else}
 
-            <!-- టూల్‌బార్ -->
             <div class="flex items-center justify-between bg-white px-4 py-2.5 rounded-2xl border border-slate-200 shadow-xs mb-4 print:hidden">
                 <div class="flex items-center gap-1.5 text-xs font-bold text-slate-600">
                     <span>అక్షరాల పరిమాణం:</span>
@@ -163,10 +149,8 @@
                 </button>
             </div>
 
-            <!-- న్యూస్ పేపర్ స్టైల్ ఆర్టికల్ కార్డ్ -->
             <article class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-6 sm:p-8 print:p-0 print:border-none print:shadow-none">
                 
-                <!-- పత్రిక మస్త్‌హెడ్ బ్యానర్ -->
                 <div class="border-b-2 border-slate-900 pb-3 mb-5 flex items-end justify-between">
                     <div>
                         <h1 class="text-2xl sm:text-3xl font-black text-slate-950 font-['Ramabhadra'] tracking-tight">
@@ -182,12 +166,10 @@
                     </div>
                 </div>
 
-                <!-- ప్రధాన హెడ్‌లైన్ -->
                 <h2 class="text-xl sm:text-2xl md:text-3xl font-black text-slate-950 leading-snug tracking-tight mb-4 font-['Noto_Sans_Telugu']">
                     {article.headline}
                 </h2>
 
-                <!-- సబ్‌లైన్స్ (బుల్లెట్ పాయింట్లు) -->
                 {#if article.subline_1}
                     <div class="bg-rose-50/60 border-l-4 border-red-600 p-3.5 rounded-r-xl mb-6 space-y-1.5">
                         <p class="text-sm sm:text-base font-bold text-red-950 flex items-start gap-2">
@@ -206,7 +188,7 @@
                     </div>
                 {/if}
 
-                <!-- ఫోటో గ్యాలరీ సెక్షన్ (తలలు కట్ అవ్వకుండా ఉండే సెటప్) -->
+                <!-- ఫోటో గ్యాలరీ (తలలు కట్ అవ్వకుండా ఉండే సెటప్) -->
                 {#if article.image_url || article.image_url_2}
                     <div class="grid grid-cols-1 {article.image_url_2 ? 'md:grid-cols-2' : ''} gap-4 mb-6">
                         {#if article.image_url}
@@ -237,7 +219,6 @@
                     </div>
                 {/if}
 
-                <!-- లొకేషన్ & రిపోర్టర్ బైలైన్ -->
                 <div class="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100 text-xs sm:text-sm font-bold text-slate-700">
                     <span class="bg-red-100 text-red-800 px-2.5 py-0.5 rounded-md">
                         {article.location_town || 'ముత్తారం'} (NS News)
@@ -248,12 +229,10 @@
                     </span>
                 </div>
 
-                <!-- వార్త పూర్తి సమాచారం (బాడీ టెక్స్ట్) -->
                 <div class="text-slate-900 font-normal whitespace-pre-line text-justify {fontSizes[fontSizeLevel]} font-['Noto_Sans_Telugu']">
                     {article.content || article.summary}
                 </div>
 
-                <!-- షేరింగ్ బటన్ -->
                 <div class="mt-8 pt-4 border-t border-slate-200 flex items-center justify-between print:hidden">
                     <div class="flex items-center gap-2">
                         <span class="text-xs font-bold text-slate-500">ఈ వార్తను షేర్ చేయండి:</span>
@@ -275,7 +254,6 @@
         {/if}
     </main>
 
-    <!-- ఫుటర్ -->
     <footer class="bg-slate-950 text-slate-400 border-t border-slate-800 py-6 mt-auto text-xs print:hidden">
         <div class="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
             <p class="text-slate-400">© 2026 NS News — A.S.V Enterprises. All rights reserved.</p>
