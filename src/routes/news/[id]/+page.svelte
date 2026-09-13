@@ -8,11 +8,6 @@
   let errorMsg = '';
   let fontSizeLevel = 1;
 
-  // మీడియా స్లైడర్ స్టేట్
-  let activeMediaIndex = 0;
-  let mediaList = [];
-  let isLightboxOpen = false;
-
   const fontSizes = [
     'text-[15px] sm:text-[16px] leading-relaxed',
     'text-[17px] sm:text-[18px] leading-loose',
@@ -50,18 +45,6 @@
 
       if (data && data.length > 0) {
         article = data[0];
-
-        // మీడియా జాబితా తయారీ
-        mediaList = [];
-        if (article.image_url) {
-          mediaList.push({ type: 'image', url: article.image_url });
-        }
-        if (article.image_url_2) {
-          mediaList.push({ type: 'image', url: article.image_url_2 });
-        }
-        if (article.youtube_url && getYouTubeEmbedUrl(article.youtube_url)) {
-          mediaList.push({ type: 'video', url: getYouTubeEmbedUrl(article.youtube_url) });
-        }
       } else {
         errorMsg = 'ఈ వార్తా కథనం అందుబాటులో లేదు.';
       }
@@ -72,22 +55,6 @@
       loading = false;
     }
   });
-
-  function nextMedia() {
-    if (activeMediaIndex < mediaList.length - 1) {
-      activeMediaIndex++;
-    } else {
-      activeMediaIndex = 0;
-    }
-  }
-
-  function prevMedia() {
-    if (activeMediaIndex > 0) {
-      activeMediaIndex--;
-    } else {
-      activeMediaIndex = mediaList.length - 1;
-    }
-  }
 
   function handlePrint() {
     window.print();
@@ -206,101 +173,24 @@
           </div>
         {/if}
 
-  <!-- 🚀 ఆటో-అడాప్టివ్ మీడియా వ్యూయర్ (పక్కా బ్లర్ బ్యాక్‌డ్రాప్ & 100% వాటర్‌మార్క్ మాస్క్) -->
-        {#if mediaList.length > 0}
-          <div class="relative w-full rounded-2xl overflow-hidden border border-slate-300 bg-slate-900 shadow-md mb-6 flex items-center justify-center h-[360px] sm:h-[450px] select-none">
-            
-            {#if mediaList[activeMediaIndex].type === 'video'}
-              <div class="w-full h-full aspect-video z-10">
-                <iframe
-                  src={mediaList[activeMediaIndex].url}
-                  title={article.headline}
-                  class="w-full h-full border-0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowfullscreen
-                ></iframe>
-              </div>
-            {:else}
-              <!-- 1. ఇన్‌లైన్ బ్లర్ బ్యాక్‌గ్రౌండ్ (Tailwind క్లాస్ ఫెయిల్ అయినా 100% పని చేస్తుంది) -->
+        <!-- 1. ప్రధాన కవర్ ఫోటో (నల్లటి ఖాళీ లేకుండా, వాటర్‌మార్క్ కవర్ అయ్యే సెటప్) -->
+        {#if article.image_url}
+          <figure class="mb-6 rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 shadow-sm">
+            <div class="relative w-full max-h-[480px] overflow-hidden flex items-center justify-center">
               <img
-                src={mediaList[activeMediaIndex].url}
-                alt=""
-                aria-hidden="true"
-                style="filter: blur(25px) brightness(0.65); transform: scale(1.25);"
-                class="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                src={article.image_url}
+                alt={article.headline}
+                class="w-full h-auto max-h-[500px] object-cover object-top -mb-8 scale-[1.03] origin-top"
               />
-
-              <!-- 2. ముందు భాగం: అసలైన ఫోటో (మనుషులు ఎవరూ కట్ అవ్వకుండా సెంటర్ ఫిట్) -->
-              <div class="relative z-10 w-full h-full flex items-center justify-center p-2 pb-6">
-                <img
-                  src={mediaList[activeMediaIndex].url}
-                  alt={article.headline}
-                  class="max-h-[300px] sm:max-h-[380px] max-w-full object-contain cursor-zoom-in drop-shadow-2xl rounded-md"
-                  on:click={() => isLightboxOpen = true}
-                />
-              </div>
-            {/if}
-
-            <!-- యారో కంట్రోల్స్ (ఒకటి కంటే ఎక్కువ ఉన్నప్పుడు) -->
-            {#if mediaList.length > 1}
-              <button
-                type="button"
-                on:click={prevMedia}
-                class="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center shadow-lg transition active:scale-95 border border-white/20 z-30"
-                aria-label="మునుపటి ఫోటో"
-              >
-                <i class="fa-solid fa-chevron-left text-sm"></i>
-              </button>
-
-              <button
-                type="button"
-                on:click={nextMedia}
-                class="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center shadow-lg transition active:scale-95 border border-white/20 z-30"
-                aria-label="తర్వాతి ఫోటో"
-              >
-                <i class="fa-solid fa-chevron-right text-sm"></i>
-              </button>
-
-              <div class="absolute top-3 right-3 bg-black/80 text-white text-xs font-bold px-2.5 py-1 rounded-full border border-white/20 z-30 shadow">
-                {activeMediaIndex + 1} / {mediaList.length}
-              </div>
-            {/if}
-
-            <!-- 3. వాటర్‌మార్క్ మాస్కింగ్ ఘనమైన బార్ (హైట్ 48px, z-30 తో పక్కాగా కెమెరా పేరు కవర్ అవుతుంది) -->
-            <div class="absolute bottom-0 inset-x-0 h-12 bg-slate-950 border-t border-slate-700/80 px-4 flex items-center justify-between text-white text-xs font-bold z-30 shadow-2xl">
-              <span class="text-amber-400 truncate max-w-[200px] sm:max-w-none">
-                📍 {article.location_town || 'ముత్తారం'} • {article.reporter_name || 'NS ప్రతినిధి'}
+              <span class="absolute top-3 right-3 bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded shadow uppercase">
+                NS NEWS
               </span>
-              <div class="flex items-center gap-2 shrink-0">
-                {#if mediaList[activeMediaIndex].type === 'image'}
-                  <button type="button" on:click={() => isLightboxOpen = true} class="text-[11px] text-slate-300 hover:text-white underline hidden sm:inline">
-                    🔍 ఫుల్ స్క్రీన్
-                  </button>
-                {/if}
-                <span class="bg-red-600 text-white text-[10px] px-2 py-0.5 rounded font-black tracking-wider uppercase shadow">NS NEWS</span>
-              </div>
             </div>
-
-          </div>
-        {/if}
-
-        <!-- లైట్‌బాక్స్ మోడల్ (ఫుల్ స్క్రీన్ వ్యూ) -->
-        {#if isLightboxOpen && mediaList[activeMediaIndex].type === 'image'}
-          <div class="fixed inset-0 z-50 bg-black/95 flex flex-col items-center justify-center p-4">
-            <button
-              type="button"
-              on:click={() => isLightboxOpen = false}
-              class="absolute top-4 right-4 text-white text-2xl w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20"
-            >
-              ✕
-            </button>
-            <img
-              src={mediaList[activeMediaIndex].url}
-              alt={article.headline}
-              class="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
-            />
-            <p class="text-slate-300 text-xs mt-3 font-semibold text-center">{article.headline}</p>
-          </div>
+            <figcaption class="bg-slate-900 text-white px-4 py-2 flex items-center justify-between text-xs font-semibold">
+              <span class="text-amber-400">📍 {article.location_town || 'ముత్తారం'}</span>
+              <span class="text-slate-400 text-[11px]">{article.reporter_name ? `${article.reporter_name} ప్రతినిధి` : 'NS నెట్‌వర్క్'}</span>
+            </figcaption>
+          </figure>
         {/if}
 
         <!-- లొకేషన్ & రిపోర్టర్ బైలైన్ -->
@@ -314,10 +204,41 @@
           </span>
         </div>
 
-        <!-- కథనం బాడీ -->
-        <div class="text-slate-900 font-normal whitespace-pre-line text-justify {fontSizes[fontSizeLevel]}">
+        <!-- వార్తా కథనం బాడీ -->
+        <div class="text-slate-900 font-normal whitespace-pre-line text-justify {fontSizes[fontSizeLevel]} mb-6">
           {article.content || article.summary}
         </div>
+
+        <!-- 2. రెండవ అనుబంధ ఫోటో (కథనం కింద పూర్తి సహజ వెడల్పుతో) -->
+        {#if article.image_url_2}
+          <figure class="my-6 rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 shadow-sm">
+            <div class="relative w-full max-h-[460px] overflow-hidden flex items-center justify-center">
+              <img
+                src={article.image_url_2}
+                alt={article.headline}
+                class="w-full h-auto max-h-[480px] object-cover object-top -mb-8 scale-[1.03] origin-top"
+              />
+              <span class="absolute top-3 right-3 bg-slate-900/80 backdrop-blur text-white text-[10px] font-bold px-2 py-0.5 rounded">
+                కార్యక్రమ దృశ్యం
+              </span>
+            </div>
+            <figcaption class="bg-slate-100 border-t border-slate-200 text-slate-600 px-4 py-2 text-xs font-medium text-center">
+              పురస్కార ప్రదానోత్సవ దృశ్యం
+            </figcaption>
+          </figure>
+        {/if}
+
+        <!-- యూట్యూబ్ వీడియో (ఉంటే డిస్‌ప్లే అవుతుంది) -->
+        {#if article.youtube_url && getYouTubeEmbedUrl(article.youtube_url)}
+          <div class="my-6 rounded-2xl overflow-hidden border border-slate-200 shadow-sm aspect-video">
+            <iframe
+              src={getYouTubeEmbedUrl(article.youtube_url)}
+              title={article.headline}
+              class="w-full h-full border-0"
+              allowfullscreen
+            ></iframe>
+          </div>
+        {/if}
 
         <!-- ఫుటర్ షేర్ బటన్ -->
         <div class="mt-8 pt-4 border-t border-slate-200 flex items-center justify-between print:hidden">
@@ -336,6 +257,7 @@
     {/if}
   </main>
 
+  <!-- ఫుటర్ -->
   <footer class="bg-slate-950 text-slate-400 border-t border-slate-800 py-6 mt-auto text-xs print:hidden">
     <div class="max-w-6xl mx-auto px-4 flex justify-between items-center">
       <p>© 2026 NS News — A.S.V Enterprises.</p>
