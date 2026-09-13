@@ -154,38 +154,43 @@
         {/if}
 
         <!-- ఫోటోలు: తలలు కట్ కాకుండా ఉండేందుకు object-cover object-top -->
-       <!-- ఫోటోలు: కెమెరా వాటర్‌మార్క్ కవర్ అవుతూ, వ్యక్తులు & అవార్డు స్పష్టంగా ఎక్స్‌పోజ్ అయ్యే జూమ్ సెటప్ -->
+      <!-- ఫోటో గ్యాలరీ: మనుషులు పూర్తిగా కనిపిస్తూ, కింది కెమెరా వాటర్‌మార్క్ కవర్ అయ్యే సెటప్ -->
         {#if article.image_url || article.image_url_2}
           <div class="grid grid-cols-1 {article.image_url_2 ? 'md:grid-cols-2' : ''} gap-4 mb-6">
+            
             {#if article.image_url}
-              <div class="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 shadow-sm flex items-center justify-center aspect-[4/3] sm:aspect-[16/10]">
-                <!-- scale-110 మరియు origin-top తో వాటర్‌మార్క్ కట్ అయి వ్యక్తులు స్పష్టంగా కనిపిస్తారు -->
-                <img
-                  src={article.image_url}
-                  alt={article.headline}
-                  class="w-full h-full object-cover object-top scale-110 origin-top transition-transform duration-300"
-                />
-                <div class="absolute bottom-2.5 right-2.5 bg-black/80 backdrop-blur text-white text-[10px] font-black px-2 py-0.5 rounded shadow uppercase">
+              <div class="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 shadow-sm flex flex-col justify-start">
+                <!-- -mb-7 ద్వారా కింది కెమెరా వాటర్‌మార్క్ కట్ అవుతుంది, మనుషులు 100% స్పష్టంగా కనిపిస్తారు -->
+                <div class="overflow-hidden w-full">
+                  <img
+                    src={article.image_url}
+                    alt={article.headline}
+                    class="w-full h-auto block -mb-7"
+                  />
+                </div>
+                <div class="absolute bottom-2.5 right-2.5 bg-black/80 backdrop-blur text-white text-[10px] font-black px-2 py-0.5 rounded shadow uppercase z-10">
                   NS NEWS
                 </div>
               </div>
             {/if}
 
             {#if article.image_url_2}
-              <div class="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 shadow-sm flex items-center justify-center aspect-[4/3] sm:aspect-[16/10]">
-                <img
-                  src={article.image_url_2}
-                  alt={article.headline}
-                  class="w-full h-full object-cover object-top scale-110 origin-top transition-transform duration-300"
-                />
-                <div class="absolute bottom-2.5 right-2.5 bg-black/80 backdrop-blur text-white text-[10px] font-black px-2 py-0.5 rounded shadow uppercase">
+              <div class="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 shadow-sm flex flex-col justify-start">
+                <div class="overflow-hidden w-full">
+                  <img
+                    src={article.image_url_2}
+                    alt={article.headline}
+                    class="w-full h-auto block -mb-7"
+                  />
+                </div>
+                <div class="absolute bottom-2.5 right-2.5 bg-black/80 backdrop-blur text-white text-[10px] font-black px-2 py-0.5 rounded shadow uppercase z-10">
                   NS NEWS
                 </div>
               </div>
             {/if}
+
           </div>
         {/if}
-
         <div class="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100 text-xs sm:text-sm font-bold text-slate-700">
           <span class="bg-red-100 text-red-800 px-2.5 py-0.5 rounded-md">
             {article.location_town || 'ముత్తారం'} (NS News)
