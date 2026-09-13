@@ -186,6 +186,17 @@
 
     </div>
   </header>
+<!-- 🕉️ వినాయక చవితి 2026 స్పెషల్ ఎక్స్‌ట్రీమ్ బ్యానర్ -->
+  <div class="bg-gradient-to-r from-red-600 via-amber-500 to-red-600 text-slate-950 py-2.5 px-4 shadow-md text-center font-bold text-xs sm:text-sm select-none border-b-2 border-yellow-300">
+    <a href="/ganesh" class="flex items-center justify-center gap-2 hover:underline">
+      <span class="text-base animate-bounce">🪔</span>
+      <span class="text-white font-['Ramabhadra'] tracking-wide">శ్రీ వినాయక చవితి ప్రత్యేకం:</span>
+      <span class="bg-slate-950 text-amber-300 px-3 py-0.5 rounded-full text-xs font-black shadow">
+        డిజిటల్ హారతి & మీ పేరుతో విషెస్ పంపండి ➡
+      </span>
+    </a>
+  </div>
+
 
   <!-- 3. లైవ్ న్యూస్ స్క్రోలింగ్ టిక్కర్ -->
   {#if tickerNews.length > 0}
