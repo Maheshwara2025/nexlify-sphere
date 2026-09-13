@@ -153,40 +153,38 @@
           </div>
         {/if}
 
-        <!-- ఫోటోలు: తలలు కట్ కాకుండా ఉండేందుకు object-cover object-top -->
-      <!-- ఫోటో గ్యాలరీ: మనుషులు పూర్తిగా కనిపిస్తూ, కింది కెమెరా వాటర్‌మార్క్ కవర్ అయ్యే సెటప్ -->
-       <!-- ఫోటో గ్యాలరీ: Portrait మరియు Landscape రెండింటినీ సమాన ఎత్తుతో అమర్చే సెటప్ -->
+        <!-- ఫోటో గ్యాలరీ: నలుపు ఖాళీలు లేకుండా, వాటర్‌మార్క్ కవర్ అయ్యే పత్రికా శైలి -->
         {#if article.image_url || article.image_url_2}
-          <div class="grid grid-cols-1 {article.image_url_2 ? 'md:grid-cols-2' : ''} gap-4 mb-6">
+          <div class="grid grid-cols-1 {article.image_url_2 ? 'md:grid-cols-2' : ''} gap-5 mb-6 items-start">
             
             {#if article.image_url}
-              <div class="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-950 shadow-sm flex items-center justify-center h-80 sm:h-96 w-full">
-                <!-- object-contain వల్ల ఫోటో Portrait అయినా Landscape అయినా ఎవరూ కట్ అవ్వరు -->
-                <img
-                  src={article.image_url}
-                  alt={article.headline}
-                  class="w-full h-full object-contain"
-                />
-                
-                <!-- కింది వైపున్న మొబైల్ వాటర్‌మార్క్‌ను కవర్ చేస్తూ NS NEWS స్ట్రిప్ -->
-                <div class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent py-2 px-3 flex items-center justify-between text-white text-[11px] font-bold">
-                  <span class="text-yellow-400">📍 {article.location_town || 'ముత్తారం'}</span>
-                  <span class="bg-red-600 text-white text-[9px] px-2 py-0.5 rounded font-black uppercase tracking-wider">NS NEWS</span>
+              <div class="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 shadow-sm flex flex-col items-center">
+                <div class="overflow-hidden w-full max-h-[440px] flex items-center justify-center">
+                  <img
+                    src={article.image_url}
+                    alt={article.headline}
+                    class="w-full h-auto max-h-[455px] object-contain -mb-5"
+                  />
+                </div>
+                <div class="w-full bg-slate-900 py-1.5 px-3 flex items-center justify-between text-white text-[10px] font-bold z-10">
+                  <span class="text-amber-400">📍 {article.location_town || 'ముత్తారం'}</span>
+                  <span class="bg-red-600 text-white text-[9px] px-2 py-0.5 rounded font-black tracking-wider uppercase">NS NEWS</span>
                 </div>
               </div>
             {/if}
 
             {#if article.image_url_2}
-              <div class="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-950 shadow-sm flex items-center justify-center h-80 sm:h-96 w-full">
-                <img
-                  src={article.image_url_2}
-                  alt={article.headline}
-                  class="w-full h-full object-contain"
-                />
-                
-                <div class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent py-2 px-3 flex items-center justify-between text-white text-[11px] font-bold">
-                  <span class="text-yellow-400">📍 {article.location_town || 'ముత్తారం'}</span>
-                  <span class="bg-red-600 text-white text-[9px] px-2 py-0.5 rounded font-black uppercase tracking-wider">NS NEWS</span>
+              <div class="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 shadow-sm flex flex-col items-center">
+                <div class="overflow-hidden w-full max-h-[440px] flex items-center justify-center">
+                  <img
+                    src={article.image_url_2}
+                    alt={article.headline}
+                    class="w-full h-auto max-h-[455px] object-contain -mb-5"
+                  />
+                </div>
+                <div class="w-full bg-slate-900 py-1.5 px-3 flex items-center justify-between text-white text-[10px] font-bold z-10">
+                  <span class="text-amber-400">📍 {article.location_town || 'ముత్తారం'}</span>
+                  <span class="bg-red-600 text-white text-[9px] px-2 py-0.5 rounded font-black tracking-wider uppercase">NS NEWS</span>
                 </div>
               </div>
             {/if}
