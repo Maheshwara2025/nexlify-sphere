@@ -50,8 +50,8 @@
 
       if (data && data.length > 0) {
         article = data[0];
-        
-        // మీడియా జాబితాను తయారు చేయడం (ఫోటో 1, ఫోటో 2, యూట్యూబ్ వీడియో)
+
+        // మీడియా జాబితా తయారీ
         mediaList = [];
         if (article.image_url) {
           mediaList.push({ type: 'image', url: article.image_url });
@@ -110,6 +110,7 @@
 
 <div class="min-h-screen bg-[#f3f4f6] text-slate-800 flex flex-col font-['Noto_Sans_Telugu',sans-serif]">
   
+  <!-- హెడర్ బార్ -->
   <header class="bg-slate-950 text-white sticky top-0 z-50 border-b-2 border-red-600 shadow-md print:hidden">
     <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
       <div class="flex items-center gap-3">
@@ -137,6 +138,7 @@
     </div>
   </header>
 
+  <!-- మెయిన్ కంటెంట్ -->
   <main class="max-w-4xl mx-auto px-4 py-6 sm:py-8 flex-grow w-full">
     {#if loading}
       <div class="text-center py-24 bg-white rounded-2xl border border-slate-200 shadow-sm">
@@ -153,6 +155,7 @@
       </div>
     {:else}
 
+      <!-- అక్షరాల పరిమాణం & ప్రింట్ టూల్‌బార్ -->
       <div class="flex items-center justify-between bg-white px-4 py-2.5 rounded-2xl border border-slate-200 shadow-xs mb-4 print:hidden">
         <div class="flex items-center gap-1.5 text-xs font-bold text-slate-600">
           <span>అక్షరాల పరిమాణం:</span>
@@ -167,8 +170,10 @@
         </button>
       </div>
 
+      <!-- ఆర్టికల్ కార్డ్ -->
       <article class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-6 sm:p-8 print:p-0 print:border-none print:shadow-none">
         
+        <!-- మస్త్‌హెడ్ -->
         <div class="border-b-2 border-slate-900 pb-3 mb-5 flex items-end justify-between">
           <div>
             <h1 class="text-2xl sm:text-3xl font-black text-slate-950 font-['Ramabhadra']">NS NEWS</h1>
@@ -182,10 +187,12 @@
           </div>
         </div>
 
+        <!-- హెడ్‌లైన్ -->
         <h2 class="text-xl sm:text-2xl md:text-3xl font-black text-slate-950 leading-snug tracking-tight mb-4">
           {article.headline}
         </h2>
 
+        <!-- సబ్‌లైన్స్ -->
         {#if article.subline_1}
           <div class="bg-rose-50/60 border-l-4 border-red-600 p-3.5 rounded-r-xl mb-6 space-y-1.5">
             <p class="text-sm sm:text-base font-bold text-red-950 flex items-start gap-2">
@@ -199,12 +206,10 @@
           </div>
         {/if}
 
-        <!-- 🚀 ఐడియా 2 & 3: లేటెస్ట్ ఇంటరాక్టివ్ మీడియా స్లైడర్ (Portrait & Landscape రెండింటికీ సమతుల్యమైన పరిష్కారం) -->
-        <!-- 🚀 లేటెస్ట్ మీడియా వ్యూయర్: ఖాళీ స్పేస్ లేకుండా బ్లర్డ్ బ్యాక్‌గ్రౌండ్ & వాటర్‌మార్క్ కవర్ సెటప్ -->
+        <!-- 🚀 ఆటో-అడాప్టివ్ మీడియా వ్యూయర్ (ఫోటో ఆస్పెక్ట్ రేషియో ఎలాంటిదైనా పర్ఫెక్ట్ ఫిట్ అయ్యే లేఅవుట్) -->
         {#if mediaList.length > 0}
           <div class="relative w-full rounded-2xl overflow-hidden border border-slate-200 bg-slate-950 shadow-md mb-6 flex items-center justify-center h-[340px] sm:h-[440px] select-none">
             
-            <!-- ఫోటో / వీడియో డిస్‌ప్లే -->
             {#if mediaList[activeMediaIndex].type === 'video'}
               <div class="w-full h-full aspect-video z-10">
                 <iframe
@@ -216,29 +221,31 @@
                 ></iframe>
               </div>
             {:else}
-              <!-- 1. వెనుక బ్లర్డ్ బ్యాక్‌గ్రౌండ్ (నల్లటి ఖాళీని నింపడానికి) -->
-              <div 
-                class="absolute inset-0 bg-cover bg-center blur-2xl scale-125 opacity-40 pointer-events-none"
-                style="background-image: url('{mediaList[activeMediaIndex].url}');"
-              ></div>
+              <!-- 1. వెనుక బ్లర్డ్ బ్యాక్‌గ్రౌండ్ ఇమేజ్ -->
+              <img
+                src={mediaList[activeMediaIndex].url}
+                alt=""
+                aria-hidden="true"
+                class="absolute inset-0 w-full h-full object-cover blur-2xl opacity-60 scale-125 pointer-events-none"
+              />
 
-              <!-- 2. ముందు అసలైన క్లియర్ ఫోటో (మనుషులు ఎవరూ కట్ అవ్వకుండా సెంటర్ డిస్‌ప్లే) -->
-              <div class="relative z-10 w-full h-full flex items-center justify-center p-1 sm:p-2 pb-6">
+              <!-- 2. ముందు అసలైన ఫోటో (మనుషులు ఎవరూ కట్ అవ్వకుండా సెంటర్‌లో ఆటో ఫిట్) -->
+              <div class="relative z-10 w-full h-full flex items-center justify-center p-2">
                 <img
                   src={mediaList[activeMediaIndex].url}
                   alt={article.headline}
-                  class="max-h-full max-w-full object-contain cursor-zoom-in drop-shadow-2xl rounded-lg"
+                  class="max-h-full max-w-full object-contain cursor-zoom-in drop-shadow-2xl rounded-md"
                   on:click={() => isLightboxOpen = true}
                 />
               </div>
             {/if}
 
-            <!-- యారో నావిగేషన్ బటన్లు (1 కంటే ఎక్కువ ఉన్నప్పుడు) -->
+            <!-- యారో కంట్రోల్స్ (ఒకటి కంటే ఎక్కువ మీడియా ఉన్నప్పుడు) -->
             {#if mediaList.length > 1}
               <button
                 type="button"
                 on:click={prevMedia}
-                class="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center backdrop-blur shadow-lg transition active:scale-95 border border-white/20 z-20"
+                class="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center backdrop-blur shadow-lg transition active:scale-95 border border-white/20 z-20"
                 aria-label="మునుపటి ఫోటో"
               >
                 <i class="fa-solid fa-chevron-left text-sm"></i>
@@ -247,21 +254,20 @@
               <button
                 type="button"
                 on:click={nextMedia}
-                class="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center backdrop-blur shadow-lg transition active:scale-95 border border-white/20 z-20"
+                class="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center backdrop-blur shadow-lg transition active:scale-95 border border-white/20 z-20"
                 aria-label="తర్వాతి ఫోటో"
               >
                 <i class="fa-solid fa-chevron-right text-sm"></i>
               </button>
 
-              <!-- మీడియా కౌంటర్ (1/2, 2/2) -->
-              <div class="absolute top-3 right-3 bg-black/75 backdrop-blur text-white text-xs font-bold px-2.5 py-1 rounded-full border border-white/10 z-20 shadow">
+              <div class="absolute top-3 right-3 bg-black/80 backdrop-blur text-white text-xs font-bold px-2.5 py-1 rounded-full border border-white/10 z-20 shadow">
                 {activeMediaIndex + 1} / {mediaList.length}
               </div>
             {/if}
 
-            <!-- 3. వాటర్‌మార్క్ మాస్క్ స్ట్రిప్ (కెమెరా పేరు దాచేస్తూ NS NEWS బ్రాండింగ్) -->
-            <div class="absolute bottom-0 inset-x-0 h-11 bg-gradient-to-t from-black via-black/90 to-transparent px-4 flex items-center justify-between text-white text-xs font-bold z-20">
-              <span class="text-amber-400 truncate max-w-[220px] sm:max-w-none">
+            <!-- 3. వాటర్‌మార్క్ మాస్కింగ్ బాటమ్ బార్ -->
+            <div class="absolute bottom-0 inset-x-0 h-12 bg-black/95 border-t border-white/10 px-4 flex items-center justify-between text-white text-xs font-bold z-20 shadow-2xl">
+              <span class="text-amber-400 truncate max-w-[200px] sm:max-w-none">
                 📍 {article.location_town || 'ముత్తారం'} • {article.reporter_name || 'NS ప్రతినిధి'}
               </span>
               <div class="flex items-center gap-2 shrink-0">
@@ -296,6 +302,7 @@
           </div>
         {/if}
 
+        <!-- లొకేషన్ & రిపోర్టర్ బైలైన్ -->
         <div class="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100 text-xs sm:text-sm font-bold text-slate-700">
           <span class="bg-red-100 text-red-800 px-2.5 py-0.5 rounded-md">
             {article.location_town || 'ముత్తారం'} (NS News)
@@ -306,10 +313,12 @@
           </span>
         </div>
 
+        <!-- కథనం బాడీ -->
         <div class="text-slate-900 font-normal whitespace-pre-line text-justify {fontSizes[fontSizeLevel]}">
           {article.content || article.summary}
         </div>
 
+        <!-- ఫుటర్ షేర్ బటన్ -->
         <div class="mt-8 pt-4 border-t border-slate-200 flex items-center justify-between print:hidden">
           <div class="flex items-center gap-2">
             <span class="text-xs font-bold text-slate-500">షేర్ చేయండి:</span>
