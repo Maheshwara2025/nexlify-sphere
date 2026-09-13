@@ -177,12 +177,25 @@
     setTimeout(() => showCopied = false, 2500);
   }
 </script>
-
 <svelte:head>
-  <title>{fromParam ? `${decodeURIComponent(fromParam)} గారి వినాయక చవితి దివ్య దర్శనం` : 'శ్రీ వినాయక చవితి మహోత్సవం 2026 | Grand Divine Darshan'}</title>
+  <!-- Browser Tab Title -->
+  <title>{fromParam ? `${decodeURIComponent(fromParam)} గారి వినాయక చవితి శుభాకాంక్షలు & దివ్య దర్శనం` : 'శ్రీ వినాయక చవితి మహోత్సవం 2026 | Grand Live Darshan'}</title>
+  <meta name="description" content="శ్రీ సిద్ధి బుద్ధి సమేత వినాయకుని ప్రత్యక్ష దర్శనం, వేద మంత్రోచ్ఛారణ, పంచ హారతి & కొబ్బరి పువ్వు ఆశీస్సులు. మీ పేరుతో శుభాకాంక్షలు పంపండి." />
+
+  <!-- WhatsApp / Facebook Open Graph Tags -->
+  <meta property="og:title" content="{fromParam ? `${decodeURIComponent(fromParam)} గారి వినాయక చవితి శుభాకాంక్షలు 🪔` : 'శ్రీ వినాయక చవితి మహోత్సవం 2026 | దివ్య దర్శనం 🐘'}" />
+  <meta property="og:description" content="వినాయకుని ప్రత్యక్ష దివ్య దర్శనం, పంచ హారతి, ఆలయ కంచు గంట, మరియు పవిత్ర కొబ్బరి పువ్వు ఆశీస్సులు పొందండి." />
+  <meta property="og:url" content="{shareUrl}" />
+  <meta property="og:image" content="https://images.unsplash.com/photo-1567591414240-e54fa57422f2?auto=format&fit=crop&w=1200&h=630&q=85" />
+  <meta property="og:image:secure_url" content="https://images.unsplash.com/photo-1567591414240-e54fa57422f2?auto=format&fit=crop&w=1200&h=630&q=85" />
+  <meta property="og:image:type" content="image/jpeg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+
+  <!-- Fonts & Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Ramabhadra&family=Noto+Sans+Telugu:wght@400;600;700;800;900&family=Rozha+One&family=Tiro+Devanagari+Sanskrit&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Ramabhadra&family=Noto+Sans+Telugu:wght@400;600;700;800;900&family=Tiro+Devanagari+Sanskrit&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 </svelte:head>
 

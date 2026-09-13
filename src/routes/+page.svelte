@@ -108,8 +108,17 @@
 </script>
 
 <svelte:head>
-  <title>A.S.V. Enterprises & NS News | మీ డిజిటల్ & పౌర సేవా కేంద్రం, ముత్తారం</title>
-  <meta name="description" content="A.S.V. Enterprises (CSC ID: 514542450010) - డిజిటల్ సేవలు, ప్రభుత్వ పథకాలు, ఆధార్, IRCTC రైలు టికెట్లు మరియు NS News తాజా వార్తలు." />
+  <title>A.S.V. Enterprises & NS News | అధీకృత డిజిటల్ సేవా కేంద్రం, ముత్తారం</title>
+  <meta name="description" content="A.S.V. Enterprises (CSC ID: 514542450010, GSTIN: 36AMXPA2915K1ZR) - డిజిటల్ సేవలు, ప్రభుత్వ పథకాలు, ఆధార్, ధరణి, IRCTC రైలు టికెట్లు మరియు NS News తాజా వార్తలు." />
+
+  <!-- WhatsApp Open Graph Tags -->
+  <meta property="og:title" content="A.S.V. Enterprises & NS News Network | ముత్తారం" />
+  <meta property="og:description" content="వన్-స్టాప్ డిజిటల్ సొల్యూషన్: ఆధార్, ధరణి, రైతు భరోసా, ఇందిరమ్మ కుట్టు మిషన్, IRCTC టికెట్లు & ముత్తారం మండల తాజా వార్తలు." />
+  <meta property="og:url" content="https://nexlifynucleus.in/" />
+  <meta property="og:image" content="https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?auto=format&fit=crop&w=1200&h=630&q=85" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Mandali&family=Ramabhadra&family=Noto+Sans+Telugu:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
