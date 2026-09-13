@@ -153,20 +153,19 @@
           </div>
         {/if}
 
-        <!-- ఫోటో గ్యాలరీ: నలుపు ఖాళీలు లేకుండా, వాటర్‌మార్క్ కవర్ అయ్యే పత్రికా శైలి -->
+        <!-- ఫోటో గ్యాలరీ: పోర్ట్రెయిట్ & ల్యాండ్‌స్కేప్ రెండూ సమాన ఎత్తుతో, మనుషులపై ఫోకస్ ఉండే పర్ఫెక్ట్ గ్రిడ్ -->
         {#if article.image_url || article.image_url_2}
-          <div class="grid grid-cols-1 {article.image_url_2 ? 'md:grid-cols-2' : ''} gap-5 mb-6 items-start">
+          <div class="grid grid-cols-1 {article.image_url_2 ? 'md:grid-cols-2' : ''} gap-4 mb-6">
             
             {#if article.image_url}
-              <div class="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 shadow-sm flex flex-col items-center">
-                <div class="overflow-hidden w-full max-h-[440px] flex items-center justify-center">
-                  <img
-                    src={article.image_url}
-                    alt={article.headline}
-                    class="w-full h-auto max-h-[455px] object-contain -mb-5"
-                  />
-                </div>
-                <div class="w-full bg-slate-900 py-1.5 px-3 flex items-center justify-between text-white text-[10px] font-bold z-10">
+              <div class="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 shadow-sm h-72 sm:h-80 md:h-84 w-full">
+                <!-- object-cover object-top తో వ్యక్తుల ముఖాలు ప్రముఖంగా కనిపిస్తాయి, ఎత్తు సరిసమానంగా కుదురుతుంది -->
+                <img
+                  src={article.image_url}
+                  alt={article.headline}
+                  class="w-full h-full object-cover object-top"
+                />
+                <div class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent py-2 px-3 flex items-center justify-between text-white text-[11px] font-bold">
                   <span class="text-amber-400">📍 {article.location_town || 'ముత్తారం'}</span>
                   <span class="bg-red-600 text-white text-[9px] px-2 py-0.5 rounded font-black tracking-wider uppercase">NS NEWS</span>
                 </div>
@@ -174,15 +173,13 @@
             {/if}
 
             {#if article.image_url_2}
-              <div class="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 shadow-sm flex flex-col items-center">
-                <div class="overflow-hidden w-full max-h-[440px] flex items-center justify-center">
-                  <img
-                    src={article.image_url_2}
-                    alt={article.headline}
-                    class="w-full h-auto max-h-[455px] object-contain -mb-5"
-                  />
-                </div>
-                <div class="w-full bg-slate-900 py-1.5 px-3 flex items-center justify-between text-white text-[10px] font-bold z-10">
+              <div class="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 shadow-sm h-72 sm:h-80 md:h-84 w-full">
+                <img
+                  src={article.image_url_2}
+                  alt={article.headline}
+                  class="w-full h-full object-cover object-top"
+                />
+                <div class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent py-2 px-3 flex items-center justify-between text-white text-[11px] font-bold">
                   <span class="text-amber-400">📍 {article.location_town || 'ముత్తారం'}</span>
                   <span class="bg-red-600 text-white text-[9px] px-2 py-0.5 rounded font-black tracking-wider uppercase">NS NEWS</span>
                 </div>
