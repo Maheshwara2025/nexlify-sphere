@@ -526,7 +526,7 @@
           <div class="space-y-2 pt-2 text-xs font-semibold">
             <div class="flex items-center gap-2.5 text-slate-300">
               <i class="fa-solid fa-phone text-amber-500 w-4"></i>
-              <span>మొబైల్: <strong>9949122402 / 7993299555</strong></span>
+              <span>మొబైల్: <strong>9949122402 / 9502336495</strong></span>
             </div>
             <div class="flex items-center gap-2.5 text-slate-300">
               <i class="fa-solid fa-envelope text-amber-500 w-4"></i>
