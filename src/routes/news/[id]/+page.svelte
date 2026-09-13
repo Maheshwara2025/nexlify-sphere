@@ -154,14 +154,15 @@
         {/if}
 
         <!-- ఫోటోలు: తలలు కట్ కాకుండా ఉండేందుకు object-cover object-top -->
+        <!-- ఫోటోలు: పై భాగం, కింది భాగం ఏదీ కట్ కాకుండా 100% పూర్తి ఫోటో కనిపించే సెటప్ -->
         {#if article.image_url || article.image_url_2}
           <div class="grid grid-cols-1 {article.image_url_2 ? 'md:grid-cols-2' : ''} gap-4 mb-6">
             {#if article.image_url}
-              <div class="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-950 shadow-xs">
+              <div class="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-900/5 shadow-xs flex items-center justify-center p-1">
                 <img
                   src={article.image_url}
                   alt={article.headline}
-                  class="w-full h-72 sm:h-80 md:h-96 object-cover object-top"
+                  class="w-full h-auto max-h-[500px] object-contain rounded-xl"
                 />
                 <div class="absolute bottom-2.5 right-2.5 bg-black/75 text-white text-[10px] font-black px-2 py-0.5 rounded shadow">
                   NS NEWS
@@ -170,11 +171,11 @@
             {/if}
 
             {#if article.image_url_2}
-              <div class="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-950 shadow-xs">
+              <div class="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-900/5 shadow-xs flex items-center justify-center p-1">
                 <img
                   src={article.image_url_2}
                   alt={article.headline}
-                  class="w-full h-72 sm:h-80 md:h-96 object-cover object-top"
+                  class="w-full h-auto max-h-[500px] object-contain rounded-xl"
                 />
                 <div class="absolute bottom-2.5 right-2.5 bg-black/75 text-white text-[10px] font-black px-2 py-0.5 rounded shadow">
                   NS NEWS
