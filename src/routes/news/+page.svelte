@@ -1,5 +1,6 @@
 <script>
     import { page } from '$app/stores';
+    import { onMount } from 'svelte';
     import { supabase } from '$lib/supabaseClient';
 
     let article = null;
@@ -13,36 +14,33 @@
         'text-[19px] sm:text-[21px] leading-loose'
     ];
 
-    // URL నుండి ID మారినప్పుడల్లా రియాక్టివ్‌గా డేటా తీసుకురావడం
-    $: if ($page.params.id) {
-        fetchArticle($page.params.id);
-    }
+    onMount(async () => {
+        const id = $page.params.id;
+        if (!id) {
+            loading = false;
+            return;
+        }
 
-    async function fetchArticle(id) {
-        loading = true;
-        errorMsg = '';
         try {
-            // .single() ఫెయిల్ కాకుండా .limit(1) వాడటం అత్యంత సురక్షితం
             const { data, error } = await supabase
                 .from('news_articles')
                 .select('*')
-                .eq('id', id)
-                .limit(1);
+                .eq('id', id);
 
             if (error) throw error;
-            
+
             if (data && data.length > 0) {
                 article = data[0];
             } else {
                 errorMsg = 'వార్త లభించలేదు.';
             }
         } catch (err) {
-            console.error('Error fetching article:', err);
+            console.error(err);
             errorMsg = 'వార్తను లోడ్ చేయడంలో సమస్య ఏర్పడింది.';
         } finally {
             loading = false;
         }
-    }
+    });
 
     function handlePrint() {
         window.print();
