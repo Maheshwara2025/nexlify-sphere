@@ -7,6 +7,7 @@
   let loading = true;
   let errorMsg = '';
   let fontSizeLevel = 1;
+  let embedVideoUrl = null;
 
   const fontSizes = [
     'text-[15px] sm:text-[16px] leading-relaxed',
@@ -14,17 +15,21 @@
     'text-[19px] sm:text-[21px] leading-loose'
   ];
 
-  function getYouTubeEmbedUrl(url) {
+  function parseYouTube(url) {
     if (!url) return null;
     let videoId = '';
-    if (url.includes('youtu.be/')) {
-      videoId = url.split('youtu.be/')[1]?.split('?')[0];
-    } else if (url.includes('shorts/')) {
-      videoId = url.split('shorts/')[1]?.split('?')[0];
-    } else if (url.includes('v=')) {
-      videoId = url.split('v=')[1]?.split('&')[0];
+    try {
+      if (url.includes('youtu.be/')) {
+        videoId = url.split('youtu.be/')[1]?.split('?')[0];
+      } else if (url.includes('shorts/')) {
+        videoId = url.split('shorts/')[1]?.split('?')[0];
+      } else if (url.includes('v=')) {
+        videoId = url.split('v=')[1]?.split('&')[0];
+      }
+      return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
+    } catch (e) {
+      return null;
     }
-    return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
   }
 
   onMount(async () => {
@@ -45,6 +50,7 @@
 
       if (data && data.length > 0) {
         article = data[0];
+        embedVideoUrl = parseYouTube(article.youtube_url);
       } else {
         errorMsg = 'ఈ వార్తా కథనం అందుబాటులో లేదు.';
       }
@@ -154,7 +160,7 @@
           </div>
         </div>
 
-        <!-- హెడ్‌లైన్ -->
+        <!-- ప్రధాన హెడ్‌లైన్ -->
         <h2 class="text-xl sm:text-2xl md:text-3xl font-black text-slate-950 leading-snug tracking-tight mb-4">
           {article.headline}
         </h2>
@@ -173,22 +179,19 @@
           </div>
         {/if}
 
-        <!-- 1. ప్రధాన కవర్ ఫోటో (నల్లటి ఖాళీ లేకుండా, వాటర్‌మార్క్ కవర్ అయ్యే సెటప్) -->
+        <!-- 1. ప్రధాన కవర్ ఫోటో (పైకప్పు కట్ అవ్వకుండా మనుషులందరూ 100% కనిపించే సహజ వ్యూ) -->
         {#if article.image_url}
-          <figure class="mb-6 rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 shadow-sm">
-            <div class="relative w-full max-h-[480px] overflow-hidden flex items-center justify-center">
+          <figure class="mb-6 rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 shadow-sm">
+            <div class="w-full flex items-center justify-center p-1 sm:p-2">
               <img
                 src={article.image_url}
                 alt={article.headline}
-                class="w-full h-auto max-h-[500px] object-cover object-top -mb-8 scale-[1.03] origin-top"
+                class="w-full h-auto max-h-[520px] object-contain rounded-xl"
               />
-              <span class="absolute top-3 right-3 bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded shadow uppercase">
-                NS NEWS
-              </span>
             </div>
             <figcaption class="bg-slate-900 text-white px-4 py-2 flex items-center justify-between text-xs font-semibold">
               <span class="text-amber-400">📍 {article.location_town || 'ముత్తారం'}</span>
-              <span class="text-slate-400 text-[11px]">{article.reporter_name ? `${article.reporter_name} ప్రతినిధి` : 'NS నెట్‌వర్క్'}</span>
+              <span class="bg-red-600 text-white text-[9px] px-2 py-0.5 rounded font-black tracking-wider uppercase">NS NEWS</span>
             </figcaption>
           </figure>
         {/if}
@@ -209,30 +212,27 @@
           {article.content || article.summary}
         </div>
 
-        <!-- 2. రెండవ అనుబంధ ఫోటో (కథనం కింద పూర్తి సహజ వెడల్పుతో) -->
+        <!-- 2. రెండవ అనుబంధ ఫోటో (మనుషులు ఎవరూ కట్ కాకుండా సహజ పరిమాణం) -->
         {#if article.image_url_2}
-          <figure class="my-6 rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 shadow-sm">
-            <div class="relative w-full max-h-[460px] overflow-hidden flex items-center justify-center">
+          <figure class="my-6 rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 shadow-sm">
+            <div class="w-full flex items-center justify-center p-1 sm:p-2">
               <img
                 src={article.image_url_2}
                 alt={article.headline}
-                class="w-full h-auto max-h-[480px] object-cover object-top -mb-8 scale-[1.03] origin-top"
+                class="w-full h-auto max-h-[520px] object-contain rounded-xl"
               />
-              <span class="absolute top-3 right-3 bg-slate-900/80 backdrop-blur text-white text-[10px] font-bold px-2 py-0.5 rounded">
-                కార్యక్రమ దృశ్యం
-              </span>
             </div>
             <figcaption class="bg-slate-100 border-t border-slate-200 text-slate-600 px-4 py-2 text-xs font-medium text-center">
-              పురస్కార ప్రదానోత్సవ దృశ్యం
+              కార్యక్రమ దృశ్యం
             </figcaption>
           </figure>
         {/if}
 
-        <!-- యూట్యూబ్ వీడియో (ఉంటే డిస్‌ప్లే అవుతుంది) -->
-        {#if article.youtube_url && getYouTubeEmbedUrl(article.youtube_url)}
+        <!-- యూట్యూబ్ వీడియో -->
+        {#if embedVideoUrl}
           <div class="my-6 rounded-2xl overflow-hidden border border-slate-200 shadow-sm aspect-video">
             <iframe
-              src={getYouTubeEmbedUrl(article.youtube_url)}
+              src={embedVideoUrl}
               title={article.headline}
               class="w-full h-full border-0"
               allowfullscreen
