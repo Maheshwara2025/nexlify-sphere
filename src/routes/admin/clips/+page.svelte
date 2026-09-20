@@ -71,7 +71,7 @@
 
   <!-- 🔹 ఇక్కడ హోమ్ పేజీ, అడ్మిన్ పేజీకి వెళ్లే బటన్లు చేర్చబడ్డాయి -->
   <div class="flex items-center justify-between pb-3 border-b">
-    <a href="/admin" class="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-slate-950 bg-slate-100 hover:bg-slate-200 px-3.5 py-2 rounded-xl transition">
+    <a href="/admin/login" class="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-slate-950 bg-slate-100 hover:bg-slate-200 px-3.5 py-2 rounded-xl transition">
       ← అడ్మిన్ డాష్‌బోర్డ్ (Admin Dashboard)
     </a>
     <a href="/" class="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3.5 py-2 rounded-xl transition">
