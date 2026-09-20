@@ -287,22 +287,51 @@
   <div class="w-full max-w-[480px] bg-slate-100 min-h-screen sm:min-h-0 sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-700/50">
     
     <!-- హెడర్ -->
-    <header class="bg-slate-950 px-4 py-3 flex items-center justify-between shrink-0 text-white border-b border-slate-800">
+    <header class="bg-slate-950 px-3 sm:px-4 py-2.5 flex items-center justify-between shrink-0 text-white border-b border-slate-800">
+      
+      <!-- ఎడమవైపు: హోమ్ బటన్ & NS SHORTS లోగో -->
       <div class="flex items-center gap-2">
-        <span class="bg-red-600 text-white font-black text-xs px-2 py-0.5 rounded shadow">NS</span>
-        <span class="text-sm font-black tracking-wider text-white">SHORTS</span>
+        <!-- 🌟 హోమ్ పేజీ లింక్ 🌟 -->
+        <a 
+          href="/" 
+          class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1 border border-slate-700 transition"
+          title="హోమ్ పేజీకి వెళ్లండి"
+        >
+          <span>🏠</span>
+          <span class="text-[11px] hidden xs:inline">హోమ్</span>
+        </a>
+
+        <div class="flex items-center gap-1.5 ml-1">
+          <span class="bg-red-600 text-white font-black text-xs px-2 py-0.5 rounded shadow">NS</span>
+          <span class="text-sm font-black tracking-wider text-white">SHORTS</span>
+        </div>
       </div>
       
-      <div class="flex items-center gap-2">
+      <!-- కుడివైపు: న్యూస్ పోర్టల్ లింక్, లాంగ్వేజ్ ఫిల్టర్స్ & కౌంటర్ -->
+      <div class="flex items-center gap-1.5 sm:gap-2">
+        <!-- 🌟 న్యూస్ పోర్టల్ లింక్ 🌟 -->
+        <a 
+          href="/news" 
+          class="bg-red-950/80 hover:bg-red-900 border border-red-700/60 text-red-300 px-2 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition"
+          title="NS News పోర్టల్"
+        >
+          <span>📰</span>
+          <span class="hidden sm:inline">న్యూస్</span>
+        </a>
+
+        <!-- లాంగ్వేజ్ బటన్లు -->
         <div class="flex bg-slate-800 p-0.5 rounded-lg border border-slate-700 text-[11px] font-bold">
           <button type="button" on:click={() => { activeLang = 'all'; currentIndex = 0; }} class="px-2 py-0.5 rounded {activeLang === 'all' ? 'bg-red-600 text-white' : 'text-slate-400'}">అన్నీ</button>
           <button type="button" on:click={() => { activeLang = 'te'; currentIndex = 0; }} class="px-2 py-0.5 rounded {activeLang === 'te' ? 'bg-red-600 text-white' : 'text-slate-400'}">తెలుగు</button>
           <button type="button" on:click={() => { activeLang = 'en'; currentIndex = 0; }} class="px-2 py-0.5 rounded {activeLang === 'en' ? 'bg-red-600 text-white' : 'text-slate-400'}">EN</button>
         </div>
-        <span class="text-xs bg-slate-800 text-slate-300 px-2 py-1 rounded-full font-bold border border-slate-700">
+
+        <!-- కౌంటర్ -->
+        <span class="text-[11px] bg-slate-800 text-slate-300 px-2 py-1 rounded-lg font-mono font-bold border border-slate-700">
           {filteredShorts.length > 0 ? `${currentIndex + 1}/${filteredShorts.length}` : '0'}
         </span>
       </div>
+      
     </header>
 
     <!-- కార్డ్ ఏరియా -->
