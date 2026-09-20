@@ -1,6 +1,18 @@
 <script>
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
+  let recentClips = [];
+
+async function getRecentClips() {
+  const { data } = await supabase
+    .from('paper_clips')
+    .select('*')
+    .order('clip_date', { ascending: false })
+    .limit(6);
+  if (data) recentClips = data;
+}
+
+getRecentClips();
 
   let recentNews = [];
   let tickerNews = [];
@@ -153,6 +165,29 @@
   <!-- 2. ప్రధాన హెడర్ (షాప్ బ్రాండింగ్ & పోర్టల్ నావిగేషన్) -->
   <header class="bg-white border-b-2 border-red-600 shadow-sm sticky top-0 z-40">
     <div class="max-w-7xl mx-auto px-4 py-3 sm:py-3.5 flex items-center justify-between">
+    <!-- Paper Clips Banner on Home Page -->
+<div class="my-8 max-w-6xl mx-auto px-4">
+  <div class="flex justify-between items-center mb-4 border-b pb-2">
+    <h2 class="text-lg md:text-xl font-black text-slate-900 flex items-center gap-2">
+      📰 నేటి పేపర్ క్లిప్పింగ్స్ (E-Paper Clips)
+    </h2>
+    <a href="/clips" class="text-xs font-bold text-red-600 hover:underline">
+      అన్నీ చూడండి →
+    </a>
+  </div>
+
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    {#each recentClips as clip}
+      <a href="/clip/{clip.id}" class="group bg-white rounded-xl border p-2 hover:shadow-md transition">
+        <div class="h-40 w-full overflow-hidden rounded-lg bg-slate-100 mb-2">
+          <img src={clip.image_url} alt={clip.title} class="w-full h-full object-cover group-hover:scale-105 transition" />
+        </div>
+        <h3 class="text-xs font-bold text-slate-900 line-clamp-2 leading-snug">{clip.title}</h3>
+        <p class="text-[10px] text-slate-500 mt-1">{clip.newspaper_name} • {clip.page_number}</p>
+      </a>
+    {/each}
+  </div>
+</div>
       
       <!-- లోగో & బ్రాండ్ టైటిల్ -->
       <a href="/" class="flex items-center gap-3">
