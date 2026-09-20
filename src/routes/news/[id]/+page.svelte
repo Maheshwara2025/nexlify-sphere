@@ -14,6 +14,39 @@
     'text-[17px] sm:text-[18px] leading-loose',
     'text-[19px] sm:text-[21px] leading-loose'
   ];
+  // Paper clip image download chese function
+  let downloadingClip = false;
+
+  async function downloadAsImage() {
+    downloadingClip = true;
+    try {
+      // html2canvas library dynamic load
+      if (!window.html2canvas) {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+        document.head.appendChild(script);
+        await new Promise((resolve) => (script.onload = resolve));
+      }
+
+      const clipElement = document.getElementById('news-printable-area');
+      if (!clipElement) return;
+
+      const canvas = await window.html2canvas(clipElement, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff'
+      });
+
+      const link = document.createElement('a');
+      link.download = `NS_News_Clip_${Date.now()}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch (err) {
+      alert('Image download lo samasya vachindi: ' + err.message);
+    } finally {
+      downloadingClip = false;
+    }
+  }
 
   function parseYouTube(url) {
     if (!url) return null;
@@ -142,6 +175,16 @@
           <span>e-Paper క్లిప్పింగ్ డౌన్‌లోడ్</span>
         </button>
       </div>
+      <div class="no-print flex items-center gap-2 mb-4 justify-end">
+  <button
+    on:click={downloadAsImage}
+    disabled={downloadingClip}
+    class="bg-red-600 hover:bg-red-700 text-white text-xs font-black px-4 py-2.5 rounded-xl shadow flex items-center gap-2 transition"
+  >
+    <span>📸</span>
+    <span>{downloadingClip ? 'క్లిప్ సిద్ధమవుతోంది...' : 'పేపర్ క్లిప్‌గా డౌన్‌లోడ్ (PNG)'}</span>
+  </button>
+</div>
 
       <!-- ఆర్టికల్ కార్డ్ -->
       <article class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-6 sm:p-8 print:p-0 print:border-none print:shadow-none">
@@ -271,14 +314,12 @@
 
 </div>
 <style>
-  /* Print mariyu Single Page Clipping styles */
   @media print {
     @page {
-      margin: 8mm 10mm;
+      margin: 4mm 6mm !important;
       size: A4 portrait;
     }
 
-    /* Website navigation, header, footer mariyu buttons print lo kanipinchakunda */
     :global(nav),
     :global(header),
     :global(footer),
@@ -290,52 +331,42 @@
 
     :global(body) {
       background: #ffffff !important;
-      color: #000000 !important;
-      font-size: 13px !important;
-      line-height: 1.6 !important;
       margin: 0 !important;
       padding: 0 !important;
     }
 
-    /* Vartha rendu pages ga thegipokunda single page lo unche setting */
-    .news-container,
-    article,
-    .news-card {
-      border: 1px solid #e2e8f0 !important;
-      box-shadow: none !important;
-      padding: 12px !important;
+    #news-printable-area {
+      border: 1px solid #cbd5e1 !important;
+      padding: 10px !important;
       margin: 0 auto !important;
       max-width: 100% !important;
       page-break-inside: avoid !important;
       break-inside: avoid !important;
     }
 
-    /* Photo size control */
+    /* Photo cut avvakunda size control */
     img {
-      max-height: 220px !important;
-      object-fit: cover !important;
-      page-break-inside: avoid !important;
-      break-inside: avoid !important;
-      border-radius: 8px !important;
-      margin-bottom: 8px !important;
-    }
-
-    h1, h2, h3, p {
+      max-height: 165px !important;
+      width: auto !important;
+      margin: 4px auto !important;
+      display: block !important;
+      object-fit: contain !important;
       page-break-inside: avoid !important;
       break-inside: avoid !important;
     }
 
     h1 {
-      font-size: 20px !important;
-      line-height: 1.3 !important;
-      margin-bottom: 8px !important;
+      font-size: 16px !important;
+      line-height: 1.25 !important;
+      margin-bottom: 6px !important;
       color: #000000 !important;
     }
 
     p {
+      font-size: 11px !important;
+      line-height: 1.4 !important;
+      margin-bottom: 6px !important;
       color: #1e293b !important;
-      font-size: 12.5px !important;
-      margin-bottom: 10px !important;
     }
   }
 </style>
