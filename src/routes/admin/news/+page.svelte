@@ -310,6 +310,15 @@
                     >
                         లాగౌట్
                     </button>
+					<!-- E-Paper Clips పేజీకి వెళ్లే బటన్ -->
+<a 
+  href="/admin/clips" 
+  class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white text-xs md:text-sm font-bold px-4 py-2.5 rounded-xl shadow-sm transition"
+>
+  📰 E-Paper Clips Upload Desk →
+</a>
+
+
                 </div>
             </div>
 			<div class="p-6 sm:p-8 space-y-6">
