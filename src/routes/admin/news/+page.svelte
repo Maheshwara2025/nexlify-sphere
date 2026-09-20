@@ -1,256 +1,306 @@
 <script>
-	import { supabase } from '$lib/supabaseClient';
-	import { goto } from '$app/navigation';
-	import { onMount } from 'svelte';
+    import { supabase } from '$lib/supabaseClient';
+    import { goto } from '$app/navigation';
+    import { onMount } from 'svelte';
 
-	let authChecking = true;
+    let authChecking = true;
 
-	onMount(async () => {
-		const { data: { session } } = await supabase.auth.getSession();
-		if (!session) {
-			goto('/admin/login');
-		} else {
-			authChecking = false;
-		}
+    onMount(async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            goto('/admin/login');
+        } else {
+            authChecking = false;
+        }
 
-		const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-			if (!session) {
-				goto('/admin/login');
-			}
-		});
+        const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+            if (!session) {
+                goto('/admin/login');
+            }
+        });
 
-		return () => {
-			authListener.subscription.unsubscribe();
-		};
-	});
+        return () => {
+            authListener.subscription.unsubscribe();
+        };
+    });
 
-	async function handleLogout() {
-		await supabase.auth.signOut();
-		goto('/admin/login');
-	}
+    async function handleLogout() {
+        await supabase.auth.signOut();
+        goto('/admin/login');
+    }
 
-	// Smart Input Box
-	let rawNewsInput = '';
+    // Smart Input Box
+    let rawNewsInput = '';
 
-	// Form Fields
-	let location_town = 'ముత్తారం';
-	let custom_town = '';
-	let headline = '';
-	let subline_1 = '';
-	let subline_2 = '';
-	let subline_3 = '';
-	let news_tone = 'soft';
-	let alert_type = 'none';
-	let category = 'రాజకీయాలు';
-	let content = '';
-	let youtube_url = '';
-	let show_in_ticker = true;
+    // Form Fields
+    let location_town = 'ముత్తారం';
+    let custom_town = '';
+    let headline = '';
+    let subline_1 = '';
+    let subline_2 = '';
+    let subline_3 = '';
+    let news_tone = 'soft';
+    let alert_type = 'none';
+    let category = 'రాజకీయాలు';
+    let content = '';
+    let youtube_url = '';
+    let show_in_ticker = true;
 
-	// Media 1
-	/** @type {File | null} */
-	let imageFile1 = null;
-	/** @type {string | null} */
-	let imagePreview1 = null;
-	let image_caption_1 = '';
+    // Media 1
+    /** @type {File | null} */
+    let imageFile1 = null;
+    /** @type {string | null} */
+    let imagePreview1 = null;
+    let image_caption_1 = '';
 
-	// Media 2
-	/** @type {File | null} */
-	let imageFile2 = null;
-	/** @type {string | null} */
-	let imagePreview2 = null;
-	let image_caption_2 = '';
+    // Media 2
+    /** @type {File | null} */
+    let imageFile2 = null;
+    /** @type {string | null} */
+    let imagePreview2 = null;
+    let image_caption_2 = '';
 
-	let isUploading = false;
-	let statusMsg = '';
-	let statusType = '';
+    let isUploading = false;
+    let statusMsg = '';
+    let statusType = '';
 
-	const towns = [
-		'ముత్తారం',
-		'పెద్దపల్లి',
-		'కరీంనగర్',
-		'మంథని',
-		'సుల్తానాబాద్',
-		'గోదావరిఖని',
-		'రామగుండం',
-		'హైదరాబాద్',
-		'తెలంగాణ',
-		'జాతీయం',
-		'ఇతర ఊరు (Type Below)'
-	];
+    const towns = [
+        'ముత్తారం',
+        'పెద్దపల్లి',
+        'కరీంనగర్',
+        'మంథని',
+        'సుల్తానాబాద్',
+        'గోదావరిఖని',
+        'రామగుండం',
+        'హైదరాబాద్',
+        'తెలంగాణ',
+        'జాతీయం',
+        'ఇతర ఊరు (Type Below)'
+    ];
 
-	const categories = [
-		'రాజకీయాలు',
-		'వ్యాపారం & ఫైనాన్స్',
-		'టెక్నాలజీ',
-		'ఆరోగ్యం',
-		'వాతావరణం & పర్యావరణం',
-		'విద్య & ఉద్యోగాలు',
-		'సైన్స్ & పరిశోధనలు',
-		'క్రీడలు & గేమ్స్',
-		'సంస్కృతి & సమాజం',
-		'ప్రపంచ వార్తలు'
-	];
+    const categories = [
+        'రాజకీయాలు',
+        'వ్యాపారం & ఫైనాన్స్',
+        'టెక్నాలజీ',
+        'ఆరోగ్యం',
+        'వాతావరణం & పర్యావరణం',
+        'విద్య & ఉద్యోగాలు',
+        'సైన్స్ & పరిశోధనలు',
+        'క్రీడలు & గేమ్స్',
+        'సంస్కృతి & సమాజం',
+        'ప్రపంచ వార్తలు'
+    ];
 
-	function autoParseNews() {
-		if (!rawNewsInput.trim()) return;
+    // మెరుగుపరిచిన స్మార్ట్ ఆటో-ఫార్మాట్ ఫంక్షన్
+    function autoParseNews() {
+        if (!rawNewsInput || !rawNewsInput.trim()) {
+            alert('దయచేసి ముందుగా పైన ఉన్న బాక్స్‌లో వార్త టెక్స్ట్‌ను పేస్ట్ చేయండి!');
+            return;
+        }
 
-		const lines = rawNewsInput
-			.split('\n')
-			.map(l => l.trim())
-			.filter(l => l.length > 0);
+        // లైన్ల వారీగా విభజించి ఖాళీలను తొలగించడం
+        let lines = rawNewsInput
+            .split(/\r?\n/)
+            .map(l => l.trim())
+            .filter(l => l.length > 0);
 
-		if (lines.length === 0) return;
+        if (lines.length === 0) return;
 
-		headline = lines[0];
+        // ఒకవేళ ఎంటర్‌లు లేకుండా ఒకే పెద్ద పేరాగా పేస్ట్ చేస్తే
+        if (lines.length === 1 && lines[0].length > 90) {
+            const sentences = lines[0].split(/(?<=[।!?.\n])\s+/);
+            if (sentences.length > 1) {
+                headline = sentences[0].replace(/^[*#•■✦-]+\s*/, '').trim();
+                content = sentences.slice(1).join('\n\n').trim();
+            } else {
+                headline = lines[0].substring(0, 80).trim();
+                content = lines[0];
+            }
+            subline_1 = '';
+            subline_2 = '';
+            subline_3 = '';
+        } else {
+            // బహుళ లైన్లు ఉన్నప్పుడు
+            headline = lines[0]
+                .replace(/^[*#•■✦-]+\s*/, '')
+                .replace(/\s+/g, ' ')
+                .trim();
 
-		let sublines = [];
-		let bodyStartIndex = 1;
+            let sublines = [];
+            let bodyStartIndex = 1;
 
-		for (let i = 1; i < Math.min(lines.length, 5); i++) {
-			const line = lines[i];
-			const isBullet = /^([•\-\*■✦]|\d+[\.\)])\s*/.test(line);
-			const isShortLine = line.length < 110 && !line.includes(':') && !line.includes('వివరాల్లోకి వెళ్తే');
+            for (let i = 1; i < Math.min(lines.length, 5); i++) {
+                const line = lines[i];
+                const isBullet = /^([•\-\*■✦]|\d+[\.\)])\s*/.test(line);
+                const isShort = line.length < 85 && !line.includes('వివరాల్లోకి వెళ్తే') && !line.includes(':') && !line.includes('ప్రతినిధి');
 
-			if (isBullet || isShortLine) {
-				const cleanedLine = line.replace(/^([•\-\*■✦]|\d+[\.\)])\s*/, '').trim();
-				if (cleanedLine) {
-					sublines.push(cleanedLine);
-					bodyStartIndex = i + 1;
-				}
-			} else {
-				break;
-			}
-		}
+                if (isBullet || isShort) {
+                    const cleaned = line.replace(/^([•\-\*■✦]|\d+[\.\)])\s*/, '').trim();
+                    if (cleaned) {
+                        sublines.push(cleaned);
+                        bodyStartIndex = i + 1;
+                    }
+                } else {
+                    break;
+                }
+            }
 
-		subline_1 = sublines[0] || '';
-		subline_2 = sublines[1] || '';
-		subline_3 = sublines[2] || '';
+            subline_1 = sublines[0] || '';
+            subline_2 = sublines[1] || '';
+            subline_3 = sublines[2] || '';
 
-		let remaining = lines.slice(bodyStartIndex);
-		let fullBody = remaining.join('\n\n');
+            let remaining = lines.slice(bodyStartIndex);
+            let fullBody = remaining.join('\n\n');
 
-		const townMatch = fullBody.match(/^([\u0C00-\u0C7F\w\s]+)\s*[:：\-–]\s*(.*)/s);
-		if (townMatch && townMatch[1] && townMatch[1].length < 25) {
-			const detectedTown = townMatch[1].trim();
-			if (towns.includes(detectedTown)) {
-				location_town = detectedTown;
-			} else {
-				location_town = 'ఇతర ఊరు (Type Below)';
-				custom_town = detectedTown;
-			}
-			fullBody = townMatch[2].trim();
-		}
+            // లొకేషన్ ప్రిఫిక్స్ ఉంటే (ఉదా: ముత్తారం :) గుర్తించి బాడీ నుండి తీసివేయడం
+            const townMatch = fullBody.match(/^([\u0C00-\u0C7F\w\s]+)\s*[:：\-–]\s*(.*)/s);
+            if (townMatch && townMatch[1] && townMatch[1].length < 25) {
+                const detectedTown = townMatch[1].trim();
+                if (towns.includes(detectedTown)) {
+                    location_town = detectedTown;
+                } else {
+                    location_town = 'ఇతర ఊరు (Type Below)';
+                    custom_town = detectedTown;
+                }
+                fullBody = townMatch[2].trim();
+            }
 
-		content = fullBody;
-	}
+            content = fullBody || (lines.length > 1 ? lines.slice(1).join('\n\n') : headline);
+        }
 
-	/**
-	 * @param {Event} e
-	 * @param {number} num
-	 */
-	function handleImageSelect(e, num) {
-		const target = /** @type {HTMLInputElement} */ (e.target);
-		if (target && target.files && target.files[0]) {
-			if (num === 1) {
-				imageFile1 = target.files[0];
-				imagePreview1 = URL.createObjectURL(imageFile1);
-			} else {
-				imageFile2 = target.files[0];
-				imagePreview2 = URL.createObjectURL(imageFile2);
-			}
-		}
-	}
+        // లొకేషన్ ఆటో-డిటెక్షన్
+        const fullText = rawNewsInput;
+        for (const t of towns) {
+            if (t !== 'ఇతర ఊరు (Type Below)' && fullText.includes(t)) {
+                location_town = t;
+                break;
+            }
+        }
 
-	/**
-	 * @param {File} file
-	 */
-	async function uploadSingleImage(file) {
-		const fileExt = file.name.split('.').pop();
-		const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
-		const filePath = `articles/${fileName}`;
+        // కేటగిరీ ఆటో-డిటెక్షన్
+        if (fullText.includes('పాఠశాల') || fullText.includes('విద్యార్థు') || fullText.includes('ఉపాధ్యాయు') || fullText.includes('డిఈవో') || fullText.includes('బడి') || fullText.includes('కళాశాల')) {
+            category = 'విద్య & ఉద్యోగాలు';
+        } else if (fullText.includes('మంత్రి') || fullText.includes('ఎమ్మెల్యే') || fullText.includes('ఎంపీ') || fullText.includes('పార్టీ') || fullText.includes('కాంగ్రెస్') || fullText.includes('బీజేపీ') || fullText.includes('బీఆర్ఎస్')) {
+            category = 'రాజకీయాలు';
+        } else if (fullText.includes('రైతు') || fullText.includes('వ్యవసాయ') || fullText.includes('పంట') || fullText.includes('వరి')) {
+            category = 'వాతావరణం & పర్యావరణం';
+        } else if (fullText.includes('వైద్యం') || fullText.includes('ఆసుపత్రి') || fullText.includes('డాక్టర్') || fullText.includes('ఆరోగ్య')) {
+            category = 'ఆరోగ్యం';
+        } else if (fullText.includes('క్రికెట్') || fullText.includes('మ్యాచ్') || fullText.includes('క్రీడ')) {
+            category = 'క్రీడలు & గేమ్స్';
+        }
+    }
 
-		const { error: uploadError } = await supabase.storage
-			.from('news-images')
-			.upload(filePath, file, { cacheControl: '3600', upsert: true });
+    // బటన్ ఏ పేరుతో పిలిచినా పనిచేసేలా అలియాస్
+    const handleAutoFormat = autoParseNews;
 
-		if (uploadError) throw uploadError;
+    /**
+     * @param {Event} e
+     * @param {number} num
+     */
+    function handleImageSelect(e, num) {
+        const target = /** @type {HTMLInputElement} */ (e.target);
+        if (target && target.files && target.files[0]) {
+            if (num === 1) {
+                imageFile1 = target.files[0];
+                imagePreview1 = URL.createObjectURL(imageFile1);
+            } else {
+                imageFile2 = target.files[0];
+                imagePreview2 = URL.createObjectURL(imageFile2);
+            }
+        }
+    }
 
-		const { data } = supabase.storage.from('news-images').getPublicUrl(filePath);
-		return data.publicUrl;
-	}
+    /**
+     * @param {File} file
+     */
+    async function uploadSingleImage(file) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+        const filePath = `articles/${fileName}`;
 
-	async function handleSubmit() {
-		if (!headline || !content) {
-			statusMsg = 'దయచేసి హెడ్‌లైన్ మరియు వార్త వివరాలను నమోదు చేయండి.';
-			statusType = 'error';
-			return;
-		}
+        const { error: uploadError } = await supabase.storage
+            .from('news-images')
+            .upload(filePath, file, { cacheControl: '3600', upsert: true });
 
-		isUploading = true;
-		statusMsg = '';
+        if (uploadError) throw uploadError;
 
-		const finalLocation = location_town === 'ఇతర ఊరు (Type Below)' 
-			? (custom_town.trim() || 'తెలంగాణ') 
-			: location_town;
+        const { data } = supabase.storage.from('news-images').getPublicUrl(filePath);
+        return data.publicUrl;
+    }
 
-		try {
-			let imageUrl1 = null;
-			let imageUrl2 = null;
+    async function handleSubmit() {
+        if (!headline || !content) {
+            statusMsg = 'దయచేసి హెడ్‌లైన్ మరియు వార్త వివరాలను నమోదు చేయండి.';
+            statusType = 'error';
+            return;
+        }
 
-			if (imageFile1) {
-				imageUrl1 = await uploadSingleImage(imageFile1);
-			}
-			if (imageFile2) {
-				imageUrl2 = await uploadSingleImage(imageFile2);
-			}
+        isUploading = true;
+        statusMsg = '';
 
-			const { error } = await supabase.from('news_articles').insert([
-				{
-					location_town: finalLocation,
-					headline,
-					subline_1: subline_1 || null,
-					subline_2: subline_2 || null,
-					subline_3: subline_3 || null,
-					news_tone,
-					alert_type,
-					category,
-					content,
-					image_url: imageUrl1,
-					image_caption_1: image_caption_1 || null,
-					image_url_2: imageUrl2,
-					image_caption_2: image_caption_2 || null,
-					youtube_url: youtube_url || null,
-					show_in_ticker
-				}
-			]);
+        const finalLocation = location_town === 'ఇతర ఊరు (Type Below)' 
+            ? (custom_town.trim() || 'తెలంగాణ') 
+            : location_town;
 
-			if (error) throw error;
+        try {
+            let imageUrl1 = null;
+            let imageUrl2 = null;
 
-			statusMsg = 'వార్త విజయవంతంగా పబ్లిష్ అయ్యింది!';
-			statusType = 'success';
+            if (imageFile1) {
+                imageUrl1 = await uploadSingleImage(imageFile1);
+            }
+            if (imageFile2) {
+                imageUrl2 = await uploadSingleImage(imageFile2);
+            }
 
-			rawNewsInput = '';
-			headline = '';
-			subline_1 = '';
-			subline_2 = '';
-			subline_3 = '';
-			content = '';
-			imageFile1 = null;
-			imagePreview1 = null;
-			image_caption_1 = '';
-			imageFile2 = null;
-			imagePreview2 = null;
-			image_caption_2 = '';
-			youtube_url = '';
-			custom_town = '';
-		} catch (/** @type {any} */ err) {
-			console.error('Submit Error:', err);
-			statusMsg = `లోపం: ${err.message || 'మళ్లీ ప్రయత్నించండి'}`;
-			statusType = 'error';
-		} finally {
-			isUploading = false;
-		}
-	}
+            const { error } = await supabase.from('news_articles').insert([
+                {
+                    location_town: finalLocation,
+                    headline,
+                    subline_1: subline_1 || null,
+                    subline_2: subline_2 || null,
+                    subline_3: subline_3 || null,
+                    news_tone,
+                    alert_type,
+                    category,
+                    content,
+                    image_url: imageUrl1,
+                    image_caption_1: image_caption_1 || null,
+                    image_url_2: imageUrl2,
+                    image_caption_2: image_caption_2 || null,
+                    youtube_url: youtube_url || null,
+                    show_in_ticker
+                }
+            ]);
+
+            if (error) throw error;
+
+            statusMsg = 'వార్త విజయవంతంగా పబ్లిష్ అయ్యింది!';
+            statusType = 'success';
+
+            rawNewsInput = '';
+            headline = '';
+            subline_1 = '';
+            subline_2 = '';
+            subline_3 = '';
+            content = '';
+            imageFile1 = null;
+            imagePreview1 = null;
+            image_caption_1 = '';
+            imageFile2 = null;
+            imagePreview2 = null;
+            image_caption_2 = '';
+            youtube_url = '';
+            custom_town = '';
+        } catch (/** @type {any} */ err) {
+            console.error('Submit Error:', err);
+            statusMsg = `లోపం: ${err.message || 'మళ్లీ ప్రయత్నించండి'}`;
+            statusType = 'error';
+        } finally {
+            isUploading = false;
+        }
+    }
 </script>
 
 <svelte:head>
