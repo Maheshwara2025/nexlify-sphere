@@ -6,6 +6,7 @@
   let tickerNews = [];
   let newsArticles = [];
   let loadingClips = true;
+  let loadingNews = true;
 
   // సేవల జాబితా (Citizen & Digital Utilities)
   const services = [
@@ -29,38 +30,39 @@
         .limit(6);
       if (clipsData) paperClips = clipsData;
     } catch (e) {
-      console.log('Error loading clips:', e);
+      console.log('Clips load error:', e);
     } finally {
       loadingClips = false;
     }
 
-    // 2. న్యూస్ ఆర్టికల్స్ & టిక్కర్ లోడ్ చేయడం
+    // 2. న్యూస్ ఆర్టికల్స్ లోడ్ చేయడం (news లేదా articles టేబుల్ నుండి)
     try {
-      const { data: newsData } = await supabase
-        .from('news')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (newsData && newsData.length > 0) {
-        newsArticles = newsData;
-        tickerNews = newsData.map(n => n.title);
+      let res = await supabase.from('news').select('*').order('created_at', { ascending: false }).limit(6);
+      if (!res.data || res.data.length === 0) {
+        res = await supabase.from('articles').select('*').order('created_at', { ascending: false }).limit(6);
+      }
+      
+      if (res.data && res.data.length > 0) {
+        newsArticles = res.data;
+        tickerNews = res.data.map(n => n.title);
       } else {
         tickerNews = [
-          'ముత్తారంలో విశ్వకర్మ జయంతి వేడుకలు ఘనంగా నిర్వహణ',
+          'ముత్తారంలో ఘనంగా విశ్వకర్మ జయంతి వేడుకలు నిర్వహణ',
           'తెలంగాణ ఇందిరమ్మ కుట్టు మిషన్ పథకం దరఖాస్తులు ప్రారంభం - వివరాలకు సంప్రదించండి',
           'A.S.V. Enterprises నందు ఆధార్, ధరణి, పాన్ కార్డ్ మరియు IRCTC రైలు టికెట్ సేవలు అందుబాటులో ఉన్నాయి'
         ];
       }
     } catch (e) {
       tickerNews = ['A.S.V. Enterprises & NS News పోర్టల్‌కు స్వాగతం - ముత్తారం బస్ స్టాండ్ వద్ద'];
+    } finally {
+      loadingNews = false;
     }
   });
 </script>
 
 <svelte:head>
   <title>A.S.V. Enterprises & NS News | అధీకృత డిజిటల్ సేవా కేంద్రం, ముత్తారం</title>
-  <meta name="description" content="A.S.V. Enterprises (CSC ID: 514542450010) - డిజిటల్ సేవలు, ప్రభుత్వ సంక్షేమ పథకాలు, ధరణి, ఆధార్ మరియు ముత్తారం మండల తాజా వార్తలు." />
+  <meta name="description" content="A.S.V. Enterprises & NS News - డిజిటల్ సేవలు, ప్రభుత్వ సంక్షేమ పథకాలు, ధరణి, ఆధార్ మరియు ముత్తారం మండల తాజా వార్తలు." />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Mandali&family=Ramabhadra&family=Noto+Sans+Telugu:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -69,7 +71,7 @@
 
 <div class="min-h-screen bg-slate-100 text-slate-900 font-['Noto_Sans_Telugu',sans-serif] flex flex-col">
 
-  <!-- 1. టాప్ స్ట్రిప్ (అధికారిక వివరాలు & హెల్ప్‌లైన్) -->
+  <!-- 1. టాప్ స్ట్రిప్ (అధికారిక గుర్తింపు వివరాలు & హెల్ప్‌లైన్) -->
   <div class="bg-slate-950 text-amber-300 py-1.5 px-4 text-[11px] font-semibold border-b border-slate-800 select-none">
     <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
       <div class="flex items-center gap-2 flex-wrap">
@@ -93,45 +95,47 @@
     </div>
   </div>
 
-  <!-- 2. ప్రధాన హెడర్ (షాప్ బ్రాండింగ్ & నావిగేషన్ - క్లీన్ లేఅవుట్) -->
+  <!-- 2. ప్రధాన హెడర్ (షాప్ లోగో + స్పష్టమైన NS NEWS పోర్టల్ బటన్) -->
   <header class="bg-white border-b-2 border-red-600 shadow-sm sticky top-0 z-40">
-    <div class="max-w-7xl mx-auto px-4 py-3 sm:py-3.5 flex items-center justify-between">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
       
-      <!-- షాప్ లోగో & టైటిల్ -->
-      <a href="/" class="flex items-center gap-3 group">
-        <div class="w-11 h-11 bg-slate-950 text-white rounded-xl flex items-center justify-center font-black text-base shadow-md group-hover:bg-red-600 transition tracking-tighter">
+      <!-- ఎడమవైపు: లోగో & బ్రాండింగ్ -->
+      <a href="/" class="flex items-center gap-3 shrink-0">
+        <div class="w-10 h-10 bg-slate-950 text-white rounded-xl flex items-center justify-center font-black text-sm shadow tracking-tighter">
           ASV
         </div>
         <div>
-          <div class="flex items-center gap-2">
-            <h1 class="font-['Ramabhadra'] text-lg sm:text-xl font-black text-slate-950 tracking-tight leading-none">
-              A.S.V. ENTERPRISES
-            </h1>
-          </div>
-          <p class="text-[10px] sm:text-xs text-slate-500 font-bold mt-0.5">
-            మీ మనీ - మీ సేవ - మీ సౌలభ్యం • బస్ స్టాండ్ వద్ద, ముత్తారం
+          <h1 class="font-['Ramabhadra'] text-base sm:text-lg font-black text-slate-950 leading-none">
+            A.S.V. ENTERPRISES
+          </h1>
+          <p class="text-[10px] text-slate-500 font-bold mt-0.5">
+            మీ మనీ - మీ సేవ - మీ సౌలభ్యం • బస్ స్టాండ్, ముత్తారం
           </p>
         </div>
       </a>
 
-      <!-- బ్యాడ్జ్‌లు & బటన్లు -->
-      <div class="flex items-center gap-2 sm:gap-2.5">
-        <span class="bg-red-600 text-white text-[10px] sm:text-xs font-black px-2.5 py-1 rounded-lg uppercase shadow-sm">
-          CSC CENTER
-        </span>
-        <span class="bg-rose-700 text-white text-[10px] sm:text-xs font-black px-2.5 py-1 rounded-lg uppercase shadow-sm hidden xs:inline-block">
-          NS NEWS
-        </span>
+      <!-- కుడివైపు: నావిగేషన్ & NS NEWS డైరెక్ట్ లింక్ బటన్ -->
+      <div class="flex items-center gap-2">
+        <!-- 🌟 ప్రత్యేక NS NEWS పోర్టల్ లింక్ 🌟 -->
+        <a
+          href="/news"
+          class="bg-red-600 hover:bg-red-700 text-white text-xs font-black px-3.5 py-2 rounded-xl shadow-md flex items-center gap-2 transition active:scale-95 border border-red-700 animate-pulse"
+        >
+          <i class="fa-solid fa-newspaper text-amber-300 text-sm"></i>
+          <span>NS NEWS పోర్టల్ ➡</span>
+        </a>
+
         <a
           href="/admin/clips"
-          class="bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 text-[11px] sm:text-xs font-bold px-3 py-1 rounded-lg transition flex items-center gap-1"
+          class="bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 text-xs font-bold px-3 py-2 rounded-xl transition hidden sm:flex items-center gap-1"
         >
-          <i class="fa-solid fa-newspaper text-red-600"></i>
+          <i class="fa-solid fa-cloud-arrow-up text-red-600"></i>
           <span>క్లిప్స్ అప్‌లోడ్</span>
         </a>
+
         <a
           href="/admin/login"
-          class="bg-slate-900 hover:bg-slate-800 text-white text-[11px] sm:text-xs font-bold px-3 py-1 rounded-lg transition flex items-center gap-1 shadow"
+          class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-xl transition flex items-center gap-1.5 shadow"
         >
           <i class="fa-solid fa-lock text-[10px] text-amber-400"></i>
           <span>లాగిన్</span>
@@ -160,7 +164,7 @@
 
   <main class="flex-grow space-y-6 pb-12">
 
-    <!-- 4. నేటి పేపర్ క్లిప్పింగ్స్ విభాగం (హెడర్ క్రింద, పర్ఫెక్ట్ లేఅవుట్) -->
+    <!-- 4. నేటి పేపర్ క్లిప్పింగ్స్ (E-Paper Clips విభాగం) -->
     <section class="max-w-7xl mx-auto px-4 pt-6">
       <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-3">
         
@@ -171,18 +175,16 @@
               నేటి పేపర్ క్లిప్పింగ్స్ (E-Paper Clips)
             </h2>
           </div>
-          <div class="flex items-center gap-3">
-            <a href="/clip" class="text-xs font-bold text-red-600 hover:text-red-700 hover:underline">
-              అన్నీ చూడండి ➡
-            </a>
-          </div>
+          <a href="/clip" class="text-xs font-bold text-red-600 hover:text-red-700 hover:underline">
+            అన్నీ చూడండి ➡
+          </a>
         </div>
 
         {#if loadingClips}
           <div class="text-center py-6 text-xs text-slate-400">పేపర్ క్లిప్పింగ్స్ లోడ్ అవుతున్నాయి...</div>
         {:else if paperClips.length === 0}
           <div class="text-center py-6 text-xs text-slate-500 bg-slate-50 rounded-xl border border-dashed">
-            ఇంకా ఎలాంటి పేపర్ క్లిప్పింగ్స్ అప్‌లోడ్ చేయలేదు. 
+            ఇంకా పేపర్ క్లిప్పింగ్స్ అప్‌లోడ్ చేయలేదు. 
             <a href="/admin/clips" class="text-red-600 font-bold underline ml-1">ఇక్కడ క్లిక్ చేసి మొదటి క్లిప్ అప్‌లోడ్ చేయండి</a>
           </div>
         {:else}
@@ -216,7 +218,80 @@
       </div>
     </section>
 
-    <!-- 5. హీరో బ్యానర్ (డిజిటల్ సేవలు & అధీకృత ప్రకటన) -->
+    <!-- 5. 📰 NS News తాజా వార్తల విభాగం (Home Page News Cards) -->
+    <section class="max-w-7xl mx-auto px-4">
+      <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+        
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div class="flex items-center gap-2">
+            <div class="w-3 h-3 rounded-full bg-red-600 animate-ping"></div>
+            <h2 class="font-['Ramabhadra'] text-lg sm:text-xl font-black text-slate-900">
+              🔥 NS News — తాజా ముత్తారం & తెలంగాణ వార్తలు
+            </h2>
+          </div>
+          <a
+            href="/news"
+            class="bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold px-3 py-1.5 rounded-lg border border-red-200 flex items-center gap-1.5 transition"
+          >
+            <span>పూర్తి న్యూస్ పోర్టల్ చూడండి</span>
+            <i class="fa-solid fa-arrow-right text-[10px]"></i>
+          </a>
+        </div>
+
+        {#if loadingNews}
+          <div class="text-center py-10 text-xs text-slate-400">వార్తలు లోడ్ అవుతున్నాయి...</div>
+        {:else if newsArticles.length === 0}
+          <div class="text-center py-8 bg-slate-50 rounded-xl border border-dashed text-slate-500 text-xs">
+            ప్రస్తుతం తాజా వార్తలు ఏవీ లేవు. 
+            <a href="/admin/news" class="text-red-600 font-bold underline ml-1">ఇక్కడ వార్త రాయండి</a>
+          </div>
+        {:else}
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {#each newsArticles as item}
+              <a
+                href="/news/{item.id}"
+                class="group border border-slate-200 rounded-xl overflow-hidden hover:shadow-md hover:border-red-500 transition flex flex-col justify-between bg-slate-50"
+              >
+                {#if item.image_url}
+                  <div class="aspect-video overflow-hidden bg-slate-200 relative">
+                    <img
+                      src={item.image_url}
+                      alt={item.title}
+                      class="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                    />
+                    <span class="absolute top-2 left-2 bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded shadow">
+                      {item.category || 'ముత్తారం'}
+                    </span>
+                  </div>
+                {/if}
+
+                <div class="p-4 space-y-2 flex-grow flex flex-col justify-between">
+                  <h3 class="text-sm font-bold text-slate-900 line-clamp-2 leading-snug group-hover:text-red-600 transition">
+                    {item.title}
+                  </h3>
+
+                  {#if item.content}
+                    <p class="text-xs text-slate-500 line-clamp-2 leading-relaxed">
+                      {item.content.replace(/<[^>]*>?/gm, '')}
+                    </p>
+                  {/if}
+
+                  <div class="text-[11px] text-slate-400 flex items-center justify-between pt-2 border-t border-slate-200 mt-2">
+                    <span>{item.created_at ? new Date(item.created_at).toLocaleDateString('te-IN', { month: 'short', day: 'numeric' }) : ''}</span>
+                    <span class="font-bold text-red-600 flex items-center gap-1 group-hover:translate-x-1 transition">
+                      పూర్తి వార్త చదవండి ➡
+                    </span>
+                  </div>
+                </div>
+              </a>
+            {/each}
+          </div>
+        {/if}
+
+      </div>
+    </section>
+
+    <!-- 6. హీరో బ్యానర్ (సేవలు & నేరుగా వార్తల లింక్ బటన్) -->
     <section class="max-w-7xl mx-auto px-4">
       <div class="bg-gradient-to-br from-slate-950 via-slate-900 to-black text-white rounded-3xl p-6 sm:p-10 shadow-xl border-2 border-red-600/40 relative overflow-hidden">
         
@@ -232,7 +307,7 @@
           </h2>
 
           <p class="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-2xl">
-            తెలంగాణ ప్రభుత్వ సంక్షేమ పథకాలు, ఆధార్ సేవలు, ధరణి భూభారతి పత్రాలు, IRCTC కన్ఫర్మ్ రైలు టికెట్లు మరియు ఆన్‌లైన్ ప్రింటింగ్ పనులకు నమ్మకమైన అధికారిక సేవా కేంద్రం.
+            తెలంగాణ ప్రభుత్వ సంక్షేమ పథకాలు, ఆధార్ సేవలు, ధరణి భూభారతి పత్రాలు, IRCTC కన్ఫర్మ్ రైలు టికెట్లు మరియు స్థానిక తాజా వార్తలకు విశ్వసనీయ వేదిక.
           </p>
 
           <!-- రిజిస్ట్రేషన్ బ్యాడ్జ్‌లు -->
@@ -258,19 +333,28 @@
           <!-- యాక్షన్ బటన్లు -->
           <div class="flex flex-wrap items-center gap-3 pt-3">
             <a
+              href="/news"
+              class="bg-red-600 hover:bg-red-500 text-white text-xs sm:text-sm font-black px-5 py-3 rounded-xl shadow-lg flex items-center gap-2 transition active:scale-95"
+            >
+              <i class="fa-solid fa-newspaper text-base"></i>
+              <span>📰 NS News పోర్టల్ ఓపెన్ చేయండి</span>
+            </a>
+
+            <a
               href="https://wa.me/919949122402?text=నమస్తే%20A.S.V.%20Enterprises,%20నాకు%20ఈ%20సేవ%20కావాలి:"
               target="_blank"
               class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-black px-5 py-3 rounded-xl shadow-lg flex items-center gap-2 transition active:scale-95"
             >
               <i class="fa-brands fa-whatsapp text-base"></i>
-              <span>వాట్సాప్ ద్వారా నేరుగా సంప్రదించండి</span>
+              <span>వాట్సాప్ సంప్రదింపు</span>
             </a>
+
             <a
               href="/admin/doc-cleaner"
               class="bg-white/10 hover:bg-white/20 text-white border border-white/20 text-xs sm:text-sm font-bold px-4 py-3 rounded-xl transition flex items-center gap-2"
             >
               <i class="fa-solid fa-print text-amber-400"></i>
-              <span>డాక్యుమెంట్ స్కానర్ & ప్రింట్ డెస్క్</span>
+              <span>డాక్యుమెంట్ స్కానర్ డెస్క్</span>
             </a>
           </div>
 
@@ -279,7 +363,7 @@
       </div>
     </section>
 
-    <!-- 6. ప్రజా సేవలు & ప్రభుత్వ సంక్షేమ పథకాలు (గ్రిడ్ లేఅవుట్) -->
+    <!-- 7. ప్రజా సేవలు & ప్రభుత్వ సంక్షేమ పథకాలు -->
     <section class="max-w-7xl mx-auto px-4 space-y-4">
       <div class="flex items-end justify-between border-b border-slate-200 pb-3">
         <div>
@@ -320,7 +404,7 @@
       </div>
     </section>
 
-    <!-- 7. షాప్ లొకేషన్ & సంప్రదింపు బ్యానర్ -->
+    <!-- 8. షాప్ లొకేషన్ & కాంటాక్ట్ డెస్క్ -->
     <section class="max-w-7xl mx-auto px-4">
       <div class="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
         <div class="md:col-span-8 space-y-2">
@@ -357,7 +441,7 @@
 
   </main>
 
-  <!-- 8. ఫుటర్ -->
+  <!-- 9. ఫుటర్ -->
   <footer class="bg-slate-950 text-slate-400 py-8 px-4 border-t border-slate-800 text-xs text-center space-y-2">
     <p class="font-bold text-slate-300">
       © 2026 A.S.V. ENTERPRISES & NS NEWS NETWORK. ALL RIGHTS RESERVED.
