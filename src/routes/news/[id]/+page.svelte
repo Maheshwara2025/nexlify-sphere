@@ -270,3 +270,72 @@
   </footer>
 
 </div>
+<style>
+  /* Print mariyu Single Page Clipping styles */
+  @media print {
+    @page {
+      margin: 8mm 10mm;
+      size: A4 portrait;
+    }
+
+    /* Website navigation, header, footer mariyu buttons print lo kanipinchakunda */
+    :global(nav),
+    :global(header),
+    :global(footer),
+    .no-print,
+    button,
+    .action-buttons {
+      display: none !important;
+    }
+
+    :global(body) {
+      background: #ffffff !important;
+      color: #000000 !important;
+      font-size: 13px !important;
+      line-height: 1.6 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
+    /* Vartha rendu pages ga thegipokunda single page lo unche setting */
+    .news-container,
+    article,
+    .news-card {
+      border: 1px solid #e2e8f0 !important;
+      box-shadow: none !important;
+      padding: 12px !important;
+      margin: 0 auto !important;
+      max-width: 100% !important;
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+    }
+
+    /* Photo size control */
+    img {
+      max-height: 220px !important;
+      object-fit: cover !important;
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+      border-radius: 8px !important;
+      margin-bottom: 8px !important;
+    }
+
+    h1, h2, h3, p {
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+    }
+
+    h1 {
+      font-size: 20px !important;
+      line-height: 1.3 !important;
+      margin-bottom: 8px !important;
+      color: #000000 !important;
+    }
+
+    p {
+      color: #1e293b !important;
+      font-size: 12.5px !important;
+      margin-bottom: 10px !important;
+    }
+  }
+</style>
