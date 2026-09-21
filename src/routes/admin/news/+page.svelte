@@ -346,6 +346,13 @@
   <span>Digital Express</span>
 </a>
 
+<a
+  href="/admin/portals"
+  class="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow flex items-center gap-1.5 transition"
+>
+  <span>🔐</span>
+  <span>పోర్టల్స్ లాంచర్</span>
+</a>
                     <a
                         href="/news"
                         target="_blank"
