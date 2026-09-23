@@ -29,7 +29,6 @@
         goto('/admin/login');
     }
 
-    // 9 ట్రెండింగ్ హెడ్‌లైన్ రంగులు
     const headlineColors = [
         '#dc2626', '#1d4ed8', '#047857', '#7c3aed', 
         '#c2410c', '#0f766e', '#be123c', '#4338ca', '#831843'
@@ -47,7 +46,7 @@
     let youtube_url = '';
     let show_in_ticker = true;
 
-    // 🖼️ ఫోటో డిజైన్ / లేఅవుట్ ఎంపిక (Full, Side, Grid)
+    // Photo Layout Options
     let image_layout = 'full'; 
     let is_rounded = true;
 
@@ -81,10 +80,9 @@
         'క్రీడలు & గేమ్స్', 'సంస్కృతి & సమాజం', 'ప్రపంచ వార్తలు'
     ];
 
-    // ⚡ స్మార్ట్ సింగిల్ హెడ్‌లైన్ ఆటో-పార్సర్
     function autoParseNews() {
         if (!rawNewsInput || !rawNewsInput.trim()) {
-            alert('దయచేసి ముందుగా వార్త టెక్స్ట్‌ను బాక్స్‌లో పేస్ట్ చేయండి!');
+            alert('Dayachesi mundhuga vartha text nu box lo paste cheyandi!');
             return;
         }
 
@@ -95,7 +93,6 @@
 
         if (lines.length === 0) return;
 
-        // మొదటి లైన్ సింగిల్ హెడ్‌లైన్
         headline = lines[0]
             .replace(/^[*#•■✦\d+.\-\)]+\s*/, '')
             .replace(/\s+/g, ' ')
@@ -114,7 +111,6 @@
             }
         }
 
-        // లొకేషన్ వేరు చేయడం
         const townMatch = fullBody.match(/^([\u0C00-\u0C7F\w\s\(\)]+)\s*[:：\-–]\s*(.*)/s);
         if (townMatch && townMatch[1] && townMatch[1].length < 35) {
             const rawTown = townMatch[1].replace(/\(.*?\)/g, '').trim();
@@ -137,13 +133,13 @@
             }
         }
 
-        if (fullText.includes('పాఠశాల') || fullText.includes('విద్యార్థు') || fullText.includes('School') || fullText.includes('College') || fullText.includes('ఉపాధ్యాయు')) {
+        if (fullText.includes('పాఠశాల') || fullText.includes('విద్యార్థు') || fullText.includes('School') || fullText.includes('College')) {
             category = 'విద్య & ఉద్యోగాలు';
-        } else if (fullText.includes('మంత్రి') || fullText.includes('ఎమ్మెల్యే') || fullText.includes('MLA') || fullText.includes('MP') || fullText.includes('పార్టీ')) {
+        } else if (fullText.includes('మంత్రి') || fullText.includes('ఎమ్మెల్యే') || fullText.includes('MLA') || fullText.includes('MP')) {
             category = 'రాజకీయాలు';
         } else if (fullText.includes('రైతు') || fullText.includes('వ్యవసాయ') || fullText.includes('Farmer')) {
             category = 'వాతావరణం & పర్యావరణం';
-        } else if (fullText.includes('Ganesh') || fullText.includes('నవరాత్రి') || fullText.includes('ఉత్సవ') || fullText.includes('ఆలయం') || fullText.includes('Temple')) {
+        } else if (fullText.includes('Ganesh') || fullText.includes('నవరాత్రి') || fullText.includes('ఉత్సవ') || fullText.includes('Temple')) {
             category = 'సంస్కృతి & సమాజం';
         }
     }
@@ -162,7 +158,7 @@
                 imageFile2 = target.files[0];
                 imagePreview2 = URL.createObjectURL(imageFile2);
                 if (image_layout === 'full') {
-                    image_layout = 'grid'; // 2nd ఫోటో ఎంచుకోగానే ఆటోమేటిక్‌గా క్లబ్ ఆప్షన్‌కు సెట్ కావడం
+                    image_layout = 'grid';
                 }
             }
         }
@@ -188,7 +184,7 @@
 
     async function handleSubmit() {
         if (!headline || !content) {
-            statusMsg = 'దయచేసి హెడ్‌లైన్ మరియు వార్త వివరాలను నమోదు చేయండి.';
+            statusMsg = 'Dayachesi headline mariyu content vivaralu enter cheyandi.';
             statusType = 'error';
             return;
         }
@@ -211,18 +207,19 @@
                 imageUrl2 = await uploadSingleImage(imageFile2);
             }
 
-            // ఫోటో లేఅవుట్ & అంచుల స్టైల్‌ను ఎన్‌కోడ్ చేయడం
+            // Layout code safe format
             const layoutStyleCode = `${image_layout}|${is_rounded ? 'rounded' : 'sharp'}`;
 
             const { error } = await supabase.from('news_articles').insert([
                 {
                     location_town: finalLocation,
                     headline,
-                    // NOT NULL ఎర్రర్ రాకుండా ఖాళీ స్ట్రింగ్స్ ('') పంపుతున్నాం
-                    subline_1: '', 
+                    // subline_1 lo layoutStyleCode save avuthundi (Constraint errors raavu)
+                    subline_1: layoutStyleCode,
                     subline_2: '',
                     subline_3: '',
-                    news_tone: layoutStyleCode,
+                    // news_tone ki eppatilaage 'soft' pampadam valla constraint error raadu
+                    news_tone: 'soft',
                     alert_type,
                     category,
                     content,
@@ -240,7 +237,6 @@
             statusMsg = 'వార్త విజయవంతంగా పబ్లిష్ అయ్యింది!';
             statusType = 'success';
 
-            // ఫారమ్ రీసెట్
             rawNewsInput = '';
             headline = '';
             content = '';
@@ -278,7 +274,6 @@
     <div class="min-h-screen bg-slate-100 py-6 px-3 sm:px-6 font-sans">
         <div class="max-w-5xl mx-auto bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
             
-            <!-- Master Header with Quick Tools -->
             <div class="bg-slate-950 px-5 py-4 flex flex-wrap items-center justify-between gap-3 text-white border-b-2 border-red-600">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center font-black text-xl shadow">
@@ -322,7 +317,7 @@
                     </div>
                 {/if}
 
-                <!-- ⚡ స్మార్ట్ సింగిల్-హెడ్‌లైన్ బాక్స్ -->
+                <!-- Smart Parser Box -->
                 <div class="bg-gradient-to-r from-red-50 via-orange-50 to-amber-50 p-5 rounded-2xl border-2 border-red-200 space-y-3">
                     <div class="flex flex-wrap items-center justify-between gap-2">
                         <label for="magic-box" class="text-xs font-black text-red-950 uppercase tracking-wider flex items-center gap-1.5">
@@ -340,14 +335,13 @@
                         id="magic-box"
                         bind:value={rawNewsInput}
                         rows="4"
-                        placeholder="పూర్తి వార్తను ఇక్కడ పేస్ట్ చేయండి... మొదటి లైన్ ఆటోమేటిక్‌గా సింగిల్ బోల్డ్ హెడ్‌లైన్ అవుతుంది, మిగిలిన భాగం కథనం అవుతుంది!"
+                        placeholder="పూర్తి వార్తను ఇక్కడ పేస్ట్ చేయండి... మొదటి లైన్ ఆటోమేటిక్‌గా సింగిల్ బోల్డ్ హెడ్‌లైన్ అవుతుంది, మిగిలినది కథనం అవుతుంది!"
                         class="w-full px-4 py-3 rounded-xl border border-red-200 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-red-500 focus:outline-none leading-relaxed"
                     ></textarea>
                 </div>
 
                 <form on:submit|preventDefault={handleSubmit} class="space-y-6">
                     
-                    <!-- లొకేషన్, కేటగిరీ, అలర్ట్ -->
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200">
                         <div>
                             <label for="town-select" class="block text-xs font-bold text-slate-700 mb-1">లొకేషన్ / ఊరు *</label>
@@ -403,7 +397,7 @@
                         </div>
                     </div>
 
-                    <!-- ప్రధాన హెడ్‌లైన్ మాత్రమే -->
+                    <!-- Single Headline Box -->
                     <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2">
                         <div class="flex items-center justify-between">
                             <label for="headline" class="block text-xs sm:text-sm font-black text-slate-900">
@@ -427,7 +421,7 @@
                         />
                     </div>
 
-                    <!-- ఫోటో 1 & ఫోటో 2 -->
+                    <!-- Photos Upload -->
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200">
                         <div class="space-y-2">
                             <label for="photo1" class="block text-xs font-bold text-slate-900">ఫోటో 1 (ప్రధాన చిత్రం)</label>
@@ -470,7 +464,7 @@
                         </div>
                     </div>
 
-                    <!-- 🎨 ఫోటో డిజైన్ / లేఅవుట్ ఎంపిక (ఇక్కడే అడ్మిన్ ఎంచుకుంటారు) -->
+                    <!-- Photo Design Selection -->
                     <div class="bg-gradient-to-r from-red-50/50 via-slate-50 to-amber-50/50 p-4 rounded-2xl border-2 border-red-200 space-y-3">
                         <div class="flex flex-wrap items-center justify-between gap-2">
                             <div>
@@ -490,7 +484,6 @@
                         </div>
 
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-bold">
-                            <!-- 1. Full Width -->
                             <button
                                 type="button"
                                 on:click={() => image_layout = 'full'}
@@ -503,7 +496,6 @@
                                 <p class="text-[10px] text-slate-500 font-normal">ఫోటో పెద్దదిగా పైన ఉండి, కింద కథనం వస్తుంది</p>
                             </button>
 
-                            <!-- 2. Side-by-Text -->
                             <button
                                 type="button"
                                 on:click={() => image_layout = 'side'}
@@ -516,7 +508,6 @@
                                 <p class="text-[10px] text-slate-500 font-normal">నేటి దర్శిని స్టైల్: ఫోటో ఎడమవైపు, పక్కనే కథనం</p>
                             </button>
 
-                            <!-- 3. Clubbed Grid -->
                             <button
                                 type="button"
                                 on:click={() => image_layout = 'grid'}
@@ -531,7 +522,7 @@
                         </div>
                     </div>
 
-                    <!-- వార్త పూర్తి కథనం -->
+                    <!-- News Content -->
                     <div>
                         <label for="content" class="block text-xs sm:text-sm font-bold text-slate-900 mb-1">వార్త పూర్తి కథనం (Content) *</label>
                         <textarea
@@ -544,7 +535,7 @@
                         ></textarea>
                     </div>
 
-                    <!-- లైవ్ టిక్కర్ & యూట్యూబ్ వీడియో -->
+                    <!-- Ticker Check & YouTube -->
                     <div class="flex flex-wrap items-center justify-between gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200">
                         <div class="flex items-center gap-2">
                             <input
@@ -566,7 +557,6 @@
                         </div>
                     </div>
 
-                    <!-- పబ్లిష్ బటన్ -->
                     <button
                         type="submit"
                         disabled={isUploading}

@@ -7,7 +7,6 @@
   let loading = true;
   let downloadingClip = false;
 
-  // 1. 9 రాయల్ హెడ్‌లైన్ రంగులు
   const headlineColors = [
     '#dc2626', '#1d4ed8', '#047857', '#7c3aed', 
     '#c2410c', '#0f766e', '#be123c', '#4338ca', '#831843'
@@ -15,20 +14,17 @@
 
   $: currentHeadlineColor = article?.id ? headlineColors[article.id % headlineColors.length] : headlineColors[0];
 
-  // 2. అడ్మిన్ సేవ్ చేసిన ఫోటో లేఅవుట్ (Full, Side, Grid) & అంచుల స్టైల్
+  // subline_1 nundi admin save chesina layout ni read cheyadam
   let imageLayout = 'full';
   let isRounded = true;
 
   $: {
     if (article) {
-      const tone = article.image_layout || article.news_tone || 'full';
-      if (typeof tone === 'string' && tone.includes('|')) {
-        const parts = tone.split('|');
+      const storedLayout = article.subline_1 || article.image_layout || '';
+      if (typeof storedLayout === 'string' && (storedLayout.startsWith('full') || storedLayout.startsWith('side') || storedLayout.startsWith('grid'))) {
+        const parts = storedLayout.split('|');
         imageLayout = parts[0] || 'full';
         isRounded = parts[1] === 'rounded';
-      } else if (['full', 'side', 'grid'].includes(tone)) {
-        imageLayout = tone;
-        isRounded = true;
       } else {
         imageLayout = 'full';
         isRounded = true;
@@ -36,7 +32,6 @@
     }
   }
 
-  // 3. ఇంగ్లీష్ వార్త అయితే ఆటో-డిటెక్షన్
   $: isEnglishArticle = (() => {
     if (!article) return false;
     const sampleText = ((article.headline || '') + ' ' + (article.content || '')).substring(0, 200);
@@ -45,13 +40,12 @@
     return hasEnglish && !hasTelugu;
   })();
 
-  // 4. ఇంగ్లీష్ ఆడియో రీడర్ (Listen to News)
   let isSpeaking = false;
   let isPaused = false;
 
   function toggleSpeech() {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-      alert('ఈ బ్రౌజర్‌లో ఆడియో రీడర్ సపోర్ట్ లేదు.');
+      alert('Ee browser lo audio reader support ledu.');
       return;
     }
 
@@ -91,7 +85,6 @@
     stopSpeech();
   });
 
-  // 5. ఫాంట్ సైజ్ కంట్రోలర్ (A-, A, A+, A++)
   let fontSizeIndex = 1;
   const fontSizes = [
     { label: 'A-', style: 'font-size: 13.5px; line-height: 1.6;' },
@@ -130,19 +123,17 @@
     }
   });
 
-  // HTML-to-Image
   async function loadHtmlToImage() {
     if (window.htmlToImage) return window.htmlToImage;
     return new Promise((resolve, reject) => {
       const script = document.createElement('script');
       script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js';
       script.onload = () => resolve(window.htmlToImage);
-      script.onerror = () => reject(new Error('html-to-image లోడ్ కాలేదు'));
+      script.onerror = () => reject(new Error('html-to-image load avvaledu'));
       document.head.appendChild(script);
     });
   }
 
-  // PNG డౌన్‌లోడ్
   async function downloadAsImage() {
     if (!article || downloadingClip) return;
     downloadingClip = true;
@@ -166,7 +157,7 @@
       link.click();
       document.body.removeChild(link);
     } catch (err) {
-      alert('PNG download ఎర్రర్: ' + err.message);
+      alert('PNG download error: ' + err.message);
     } finally {
       downloadingClip = false;
     }
@@ -206,7 +197,7 @@
       copyFeedback = true;
       setTimeout(() => copyFeedback = false, 2000);
     } catch (e) {
-      alert('లింక్ కాపీ కాలేదు');
+      alert('Link copy avvaledu');
     }
   }
 </script>
@@ -219,7 +210,6 @@
 
 <div class="min-h-screen bg-[#f1f5f9] font-sans pb-16">
   
-  <!-- స్క్రీన్ నావిగేషన్ హెడర్ (ప్రింట్‌లో రాదు) -->
   <header class="no-print bg-[#0b1120] text-white py-3 px-4 shadow-md sticky top-0 z-40 border-b border-slate-800">
     <div class="max-w-4xl mx-auto flex items-center justify-between">
       <a href="/" class="flex items-center gap-2">
@@ -247,7 +237,6 @@
       </div>
     {:else}
 
-      <!-- యాక్షన్ బటన్ల బార్ (క్లీన్‌గా కేవలం ప్రింట్, క్లిప్, వాట్సాప్ మాత్రమే ఉంటాయి) -->
       <div class="no-print bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-3 text-xs">
         <span class="text-xs font-bold text-slate-600">పేపర్ క్లిప్ ఆప్షన్లు:</span>
         <div class="flex items-center gap-2">
@@ -279,13 +268,13 @@
         </div>
       </div>
 
-      <!-- 📰 అసలైన దినపత్రిక ఈ-పేపర్ కార్డ్ -->
+      <!-- 📰 News Printable Area -->
       <div 
         id="news-printable-area" 
         style="background-color: #ffffff; border: 3px double #0f172a; border-radius: 14px; padding: 22px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08);"
       >
         
-        <!-- 1. ప్రధాన సింగిల్ హెడ్‌లైన్ (9 రంగుల్లో ఒకటి ఆటోమేటిక్‌గా వస్తుంది) -->
+        <!-- Headline -->
         <div style="margin-bottom: 12px;">
           <h1 
             style="color: {currentHeadlineColor}; font-size: 24px; line-height: 1.35; font-weight: 900; margin: 0; font-family: 'Ramabhadra', 'Noto Sans Telugu', sans-serif; letter-spacing: -0.01em;"
@@ -294,7 +283,7 @@
           </h1>
         </div>
 
-        <!-- 2. హెడ్‌లైన్ కింద ఇన్ఫో బార్ -->
+        <!-- Info Bar -->
         <div style="border-top: 2px solid #0f172a; border-bottom: 1px solid #cbd5e1; padding: 6px 4px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; background-color: #f8fafc;">
           <div style="display: flex; align-items: center; gap: 6px;">
             <span style="background-color: #dc2626; color: #ffffff; font-weight: 900; font-size: 11px; padding: 2px 6px; border-radius: 4px;">NS</span>
@@ -323,7 +312,7 @@
           </div>
         </div>
 
-        <!-- 3. కేవలం ఇంగ్లీష్ వార్తలకు మాత్రమే ఆడియో రీడర్ -->
+        <!-- English Audio Reader -->
         {#if isEnglishArticle}
           <div class="no-print" style="margin-bottom: 12px; background-color: #f0fdf4; border: 1px solid #86efac; padding: 8px 12px; border-radius: 10px; display: flex; align-items: center; justify-content: space-between;">
             <div style="display: flex; align-items: center; gap: 6px;">
@@ -351,7 +340,7 @@
           </div>
         {/if}
 
-        <!-- 4. ఫాంట్ సైజ్ కంట్రోలర్ (A-, A, A+, A++) -->
+        <!-- Font Size Toggler -->
         <div class="no-print" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; background-color: #f1f5f9; padding: 4px 10px; border-radius: 8px;">
           <span style="font-size: 11px; font-weight: 700; color: #475569;">అక్షరాల సైజు (Font Size):</span>
           <div style="display: flex; gap: 4px;">
@@ -367,9 +356,9 @@
           </div>
         </div>
 
-        <!-- 5. ఫోటో & వార్తా కథనం (అడ్మిన్ ఎంచుకున్న లేఅవుట్ ప్రకారం నేరుగా కనిపిస్తుంది) -->
+        <!-- Dynamic Photo Layout based on Admin Selection -->
         {#if imageLayout === 'side' && article.image_url}
-          <!-- 📰 నేటి దర్శిని స్టైల్ (Side-by-Text Wrap) -->
+          <!-- Side-by-Text Newspaper Style -->
           <div style="display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 14px;">
             <div style="flex: 1 1 280px; max-width: 320px;">
               <div style="border: 1px solid #cbd5e1; border-radius: {isRounded ? '10px' : '0px'}; overflow: hidden; background-color: #f8fafc;">
@@ -414,7 +403,7 @@
           </div>
 
         {:else if imageLayout === 'grid' && article.image_url && article.image_url_2}
-          <!-- 🖼️ రెండు ఫోటోలు సమానంగా పక్కపక్కనే క్లబ్ అయిన స్టైల్ -->
+          <!-- Clubbed Grid Style -->
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px;">
             <div style="border: 1px solid #cbd5e1; border-radius: {isRounded ? '10px' : '0px'}; overflow: hidden; background-color: #f8fafc;">
               <img src={article.image_url} alt="Pic 1" crossorigin="anonymous" style="width: 100%; height: 200px; object-fit: cover; display: block;" />
@@ -440,7 +429,7 @@
           </div>
 
         {:else}
-          <!-- 🌟 విశాలమైనది (Full Width స్టైల్) -->
+          <!-- Full Width Style -->
           {#if article.image_url}
             <div style="border: 1px solid #cbd5e1; border-radius: {isRounded ? '10px' : '0px'}; overflow: hidden; background-color: #f8fafc; margin-bottom: 14px;">
               <img
@@ -483,7 +472,7 @@
           {/if}
         {/if}
 
-        <!-- 6. సోషల్ మీడియా షేరింగ్ బార్ -->
+        <!-- Social Media Bar -->
         <div style="border-top: 1px solid #cbd5e1; padding-top: 12px; margin-top: 14px;">
           <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;">
             <span style="font-size: 11px; font-weight: 800; color: #475569;">📢 షేర్ చేయండి:</span>
@@ -507,7 +496,7 @@
           </div>
         </div>
 
-        <!-- 7. కాపీరైట్ & కలర్ చుక్కల బార్ -->
+        <!-- Copyright & CMYK Color Dots -->
         <div style="border-top: 2px solid #0f172a; padding-top: 8px; margin-top: 14px; display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: #64748b; font-weight: 700;">
           <span>Copyright © 2026. A.S.V. Enterprises & NS News Network. All rights reserved.</span>
           <div style="display: flex; align-items: center; gap: 4px;">
