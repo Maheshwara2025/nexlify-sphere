@@ -1,525 +1,574 @@
 <script>
-    import { onMount } from 'svelte';
-    import { supabase } from '$lib/supabaseClient';
+  import { page } from '$app/stores';
+  import { onMount, onDestroy } from 'svelte';
+  import { supabase } from '$lib/supabaseClient';
 
-    let articles = [];
-    let loading = true;
-    let selectedCategory = 'అన్నీ';
-    let searchQuery = '';
+  let article = null;
+  let loading = true;
+  let downloadingClip = false;
 
-    let liveTemp = '29°C';
-    let weatherDesc = 'పాక్షిక మేఘావృతం';
-    let todayTeluguDate = '';
+  // 1. 9 రాయల్ హెడ్‌లైన్ రంగులు
+  const headlineColors = [
+    '#dc2626', '#1d4ed8', '#047857', '#7c3aed', 
+    '#c2410c', '#0f766e', '#be123c', '#4338ca', '#831843'
+  ];
 
-    const categories = [
-        'అన్నీ',
-        'రాజకీయాలు',
-        'వ్యాపారం & ఫైనాన్స్',
-        'టెక్నాలజీ',
-        'ఆరోగ్యం',
-        'వాతావరణం & పర్యావరణం',
-        'విద్య & ఉద్యోగాలు',
-        'సైన్స్ & పరిశోధనలు',
-        'క్రీడలు & గేమ్స్',
-        'సంస్కృతి & సమాజం',
-        'ప్రపంచ వార్తలు'
-    ];
+  $: currentHeadlineColor = article?.id ? headlineColors[article.id % headlineColors.length] : headlineColors[0];
 
-    const digitalServices = [
-        { name: 'ఆధార్ సేవలు', icon: 'fa-id-card', desc: 'అప్‌డేట్, ప్రింట్ & లింకింగ్' },
-        { name: 'రైతు సేవలు', icon: 'fa-tractor', desc: 'రైతు భరోసా, PM కిసాన్' },
-        { name: 'భూభారతి / ధరణి', icon: 'fa-map-location-dot', desc: 'పట్టాదారు పాస్‌బుక్, ROR-1B' },
-        { name: 'ఓటర్ సేవలు', icon: 'fa-check-to-slot', desc: 'కొత్త కార్డు, కరెక్షన్స్' },
-        { name: 'విద్యార్థి సేవలు', icon: 'fa-graduation-cap', desc: 'స్కాలర్‌షిప్స్, TSPSC ఫారమ్స్' },
-        { name: 'విద్యుత్ & బిల్లులు', icon: 'fa-bolt', desc: 'కరెంట్ బిల్లులు, రీఛార్జ్‌లు' },
-        { name: 'ఆరోగ్య / ఇన్సూరెన్స్', icon: 'fa-heart-pulse', desc: 'ఆయుష్మాన్ భారత్, బీమా' },
-        { name: 'గ్రామ పంచాయతీ', icon: 'fa-landmark-dome', desc: 'eGramSwaraj, పన్ను రసీదులు' }
-    ];
+  // 2. అడ్మిన్ సేవ్ చేసిన ఫోటో లేఅవుట్ (Full, Side, Grid) & అంచుల స్టైల్
+  let imageLayout = 'full';
+  let isRounded = true;
 
-    const emergencyHelplines = [
-        { title: 'పోలీస్ కంట్రోల్', number: '112', icon: 'fa-shield-halved', color: 'text-blue-600 bg-blue-50 border-blue-200' },
-        { title: 'అంబులెన్స్ సర్వీస్', number: '108', icon: 'fa-truck-medical', color: 'text-rose-600 bg-rose-50 border-rose-200' },
-        { title: 'విద్యుత్ సమస్యలు', number: '1912', icon: 'fa-bolt', color: 'text-amber-600 bg-amber-50 border-amber-200' },
-        { title: 'సైబర్ క్రైమ్ హెల్ప్‌లైన్', number: '1930', icon: 'fa-user-secret', color: 'text-purple-600 bg-purple-50 border-purple-200' }
-    ];
+  $: {
+    if (article) {
+      const tone = article.image_layout || article.news_tone || 'full';
+      if (typeof tone === 'string' && tone.includes('|')) {
+        const parts = tone.split('|');
+        imageLayout = parts[0] || 'full';
+        isRounded = parts[1] === 'rounded';
+      } else if (['full', 'side', 'grid'].includes(tone)) {
+        imageLayout = tone;
+        isRounded = true;
+      } else {
+        imageLayout = 'full';
+        isRounded = true;
+      }
+    }
+  }
 
-    async function fetchLiveWeather() {
-        try {
-            const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=18.61&longitude=79.38&current=temperature_2m,weather_code&timezone=Asia%2FKolkata');
-            if (res.ok) {
-                const data = await res.json();
-                if (data.current) {
-                    liveTemp = `${Math.round(data.current.temperature_2m)}°C`;
-                    const code = data.current.weather_code;
-                    if (code === 0) weatherDesc = 'నిర్మలమైన ఆకాశం ☀️';
-                    else if (code <= 3) weatherDesc = 'పాక్షిక మేఘావృతం ⛅';
-                    else if (code >= 51 && code <= 67) weatherDesc = 'వర్షం / జల్లులు 🌧️';
-                    else if (code >= 95) weatherDesc = 'ఉరుముల వర్షం ⛈️';
-                    else weatherDesc = 'చల్లని వాతావరణం 🌤️';
-                }
-            }
-        } catch (e) {
-            console.log('Weather fallback');
-        }
+  // 3. ఇంగ్లీష్ వార్త అయితే ఆటో-డిటెక్షన్
+  $: isEnglishArticle = (() => {
+    if (!article) return false;
+    const sampleText = ((article.headline || '') + ' ' + (article.content || '')).substring(0, 200);
+    const hasTelugu = /[\u0C00-\u0C7F]/.test(sampleText);
+    const hasEnglish = /[a-zA-Z]{4,}/.test(sampleText);
+    return hasEnglish && !hasTelugu;
+  })();
+
+  // 4. ఇంగ్లీష్ ఆడియో రీడర్ (Listen to News)
+  let isSpeaking = false;
+  let isPaused = false;
+
+  function toggleSpeech() {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      alert('ఈ బ్రౌజర్‌లో ఆడియో రీడర్ సపోర్ట్ లేదు.');
+      return;
     }
 
-    async function fetchNews() {
-        loading = true;
-        try {
-            const { data, error } = await supabase
-                .from('news_articles')
-                .select('*')
-                .order('created_at', { ascending: false });
-
-            if (error) throw error;
-            articles = data || [];
-        } catch (err) {
-            console.error('Error fetching articles:', err);
-        } finally {
-            loading = false;
-        }
+    if (isSpeaking) {
+      if (isPaused) {
+        window.speechSynthesis.resume();
+        isPaused = false;
+      } else {
+        window.speechSynthesis.pause();
+        isPaused = true;
+      }
+      return;
     }
 
-    onMount(() => {
-        todayTeluguDate = new Date().toLocaleDateString('te-IN', {
-            weekday: 'long',
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric'
-        });
-        fetchNews();
-        fetchLiveWeather();
-    });
+    window.speechSynthesis.cancel();
+    const textToRead = `${article.headline || ''}. ${article.content || ''}`;
+    const utterance = new SpeechSynthesisUtterance(textToRead);
+    utterance.lang = 'en-US';
+    utterance.rate = 0.95;
 
-    $: filteredArticles = articles.filter(a => {
-        const matchCategory = selectedCategory === 'అన్నీ' || a.category === selectedCategory;
-        const query = searchQuery.toLowerCase().trim();
-        const matchSearch = !query || 
-            (a.headline && a.headline.toLowerCase().includes(query)) ||
-            (a.content && a.content.toLowerCase().includes(query)) ||
-            (a.location_town && a.location_town.toLowerCase().includes(query)) ||
-            (a.subline_1 && a.subline_1.toLowerCase().includes(query));
-        return matchCategory && matchSearch;
-    });
+    utterance.onstart = () => { isSpeaking = true; isPaused = false; };
+    utterance.onend = () => { isSpeaking = false; isPaused = false; };
+    utterance.onerror = () => { isSpeaking = false; isPaused = false; };
 
-    $: tickerNews = articles.filter(a => a.show_in_ticker);
-    $: breakingNews = articles.filter(a => a.alert_type === 'breaking' || a.alert_type === 'flash');
+    window.speechSynthesis.speak(utterance);
+  }
+
+  function stopSpeech() {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      isSpeaking = false;
+      isPaused = false;
+    }
+  }
+
+  onDestroy(() => {
+    stopSpeech();
+  });
+
+  // 5. ఫాంట్ సైజ్ కంట్రోలర్ (A-, A, A+, A++)
+  let fontSizeIndex = 1;
+  const fontSizes = [
+    { label: 'A-', style: 'font-size: 13.5px; line-height: 1.6;' },
+    { label: 'A',  style: 'font-size: 15.5px; line-height: 1.65;' },
+    { label: 'A+', style: 'font-size: 18.5px; line-height: 1.7;' },
+    { label: 'A++', style: 'font-size: 21.5px; line-height: 1.75;' }
+  ];
+
+  let copyFeedback = false;
+
+  onMount(async () => {
+    const id = $page.params.id;
+    if (!id) return;
+
+    try {
+      let { data } = await supabase
+        .from('news_articles')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (!data) {
+        const res = await supabase
+          .from('news')
+          .select('*')
+          .eq('id', id)
+          .single();
+        data = res.data;
+      }
+
+      article = data;
+    } catch (e) {
+      console.error('Fetch error:', e);
+    } finally {
+      loading = false;
+    }
+  });
+
+  // HTML-to-Image
+  async function loadHtmlToImage() {
+    if (window.htmlToImage) return window.htmlToImage;
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js';
+      script.onload = () => resolve(window.htmlToImage);
+      script.onerror = () => reject(new Error('html-to-image లోడ్ కాలేదు'));
+      document.head.appendChild(script);
+    });
+  }
+
+  // PNG డౌన్‌లోడ్
+  async function downloadAsImage() {
+    if (!article || downloadingClip) return;
+    downloadingClip = true;
+
+    try {
+      const clipNode = document.getElementById('news-printable-area');
+      if (!clipNode) return;
+
+      const hti = await loadHtmlToImage();
+      const dataUrl = await hti.toPng(clipNode, {
+        quality: 0.95,
+        pixelRatio: 2,
+        backgroundColor: '#ffffff'
+      });
+
+      const link = document.createElement('a');
+      const safeTitle = (article.headline || article.title || 'news').substring(0, 15).replace(/\s+/g, '_');
+      link.download = `NS_News_${safeTitle}_${Date.now()}.png`;
+      link.href = dataUrl;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      alert('PNG download ఎర్రర్: ' + err.message);
+    } finally {
+      downloadingClip = false;
+    }
+  }
+
+  function getShareData() {
+    const title = article?.headline || article?.title || 'NS News';
+    const url = typeof window !== 'undefined' ? window.location.href : '';
+    const text = `*${title}*\n📍 ${article?.location_town || 'ముత్తారం'} | NS News Network\n\nపూర్తి వార్తా కథనం చదవండి:\n👉 ${url}\n\n_A.S.V. Enterprises & NS News_`;
+    return { title, url, text };
+  }
+
+  function shareWhatsApp() {
+    const { text } = getShareData();
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+  }
+
+  function shareFacebook() {
+    const { url } = getShareData();
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank');
+  }
+
+  function shareTwitter() {
+    const { title, url } = getShareData();
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}`, '_blank');
+  }
+
+  function shareTelegram() {
+    const { title, url } = getShareData();
+    window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(title)}`, '_blank');
+  }
+
+  async function copyPageLink() {
+    if (typeof window === 'undefined') return;
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      copyFeedback = true;
+      setTimeout(() => copyFeedback = false, 2000);
+    } catch (e) {
+      alert('లింక్ కాపీ కాలేదు');
+    }
+  }
 </script>
 
 <svelte:head>
-    <title>NS News | నిజమైన వార్తల వేదిక | A.S.V Enterprises</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
-    <link href="https://fonts.googleapis.com/css2?family=Mandali&family=Ramabhadra&family=Noto+Sans+Telugu:wght@500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  {#if article}
+    <title>{article.headline || article.title} | NS News</title>
+  {/if}
 </svelte:head>
 
-<div class="min-h-screen bg-[#f3f4f6] text-slate-800 flex flex-col font-['Noto_Sans_Telugu',sans-serif]">
-    
-    <!-- Header Bar -->
-    <header class="bg-slate-950 text-white sticky top-0 z-50 border-b-2 border-red-600 shadow-md">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-            <div class="flex items-center gap-3 sm:gap-5">
-                <a
-                    href="/"
-                    class="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white font-bold text-xs sm:text-sm px-3.5 py-2 rounded-xl flex items-center gap-2 shadow-md transition-all active:scale-95 border border-orange-400/30"
-                >
-                    <i class="fa-solid fa-house-chimney text-yellow-200"></i>
-                    <span>డిజిటల్ సేవలు (హోమ్)</span>
-                </a>
-
-                <span class="text-slate-700 hidden sm:inline">|</span>
-
-                <div class="flex items-center gap-2">
-                    <div class="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center font-black text-base shadow-sm font-['Ramabhadra']">
-                        NS
-                    </div>
-                    <div>
-                        <a href="/news" class="text-lg sm:text-xl font-extrabold tracking-tight text-white leading-none font-['Ramabhadra']">
-                            NS NEWS
-                        </a>
-                        <span class="text-[10px] text-red-400 font-semibold block uppercase tracking-wider">A.S.V Digital Network</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="flex items-center gap-2 sm:gap-3">
-                <a
-                    href="/admin/news"
-                    class="bg-slate-800 hover:bg-slate-700 text-xs px-3 py-2 rounded-xl border border-slate-700 font-bold text-slate-200 transition-all hidden sm:inline-flex items-center gap-1.5"
-                >
-                    <i class="fa-solid fa-lock text-red-400"></i> అడ్మిన్ డెస్క్
-                </a>
-                <a
-                    href="https://wa.me/919502336495"
-                    target="_blank"
-                    rel="noreferrer"
-                    class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 shadow-md transition-all"
-                    aria-label="WhatsApp లో న్యూస్ పంపండి"
-                >
-                    <i class="fa-brands fa-whatsapp text-base"></i> <span>వార్త పంపండి</span>
-                </a>
-            </div>
-        </div>
-    </header>
-
-    <!-- Live Ticker Strip -->
-    {#if tickerNews.length > 0}
-        <div class="bg-[#b91c1c] text-white py-3 sm:py-3.5 flex items-center border-y-2 border-red-900 shadow-md relative z-30">
-            <div class="bg-[#7f1d1d] px-4 sm:px-6 py-2 font-black text-xs sm:text-sm uppercase tracking-wider shrink-0 z-20 flex items-center gap-2 shadow-xl border-r border-red-500/50">
-                <span class="w-2.5 h-2.5 rounded-full bg-yellow-400 animate-ping"></span>
-                <i class="fa-solid fa-bolt text-yellow-300 text-sm"></i>
-                <span class="font-['Ramabhadra'] text-white">లైవ్ న్యూస్</span>
-            </div>
-            
-            <div class="overflow-hidden relative w-full flex items-center">
-                <div class="inline-block whitespace-nowrap animate-marquee">
-                    {#each tickerNews as item}
-                        <a 
-                            href={`/news/${item.id}`} 
-                            class="inline-flex items-center mx-8 text-[15px] sm:text-[17px] font-bold text-white hover:text-yellow-200 transition-colors tracking-wide"
-                        >
-                            <span class="bg-black/35 text-yellow-300 border border-yellow-400/40 text-xs sm:text-sm px-2.5 py-0.5 rounded-md mr-2.5 font-bold">
-                                {item.location_town || item.category}
-                            </span>
-                            <span class="drop-shadow-xs">{item.headline}</span>
-                            <span class="mx-6 text-yellow-400 text-base font-black">✦</span>
-                        </a>
-                    {/each}
-                </div>
-            </div>
-        </div>
-    {/if}
-
-    <!-- Breaking News Alert -->
-    {#if breakingNews.length > 0}
-        <div class="max-w-7xl mx-auto px-4 pt-4 w-full">
-            <div class="bg-gradient-to-r from-red-600 via-rose-600 to-red-700 rounded-2xl p-4 sm:p-5 text-white shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-red-500">
-                <div class="flex items-start gap-3.5">
-                    <div class="w-11 h-11 rounded-xl bg-white text-red-600 flex items-center justify-center font-black text-xl shrink-0 shadow">
-                        <i class="fa-solid fa-fire"></i>
-                    </div>
-                    <div>
-                        <span class="inline-block bg-yellow-400 text-slate-950 font-black text-[11px] uppercase tracking-wider px-2.5 py-0.5 rounded mb-1">
-                            {breakingNews[0].alert_type === 'breaking' ? 'బ్రేకింగ్ న్యూస్' : 'ఫ్లాష్ న్యూస్'}
-                        </span>
-                        <h2 class="text-lg sm:text-xl font-bold leading-snug">
-                            {breakingNews[0].headline}
-                        </h2>
-                        <p class="text-xs sm:text-sm text-red-100 mt-0.5 font-medium">{breakingNews[0].subline_1}</p>
-                    </div>
-                </div>
-                <a
-                    href={`/news/${breakingNews[0].id}`}
-                    class="shrink-0 bg-slate-950 hover:bg-black text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow"
-                >
-                    పూర్తి వివరాలు <i class="fa-solid fa-arrow-right ml-1"></i>
-                </a>
-            </div>
-        </div>
-    {/if}
-
-    <!-- Categories & Search Bar -->
-    <div class="bg-white border-b border-slate-200 sticky top-[57px] z-20 shadow-xs">
-        <div class="max-w-7xl mx-auto px-4 py-2.5 flex flex-col md:flex-row items-center justify-between gap-3">
-            <div class="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto no-scrollbar py-0.5">
-                {#each categories as cat}
-                    <button
-                        type="button"
-                        on:click={() => selectedCategory = cat}
-                        class="px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all {selectedCategory === cat ? 'bg-slate-900 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}"
-                    >
-                        {cat}
-                    </button>
-                {/each}
-            </div>
-
-            <div class="relative w-full md:w-72 shrink-0">
-                <input
-                    type="text"
-                    bind:value={searchQuery}
-                    placeholder="వార్త లేదా ఊరి పేరు శోధించండి..."
-                    class="w-full pl-9 pr-8 py-1.5 bg-slate-100 hover:bg-slate-50 focus:bg-white text-xs font-semibold rounded-full border border-slate-300 focus:border-red-500 focus:ring-2 focus:ring-red-500/20 focus:outline-none transition-all placeholder:text-slate-400"
-                />
-                <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                {#if searchQuery}
-                    <button
-                        type="button"
-                        on:click={() => searchQuery = ''}
-                        class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 text-xs"
-                    >
-                        <i class="fa-solid fa-circle-xmark"></i>
-                    </button>
-                {/if}
-            </div>
-        </div>
+<div class="min-h-screen bg-[#f1f5f9] font-sans pb-16">
+  
+  <!-- స్క్రీన్ నావిగేషన్ హెడర్ (ప్రింట్‌లో రాదు) -->
+  <header class="no-print bg-[#0b1120] text-white py-3 px-4 shadow-md sticky top-0 z-40 border-b border-slate-800">
+    <div class="max-w-4xl mx-auto flex items-center justify-between">
+      <a href="/" class="flex items-center gap-2">
+        <span class="bg-[#dc2626] text-white font-black text-xs px-2 py-0.5 rounded shadow">NS</span>
+        <span class="font-black text-sm tracking-wide">NEWS PORTAL</span>
+      </a>
+      <div class="flex items-center gap-2">
+        <a href="/" class="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-700 font-bold transition">
+          🏠 హోమ్
+        </a>
+        <a href="/news" class="text-xs bg-[#dc2626] hover:bg-red-700 px-3 py-1.5 rounded-lg font-bold transition">
+          అన్ని వార్తలు
+        </a>
+      </div>
     </div>
+  </header>
 
-    <!-- Main Feed & Sidebars -->
-    <main class="max-w-7xl mx-auto px-4 py-8 flex-grow w-full">
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            
-            <!-- News Feed (Left - 8 Cols) -->
-            <div class="lg:col-span-8 space-y-6">
-                <div class="flex items-center justify-between border-b border-slate-200 pb-2">
-                    <h3 class="text-xl font-black text-slate-900 flex items-center gap-2">
-                        <span class="w-2.5 h-6 bg-red-600 rounded-full"></span>
-                        {#if searchQuery}
-                            <span>శోధన ఫలితాలు: "{searchQuery}"</span>
-                        {:else}
-                            <span>{selectedCategory === 'అన్నీ' ? 'తాజా ప్రధాన వార్తలు' : selectedCategory}</span>
-                        {/if}
-                    </h3>
-                    <span class="text-xs text-slate-500 font-bold">{filteredArticles.length} కథనాలు</span>
-                </div>
+  <main class="max-w-3xl mx-auto p-3 sm:p-5 space-y-4">
+    {#if loading}
+      <div class="text-center py-24 text-slate-500 font-bold text-sm">వార్తా కథనం లోడ్ అవుతోంది...</div>
+    {:else if !article}
+      <div class="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-300 text-slate-500">
+        వార్త కనుగొనబడలేదు. <br />
+        <a href="/news" class="text-red-600 font-bold underline mt-2 inline-block">వార్తల పేజీకి వెళ్లండి</a>
+      </div>
+    {:else}
 
-                {#if loading}
-                    <div class="text-center py-16 bg-white rounded-2xl border border-slate-200">
-                        <i class="fa-solid fa-circle-notch fa-spin text-3xl text-red-600 mb-2"></i>
-                        <p class="text-sm text-slate-500 font-medium">వార్తలు లోడ్ అవుతున్నాయి...</p>
-                    </div>
-                {:else if filteredArticles.length === 0}
-                    <div class="text-center py-16 bg-white rounded-2xl border border-slate-200 space-y-2">
-                        <i class="fa-regular fa-newspaper text-4xl text-slate-300"></i>
-                        <p class="text-slate-700 font-bold text-base">ఎలాంటి వార్తలు లభించలేదు.</p>
-                        <p class="text-xs text-slate-400">శోధన పదాన్ని మార్చి లేదా వేరే కేటగిరీని ఎంచుకోండి.</p>
-                    </div>
-                {:else}
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {#each filteredArticles as news}
-                            <article class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col justify-between group">
-                                <div>
-                                    {#if news.image_url}
-                                        <a href={`/news/${news.id}`} class="block aspect-video overflow-hidden bg-slate-100 relative">
-                                            <img
-                                                src={news.image_url}
-                                                alt={news.headline}
-                                                class="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
-                                            />
-                                            {#if news.alert_type !== 'none'}
-                                                <span class="absolute top-3 left-3 {news.alert_type === 'breaking' ? 'bg-red-600' : 'bg-amber-500'} text-white text-[10px] font-black uppercase px-2 py-0.5 rounded shadow">
-                                                    {news.alert_type === 'breaking' ? 'బ్రేకింగ్' : 'ఫ్లాష్'}
-                                                </span>
-                                            {/if}
-                                        </a>
-                                    {/if}
+      <!-- యాక్షన్ బటన్ల బార్ (క్లీన్‌గా కేవలం ప్రింట్, క్లిప్, వాట్సాప్ మాత్రమే ఉంటాయి) -->
+      <div class="no-print bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-3 text-xs">
+        <span class="text-xs font-bold text-slate-600">పేపర్ క్లిప్ ఆప్షన్లు:</span>
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            on:click={downloadAsImage}
+            disabled={downloadingClip}
+            class="bg-[#dc2626] hover:bg-red-700 text-white font-bold px-3.5 py-1.5 rounded-xl shadow transition flex items-center gap-1.5 cursor-pointer active:scale-95"
+          >
+            <span>📸</span>
+            <span>{downloadingClip ? 'తయారవుతోంది...' : 'పేపర్ క్లిప్ (PNG)'}</span>
+          </button>
+          
+          <button
+            type="button"
+            on:click={() => window.print()}
+            class="bg-[#0f172a] hover:bg-black text-white font-bold px-3.5 py-1.5 rounded-xl shadow transition flex items-center gap-1.5 cursor-pointer"
+          >
+            <span>🖨️ ప్రింట్ / PDF</span>
+          </button>
 
-                                    <div class="p-5">
-                                        <div class="flex items-center gap-2 mb-2">
-                                            {#if news.location_town}
-                                                <span class="text-xs font-bold px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">
-                                                    {news.location_town}
-                                                </span>
-                                            {/if}
-                                            <span class="text-xs font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
-                                                {news.category}
-                                            </span>
-                                        </div>
-
-                                        <h4 class="text-base sm:text-lg font-bold text-slate-900 group-hover:text-red-600 transition-colors leading-snug line-clamp-2 mb-2">
-                                            <a href={`/news/${news.id}`}>{news.headline}</a>
-                                        </h4>
-
-                                        {#if news.subline_1}
-                                            <ul class="space-y-1 text-xs text-slate-600 border-l-2 border-red-500 pl-2.5 mb-3 font-medium">
-                                                <li>{news.subline_1}</li>
-                                                {#if news.subline_2}
-                                                    <li class="text-slate-500">{news.subline_2}</li>
-                                                {/if}
-                                            </ul>
-                                        {/if}
-                                    </div>
-                                </div>
-
-                                <div class="px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
-                                    <span>{new Date(news.created_at).toLocaleDateString('te-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                                    <a href={`/news/${news.id}`} class="font-bold text-red-600 hover:text-red-700 flex items-center gap-1">
-                                        పూర్తి కథనం <i class="fa-solid fa-arrow-right text-[10px]"></i>
-                                    </a>
-                                </div>
-                            </article>
-                        {/each}
-                    </div>
-                {/if}
-            </div>
-
-            <!-- Sidebar (Right - 4 Cols) -->
-            <div class="lg:col-span-4 space-y-6">
-                
-                <!-- 1. Digital Seva Kendra Services -->
-                <div class="bg-white rounded-2xl border-2 border-orange-500/80 shadow-md p-5 space-y-4 relative overflow-hidden">
-                    <div class="bg-gradient-to-r from-orange-500 to-amber-600 -mx-5 -mt-5 p-4 text-white flex items-center justify-between">
-                        <div>
-                            <span class="text-[10px] font-black uppercase tracking-widest bg-black/30 px-2 py-0.5 rounded">డిజిటల్ సేవా కేంద్రం</span>
-                            <h4 class="text-base font-black mt-1">ముఖ్యమైన పౌర & రైతు సేవలు</h4>
-                        </div>
-                        <i class="fa-solid fa-laptop-code text-2xl text-yellow-200"></i>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-2.5 pt-1">
-                        {#each digitalServices as s}
-                            <a
-                                href="/"
-                                class="bg-orange-50/70 hover:bg-orange-100/80 border border-orange-200 rounded-xl p-2.5 flex flex-col justify-between group transition-all"
-                            >
-                                <div class="flex items-center gap-2 mb-1">
-                                    <i class={`fa-solid ${s.icon} text-orange-600 text-sm group-hover:scale-110 transition-transform`}></i>
-                                    <span class="text-xs font-bold text-slate-900 leading-tight">{s.name}</span>
-                                </div>
-                                <span class="text-[10px] text-slate-500 font-medium leading-tight">{s.desc}</span>
-                            </a>
-                        {/each}
-                    </div>
-
-                    <a
-                        href="/"
-                        class="w-full bg-slate-950 hover:bg-black text-white font-bold text-xs py-3 rounded-xl flex items-center justify-center gap-2 shadow transition-all active:scale-95"
-                    >
-                        <span>అన్ని డిజిటల్ సేవలు చూడండి</span>
-                        <i class="fa-solid fa-arrow-right text-orange-400"></i>
-                    </a>
-                </div>
-
-                <!-- 2. High Impact Advertisement Box -->
-                <div class="bg-gradient-to-br from-amber-500 via-orange-500 to-rose-600 rounded-2xl p-5 text-white shadow-lg relative overflow-hidden space-y-3">
-                    <div class="flex items-center justify-between">
-                        <span class="text-[10px] uppercase font-black tracking-widest bg-black/30 px-2 py-0.5 rounded">
-                            వాణిజ్య ప్రకటన / Sponsor Ad
-                        </span>
-                        <i class="fa-solid fa-bullhorn text-yellow-200"></i>
-                    </div>
-
-                    <h4 class="text-lg font-black leading-tight">
-                        మీ వ్యాపార ప్రకటన ఇక్కడ ఇవ్వండి!
-                    </h4>
-                    <p class="text-xs text-orange-100 leading-relaxed font-medium">
-                        వేలాది మంది పాఠకులకు మీ షాప్, వ్యాపారం, విద్యాసంస్థలు మరియు శుభకార్యాల ప్రకటనలు అతి తక్కువ ధరలో ప్రచారం చేసుకోండి.
-                    </p>
-
-                    <div class="pt-1">
-                        <a
-                            href="https://wa.me/919502336495?text=Hello,%20I%20want%20to%20place%20an%20Advertisement%20in%20NS%20News"
-                            target="_blank"
-                            rel="noreferrer"
-                            class="w-full bg-slate-950 hover:bg-black text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow transition-all active:scale-95"
-                        >
-                            <i class="fa-brands fa-whatsapp text-emerald-400 text-sm"></i>
-                            <span>యాడ్ బుకింగ్ కోసం WhatsApp చేయండి</span>
-                        </a>
-                    </div>
-                </div>
-
-                <!-- 3. Emergency Helplines -->
-                <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
-                    <div class="flex items-center justify-between border-b border-slate-100 pb-2">
-                        <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                            <i class="fa-solid fa-phone-volume text-rose-600"></i> అత్యవసర హెల్ప్‌లైన్ నంబర్లు
-                        </span>
-                        <span class="text-[10px] bg-rose-50 text-rose-700 px-2 py-0.5 rounded font-bold">24x7 సేవలు</span>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-2.5">
-                        {#each emergencyHelplines as h}
-                            <a
-                                href={`tel:${h.number}`}
-                                class="p-2.5 rounded-xl border flex items-center justify-between {h.color} hover:shadow-xs transition-all"
-                            >
-                                <div>
-                                    <span class="text-[10px] font-bold block leading-none">{h.title}</span>
-                                    <span class="text-sm font-black font-mono tracking-wider block mt-1">{h.number}</span>
-                                </div>
-                                <i class="fa-solid {h.icon} text-base opacity-75"></i>
-                            </a>
-                        {/each}
-                    </div>
-
-                    <!-- Live Weather Box -->
-                    <div class="bg-sky-50 border border-sky-200 rounded-xl p-3 flex items-center justify-between text-xs">
-                        <div class="flex items-center gap-2.5">
-                            <i class="fa-solid fa-cloud-sun text-2xl text-sky-600"></i>
-                            <div>
-                                <span class="font-bold text-slate-800 block">స్థానిక వాతావరణం</span>
-                                <span class="text-[10px] text-slate-500 font-medium">పెద్దపల్లి & ముత్తారం</span>
-                            </div>
-                        </div>
-                        <div class="text-right">
-                            <span class="text-sm font-black text-sky-800 font-mono block">{liveTemp}</span>
-                            <span class="text-[10px] text-sky-700 font-bold">{weatherDesc}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 4. Parent Organization Contact Card -->
-                <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
-                    <div class="flex items-center gap-3 border-b border-slate-100 pb-3">
-                        <div class="w-10 h-10 bg-slate-900 text-white rounded-xl flex items-center justify-center font-black text-lg">
-                            A
-                        </div>
-                        <div>
-                            <h5 class="font-bold text-slate-900 leading-none">A.S.V Enterprises</h5>
-                            <p class="text-xs text-slate-500 mt-1">Parent Organization & Digital Hub</p>
-                        </div>
-                    </div>
-
-                    <div class="space-y-2 text-xs text-slate-600">
-                        <p class="flex items-center gap-2">
-                            <i class="fa-solid fa-location-dot text-slate-400 w-4"></i>
-                            <span>ముత్తారం, పెద్దపల్లి జిల్లా, తెలంగాణ</span>
-                        </p>
-                        <p class="flex items-center gap-2">
-                            <i class="fa-solid fa-phone text-slate-400 w-4"></i>
-                            <span>+91 9502336495 / +91 9949122402</span>
-                        </p>
-                    </div>
-
-                    <div class="pt-2 border-t border-slate-100 flex items-center justify-between">
-                        <span class="text-xs font-bold text-slate-700">మమ్మల్ని కలవండి:</span>
-                        <div class="flex gap-2">
-                            <a href="https://wa.me/919502336495" target="_blank" rel="noreferrer" class="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-600 hover:text-white transition-all" aria-label="WhatsApp">
-                                <i class="fa-brands fa-whatsapp text-sm"></i>
-                            </a>
-                            <a href="https://youtube.com" target="_blank" rel="noreferrer" class="w-8 h-8 rounded-full bg-red-50 text-red-600 flex items-center justify-center hover:bg-red-600 hover:text-white transition-all" aria-label="YouTube">
-                                <i class="fa-brands fa-youtube text-sm"></i>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-
-            </div>
+          <button
+            type="button"
+            on:click={shareWhatsApp}
+            class="bg-[#25d366] hover:bg-emerald-600 text-white font-bold px-3.5 py-1.5 rounded-xl shadow transition flex items-center gap-1.5 cursor-pointer active:scale-95"
+          >
+            <span>📲 WhatsApp</span>
+          </button>
         </div>
-    </main>
+      </div>
 
-    <!-- Footer -->
-    <footer class="bg-slate-950 text-slate-400 border-t border-slate-800 py-8 mt-auto text-xs">
-        <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <!-- 📰 అసలైన దినపత్రిక ఈ-పేపర్ కార్డ్ -->
+      <div 
+        id="news-printable-area" 
+        style="background-color: #ffffff; border: 3px double #0f172a; border-radius: 14px; padding: 22px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08);"
+      >
+        
+        <!-- 1. ప్రధాన సింగిల్ హెడ్‌లైన్ (9 రంగుల్లో ఒకటి ఆటోమేటిక్‌గా వస్తుంది) -->
+        <div style="margin-bottom: 12px;">
+          <h1 
+            style="color: {currentHeadlineColor}; font-size: 24px; line-height: 1.35; font-weight: 900; margin: 0; font-family: 'Ramabhadra', 'Noto Sans Telugu', sans-serif; letter-spacing: -0.01em;"
+          >
+            {article.headline || article.title}
+          </h1>
+        </div>
+
+        <!-- 2. హెడ్‌లైన్ కింద ఇన్ఫో బార్ -->
+        <div style="border-top: 2px solid #0f172a; border-bottom: 1px solid #cbd5e1; padding: 6px 4px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; background-color: #f8fafc;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="background-color: #dc2626; color: #ffffff; font-weight: 900; font-size: 11px; padding: 2px 6px; border-radius: 4px;">NS</span>
             <div>
-                <p class="text-slate-300 font-bold">NS News — Powered by A.S.V Enterprises</p>
-                <p class="mt-1 text-slate-500">© 2026 A.S.V Enterprises. All rights reserved.</p>
+              <span style="font-weight: 900; font-size: 15px; color: #0f172a; font-family: 'Ramabhadra', sans-serif;">NS NEWS</span>
+              <span style="font-size: 10px; color: #64748b; font-weight: 700; margin-left: 4px; display: inline-block;">(తెలుగు దినపత్రిక డిజిటల్ ఎడిషన్)</span>
             </div>
-            <div class="flex gap-4 font-semibold">
-                <a href="/" class="text-orange-400 hover:underline">🏠 డిజిటల్ సేవలు (హోమ్)</a>
-                <a href="/news" class="hover:text-white">న్యూస్ పోర్టల్</a>
-                <a href="/admin/news" class="hover:text-white">అడ్మిన్ కంట్రోల్</a>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 8px; text-align: right;">
+            <div>
+              <span style="color: {currentHeadlineColor}; font-size: 11px; font-weight: 800; display: block;">📍 {article.location_town || 'ముత్తారం'}</span>
+              <span style="color: #64748b; font-size: 10px; font-weight: 600;">
+                {article.created_at ? new Date(article.created_at).toLocaleDateString('te-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : ''}
+              </span>
             </div>
+
+            <button
+              type="button"
+              on:click={shareWhatsApp}
+              style="background-color: #25d366; color: #ffffff; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; font-size: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.2);"
+              title="వాట్సాప్‌లో షేర్ చేయండి"
+            >
+              📲
+            </button>
+          </div>
         </div>
-    </footer>
+
+        <!-- 3. కేవలం ఇంగ్లీష్ వార్తలకు మాత్రమే ఆడియో రీడర్ -->
+        {#if isEnglishArticle}
+          <div class="no-print" style="margin-bottom: 12px; background-color: #f0fdf4; border: 1px solid #86efac; padding: 8px 12px; border-radius: 10px; display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="font-size: 16px;">🎧</span>
+              <span style="font-size: 12px; font-weight: 700; color: #166534;">English Audio Reader:</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <button
+                type="button"
+                on:click={toggleSpeech}
+                style="background-color: #15803d; color: #ffffff; font-size: 11px; font-weight: 800; padding: 4px 12px; border-radius: 8px; border: none; cursor: pointer;"
+              >
+                {isSpeaking ? (isPaused ? '▶️ Resume' : '⏸️ Pause') : '🔊 Listen to News'}
+              </button>
+              {#if isSpeaking}
+                <button
+                  type="button"
+                  on:click={stopSpeech}
+                  style="background-color: #dc2626; color: #ffffff; font-size: 11px; font-weight: 800; padding: 4px 8px; border-radius: 8px; border: none; cursor: pointer;"
+                >
+                  ⏹️ Stop
+                </button>
+              {/if}
+            </div>
+          </div>
+        {/if}
+
+        <!-- 4. ఫాంట్ సైజ్ కంట్రోలర్ (A-, A, A+, A++) -->
+        <div class="no-print" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; background-color: #f1f5f9; padding: 4px 10px; border-radius: 8px;">
+          <span style="font-size: 11px; font-weight: 700; color: #475569;">అక్షరాల సైజు (Font Size):</span>
+          <div style="display: flex; gap: 4px;">
+            {#each fontSizes as fs, idx}
+              <button
+                type="button"
+                on:click={() => fontSizeIndex = idx}
+                style="padding: 2px 8px; border-radius: 6px; font-weight: 800; font-size: 12px; border: 1px solid #cbd5e1; cursor: pointer; background-color: {fontSizeIndex === idx ? currentHeadlineColor : '#ffffff'}; color: {fontSizeIndex === idx ? '#ffffff' : '#334155'};"
+              >
+                {fs.label}
+              </button>
+            {/each}
+          </div>
+        </div>
+
+        <!-- 5. ఫోటో & వార్తా కథనం (అడ్మిన్ ఎంచుకున్న లేఅవుట్ ప్రకారం నేరుగా కనిపిస్తుంది) -->
+        {#if imageLayout === 'side' && article.image_url}
+          <!-- 📰 నేటి దర్శిని స్టైల్ (Side-by-Text Wrap) -->
+          <div style="display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 14px;">
+            <div style="flex: 1 1 280px; max-width: 320px;">
+              <div style="border: 1px solid #cbd5e1; border-radius: {isRounded ? '10px' : '0px'}; overflow: hidden; background-color: #f8fafc;">
+                <img
+                  src={article.image_url}
+                  alt="News Pic"
+                  crossorigin="anonymous"
+                  style="width: 100%; height: auto; object-fit: cover; display: block;"
+                />
+                {#if article.image_caption_1}
+                  <p style="font-size: 10px; color: #64748b; text-align: center; padding: 4px; background-color: #f1f5f9; margin: 0; font-weight: 600;">
+                    {article.image_caption_1}
+                  </p>
+                {/if}
+              </div>
+
+              {#if article.image_url_2}
+                <div style="border: 1px solid #cbd5e1; border-radius: {isRounded ? '10px' : '0px'}; overflow: hidden; background-color: #f8fafc; margin-top: 10px;">
+                  <img
+                    src={article.image_url_2}
+                    alt="News Pic 2"
+                    crossorigin="anonymous"
+                    style="width: 100%; height: auto; object-fit: cover; display: block;"
+                  />
+                  {#if article.image_caption_2}
+                    <p style="font-size: 10px; color: #64748b; text-align: center; padding: 4px; background-color: #f1f5f9; margin: 0; font-weight: 600;">
+                      {article.image_caption_2}
+                    </p>
+                  {/if}
+                </div>
+              {/if}
+            </div>
+
+            <div style="flex: 2 1 300px;">
+              <p style="font-size: 13px; font-weight: 800; color: {currentHeadlineColor}; margin: 0 0 6px 0;">
+                {article.location_town || 'ముత్తారం'} (NS News) :
+              </p>
+              <div style="color: #0f172a; {fontSizes[fontSizeIndex].style} white-space: pre-line; text-align: justify; font-family: 'Noto Sans Telugu', sans-serif;">
+                {article.content}
+              </div>
+            </div>
+          </div>
+
+        {:else if imageLayout === 'grid' && article.image_url && article.image_url_2}
+          <!-- 🖼️ రెండు ఫోటోలు సమానంగా పక్కపక్కనే క్లబ్ అయిన స్టైల్ -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px;">
+            <div style="border: 1px solid #cbd5e1; border-radius: {isRounded ? '10px' : '0px'}; overflow: hidden; background-color: #f8fafc;">
+              <img src={article.image_url} alt="Pic 1" crossorigin="anonymous" style="width: 100%; height: 200px; object-fit: cover; display: block;" />
+              {#if article.image_caption_1}
+                <p style="font-size: 10px; color: #64748b; text-align: center; padding: 3px; margin: 0;">{article.image_caption_1}</p>
+              {/if}
+            </div>
+            <div style="border: 1px solid #cbd5e1; border-radius: {isRounded ? '10px' : '0px'}; overflow: hidden; background-color: #f8fafc;">
+              <img src={article.image_url_2} alt="Pic 2" crossorigin="anonymous" style="width: 100%; height: 200px; object-fit: cover; display: block;" />
+              {#if article.image_caption_2}
+                <p style="font-size: 10px; color: #64748b; text-align: center; padding: 3px; margin: 0;">{article.image_caption_2}</p>
+              {/if}
+            </div>
+          </div>
+
+          <div style="margin-bottom: 14px;">
+            <p style="font-size: 13px; font-weight: 800; color: {currentHeadlineColor}; margin: 0 0 6px 0;">
+              {article.location_town || 'ముత్తారం'} (NS News) :
+            </p>
+            <div style="color: #0f172a; {fontSizes[fontSizeIndex].style} white-space: pre-line; text-align: justify; font-family: 'Noto Sans Telugu', sans-serif;">
+              {article.content}
+            </div>
+          </div>
+
+        {:else}
+          <!-- 🌟 విశాలమైనది (Full Width స్టైల్) -->
+          {#if article.image_url}
+            <div style="border: 1px solid #cbd5e1; border-radius: {isRounded ? '10px' : '0px'}; overflow: hidden; background-color: #f8fafc; margin-bottom: 14px;">
+              <img
+                src={article.image_url}
+                alt="Main News Pic"
+                crossorigin="anonymous"
+                style="width: 100%; max-height: 360px; object-fit: cover; display: block; margin: 0 auto;"
+              />
+              {#if article.image_caption_1}
+                <p style="font-size: 10px; color: #64748b; text-align: center; padding: 4px; background-color: #f1f5f9; margin: 0; font-weight: 600;">
+                  {article.image_caption_1}
+                </p>
+              {/if}
+            </div>
+          {/if}
+
+          <div style="margin-bottom: 14px;">
+            <p style="font-size: 13px; font-weight: 800; color: {currentHeadlineColor}; margin: 0 0 6px 0;">
+              {article.location_town || 'ముత్తారం'} (NS News) :
+            </p>
+            <div style="color: #0f172a; {fontSizes[fontSizeIndex].style} white-space: pre-line; text-align: justify; font-family: 'Noto Sans Telugu', sans-serif;">
+              {article.content}
+            </div>
+          </div>
+
+          {#if article.image_url_2}
+            <div style="border: 1px solid #cbd5e1; border-radius: {isRounded ? '10px' : '0px'}; overflow: hidden; background-color: #f8fafc; margin-bottom: 14px;">
+              <img
+                src={article.image_url_2}
+                alt="News Pic 2"
+                crossorigin="anonymous"
+                style="width: 100%; max-height: 240px; object-fit: cover; display: block; margin: 0 auto;"
+              />
+              {#if article.image_caption_2}
+                <p style="font-size: 10px; color: #64748b; text-align: center; padding: 4px; background-color: #f1f5f9; margin: 0; font-weight: 600;">
+                  {article.image_caption_2}
+                </p>
+              {/if}
+            </div>
+          {/if}
+        {/if}
+
+        <!-- 6. సోషల్ మీడియా షేరింగ్ బార్ -->
+        <div style="border-top: 1px solid #cbd5e1; padding-top: 12px; margin-top: 14px;">
+          <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;">
+            <span style="font-size: 11px; font-weight: 800; color: #475569;">📢 షేర్ చేయండి:</span>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <button type="button" on:click={shareWhatsApp} style="background-color: #25d366; color: #ffffff; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 800; border: none; cursor: pointer;">
+                WhatsApp
+              </button>
+              <button type="button" on:click={shareFacebook} style="background-color: #1877f2; color: #ffffff; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 800; border: none; cursor: pointer;">
+                Facebook
+              </button>
+              <button type="button" on:click={shareTwitter} style="background-color: #000000; color: #ffffff; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 800; border: none; cursor: pointer;">
+                X
+              </button>
+              <button type="button" on:click={shareTelegram} style="background-color: #229ed9; color: #ffffff; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 800; border: none; cursor: pointer;">
+                Telegram
+              </button>
+              <button type="button" on:click={copyPageLink} style="background-color: #f1f5f9; color: #334155; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 800; border: 1px solid #cbd5e1; cursor: pointer;">
+                {copyFeedback ? '✓ కాపీడ్!' : '🔗 లింక్'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 7. కాపీరైట్ & కలర్ చుక్కల బార్ -->
+        <div style="border-top: 2px solid #0f172a; padding-top: 8px; margin-top: 14px; display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: #64748b; font-weight: 700;">
+          <span>Copyright © 2026. A.S.V. Enterprises & NS News Network. All rights reserved.</span>
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <span style="width: 8px; height: 8px; border-radius: 50%; background-color: #0284c7; display: inline-block;"></span>
+            <span style="width: 8px; height: 8px; border-radius: 50%; background-color: #e11d48; display: inline-block;"></span>
+            <span style="width: 8px; height: 8px; border-radius: 50%; background-color: #eab308; display: inline-block;"></span>
+            <span style="width: 8px; height: 8px; border-radius: 50%; background-color: #0f172a; display: inline-block;"></span>
+          </div>
+        </div>
+
+      </div>
+
+    {/if}
+  </main>
 </div>
 
 <style>
-    @keyframes marquee {
-        0% { transform: translateX(100%); }
-        100% { transform: translateX(-100%); }
+  @media print {
+    @page {
+      margin: 4mm 6mm !important;
+      size: A4 portrait;
     }
-    .animate-marquee {
-        display: inline-block;
-        white-space: nowrap;
-        animation: marquee 35s linear infinite;
+
+    :global(nav),
+    :global(header),
+    :global(footer),
+    .no-print,
+    button {
+      display: none !important;
     }
-    .no-scrollbar::-webkit-scrollbar {
-        display: none;
+
+    :global(body) {
+      background: #ffffff !important;
+      margin: 0 !important;
+      padding: 0 !important;
     }
-    .no-scrollbar {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
+
+    #news-printable-area {
+      border: 1px solid #64748b !important;
+      box-shadow: none !important;
+      padding: 8px 12px !important;
+      margin: 0 auto !important;
+      max-width: 100% !important;
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
     }
+
+    img {
+      max-height: 160px !important;
+      width: auto !important;
+      margin: 2px auto !important;
+      display: block !important;
+      object-fit: contain !important;
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+    }
+
+    h1 {
+      font-size: 16px !important;
+      line-height: 1.25 !important;
+      margin-bottom: 4px !important;
+    }
+  }
 </style>

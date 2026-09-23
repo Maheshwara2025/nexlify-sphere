@@ -29,25 +29,27 @@
         goto('/admin/login');
     }
 
-    // 9 ట్రెండింగ్ హెడ్‌లైన్ కలర్స్ ప్రివ్యూ
+    // 9 ట్రెండింగ్ హెడ్‌లైన్ రంగులు
     const headlineColors = [
         '#dc2626', '#1d4ed8', '#047857', '#7c3aed', 
         '#c2410c', '#0f766e', '#be123c', '#4338ca', '#831843'
     ];
 
-    // Smart Input Box
     let rawNewsInput = '';
 
-    // Form Fields (కేవలం సింగిల్ హెడ్‌లైన్ మాత్రమే)
+    // Form Fields
     let location_town = 'ముత్తారం';
     let custom_town = '';
     let headline = '';
-    let news_tone = 'soft';
     let alert_type = 'none';
     let category = 'రాజకీయాలు';
     let content = '';
     let youtube_url = '';
     let show_in_ticker = true;
+
+    // 🖼️ ఫోటో డిజైన్ / లేఅవుట్ ఎంపిక (Full, Side, Grid)
+    let image_layout = 'full'; 
+    let is_rounded = true;
 
     // Media 1
     /** @type {File | null} */
@@ -68,36 +70,21 @@
     let statusType = '';
 
     const towns = [
-        'ముత్తారం',
-        'పెద్దపల్లి',
-        'కరీంనగర్',
-        'మంథని',
-        'సుల్తానాబాద్',
-        'గోదావరిఖని',
-        'రామగుండం',
-        'హైదరాబాద్',
-        'తెలంగాణ',
-        'జాతీయం',
+        'ముత్తారం', 'పెద్దపల్లి', 'కరీంనగర్', 'మంథని', 'సుల్తానాబాద్',
+        'గోదావరిఖని', 'రామగుండం', 'హైదరాబాద్', 'తెలంగాణ', 'జాతీయం',
         'ఇతర ఊరు (Type Below)'
     ];
 
     const categories = [
-        'రాజకీయాలు',
-        'వ్యాపారం & ఫైనాన్స్',
-        'టెక్నాలజీ',
-        'ఆరోగ్యం',
-        'వాతావరణం & పర్యావరణం',
-        'విద్య & ఉద్యోగాలు',
-        'సైన్స్ & పరిశోధనలు',
-        'క్రీడలు & గేమ్స్',
-        'సంస్కృతి & సమాజం',
-        'ప్రపంచ వార్తలు'
+        'రాజకీయాలు', 'వ్యాపారం & ఫైనాన్స్', 'టెక్నాలజీ', 'ఆరోగ్యం',
+        'వాతావరణం & పర్యావరణం', 'విద్య & ఉద్యోగాలు', 'సైన్స్ & పరిశోధనలు',
+        'క్రీడలు & గేమ్స్', 'సంస్కృతి & సమాజం', 'ప్రపంచ వార్తలు'
     ];
 
-    // ⚡ ఆధునిక స్మార్ట్ సింగిల్ హెడ్‌లైన్ ఆటో-పార్సర్
+    // ⚡ స్మార్ట్ సింగిల్ హెడ్‌లైన్ ఆటో-పార్సర్
     function autoParseNews() {
         if (!rawNewsInput || !rawNewsInput.trim()) {
-            alert('దయచేసి ముందుగా పైన ఉన్న బాక్స్‌లో వార్త టెక్స్ట్‌ను పేస్ట్ చేయండి!');
+            alert('దయచేసి ముందుగా వార్త టెక్స్ట్‌ను బాక్స్‌లో పేస్ట్ చేయండి!');
             return;
         }
 
@@ -108,16 +95,14 @@
 
         if (lines.length === 0) return;
 
-        // 1. మొదటి లైన్ ఎల్లప్పుడూ సింగిల్ మెయిన్ హెడ్‌లైన్
+        // మొదటి లైన్ సింగిల్ హెడ్‌లైన్
         headline = lines[0]
             .replace(/^[*#•■✦\d+.\-\)]+\s*/, '')
             .replace(/\s+/g, ' ')
             .trim();
 
-        // 2. మిగిలిన మొత్తం భాగం క్లీన్ బాడీ కంటెంట్
         let fullBody = lines.slice(1).join('\n\n').trim();
 
-        // ఒకవేళ ఎంటర్‌లు లేకుండా ఒకే పెద్ద పేరాగా పేస్ట్ చేసి ఉంటే
         if (lines.length === 1 && lines[0].length > 80) {
             const sentences = lines[0].split(/(?<=[।!?.\n])\s+/);
             if (sentences.length > 1) {
@@ -129,7 +114,7 @@
             }
         }
 
-        // లొకేషన్ ప్రిఫిక్స్ ఉంటే (ఉదా: ముత్తారం : లేదా పెద్దపల్లి (NS News) :) బాడీ నుండి వేరు చేయడం
+        // లొకేషన్ వేరు చేయడం
         const townMatch = fullBody.match(/^([\u0C00-\u0C7F\w\s\(\)]+)\s*[:：\-–]\s*(.*)/s);
         if (townMatch && townMatch[1] && townMatch[1].length < 35) {
             const rawTown = townMatch[1].replace(/\(.*?\)/g, '').trim();
@@ -144,7 +129,6 @@
 
         content = fullBody || headline;
 
-        // లొకేషన్ ఆటో-డిటెక్షన్
         const fullText = rawNewsInput;
         for (const t of towns) {
             if (t !== 'ఇతర ఊరు (Type Below)' && fullText.includes(t)) {
@@ -153,19 +137,14 @@
             }
         }
 
-        // కేటగిరీ ఆటో-డిటెక్షన్
-        if (fullText.includes('పాఠశాల') || fullText.includes('విద్యార్థు') || fullText.includes('ఉపాధ్యాయు') || fullText.includes('డిఈవో') || fullText.includes('బడి') || fullText.includes('కళాశాల') || fullText.includes('పరీక్ష')) {
+        if (fullText.includes('పాఠశాల') || fullText.includes('విద్యార్థు') || fullText.includes('School') || fullText.includes('College') || fullText.includes('ఉపాధ్యాయు')) {
             category = 'విద్య & ఉద్యోగాలు';
-        } else if (fullText.includes('మంత్రి') || fullText.includes('ఎమ్మెల్యే') || fullText.includes('ఎంపీ') || fullText.includes('పార్టీ') || fullText.includes('కాంగ్రెస్') || fullText.includes('బీజేపీ') || fullText.includes('బీఆర్ఎస్') || fullText.includes('ప్రభుత్వ')) {
+        } else if (fullText.includes('మంత్రి') || fullText.includes('ఎమ్మెల్యే') || fullText.includes('MLA') || fullText.includes('MP') || fullText.includes('పార్టీ')) {
             category = 'రాజకీయాలు';
-        } else if (fullText.includes('రైతు') || fullText.includes('వ్యవసాయ') || fullText.includes('పంట') || fullText.includes('వరి') || fullText.includes('వర్షం') || fullText.includes('ఎరువు')) {
+        } else if (fullText.includes('రైతు') || fullText.includes('వ్యవసాయ') || fullText.includes('Farmer')) {
             category = 'వాతావరణం & పర్యావరణం';
-        } else if (fullText.includes('వైద్యం') || fullText.includes('ఆసుపత్రి') || fullText.includes('డాక్టర్') || fullText.includes('ఆరోగ్య') || fullText.includes('చికిత్స')) {
-            category = 'ఆరోగ్యం';
-        } else if (fullText.includes('క్రికెట్') || fullText.includes('మ్యాచ్') || fullText.includes('క్రీడ') || fullText.includes('టోర్నమెంట్')) {
-            category = 'క్రీడలు & గేమ్స్';
-        } else if (fullText.includes('వ్యాపారం') || fullText.includes('మార్కెట్') || fullText.includes('బ్యాంక్') || fullText.includes('బడ్జెట్')) {
-            category = 'వ్యాపారం & ఫైనాన్స్';
+        } else if (fullText.includes('Ganesh') || fullText.includes('నవరాత్రి') || fullText.includes('ఉత్సవ') || fullText.includes('ఆలయం') || fullText.includes('Temple')) {
+            category = 'సంస్కృతి & సమాజం';
         }
     }
 
@@ -182,6 +161,9 @@
             } else {
                 imageFile2 = target.files[0];
                 imagePreview2 = URL.createObjectURL(imageFile2);
+                if (image_layout === 'full') {
+                    image_layout = 'grid'; // 2nd ఫోటో ఎంచుకోగానే ఆటోమేటిక్‌గా క్లబ్ ఆప్షన్‌కు సెట్ కావడం
+                }
             }
         }
     }
@@ -229,21 +211,25 @@
                 imageUrl2 = await uploadSingleImage(imageFile2);
             }
 
+            // ఫోటో లేఅవుట్ & అంచుల స్టైల్‌ను ఎన్‌కోడ్ చేయడం
+            const layoutStyleCode = `${image_layout}|${is_rounded ? 'rounded' : 'sharp'}`;
+
             const { error } = await supabase.from('news_articles').insert([
                 {
                     location_town: finalLocation,
                     headline,
-                    subline_1: null,
-                    subline_2: null,
-                    subline_3: null,
-                    news_tone,
+                    // NOT NULL ఎర్రర్ రాకుండా ఖాళీ స్ట్రింగ్స్ ('') పంపుతున్నాం
+                    subline_1: '', 
+                    subline_2: '',
+                    subline_3: '',
+                    news_tone: layoutStyleCode,
                     alert_type,
                     category,
                     content,
                     image_url: imageUrl1,
-                    image_caption_1: image_caption_1 || null,
+                    image_caption_1: image_caption_1 || '',
                     image_url_2: imageUrl2,
-                    image_caption_2: image_caption_2 || null,
+                    image_caption_2: image_caption_2 || '',
                     youtube_url: youtube_url || null,
                     show_in_ticker
                 }
@@ -254,7 +240,7 @@
             statusMsg = 'వార్త విజయవంతంగా పబ్లిష్ అయ్యింది!';
             statusType = 'success';
 
-            // ఫారమ్ రీసెట్ చేయడం
+            // ఫారమ్ రీసెట్
             rawNewsInput = '';
             headline = '';
             content = '';
@@ -266,6 +252,7 @@
             image_caption_2 = '';
             youtube_url = '';
             custom_town = '';
+            image_layout = 'full';
         } catch (/** @type {any} */ err) {
             console.error('Submit Error:', err);
             statusMsg = `లోపం: ${err.message || 'మళ్లీ ప్రయత్నించండి'}`;
@@ -291,7 +278,7 @@
     <div class="min-h-screen bg-slate-100 py-6 px-3 sm:px-6 font-sans">
         <div class="max-w-5xl mx-auto bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
             
-            <!-- Master Header with All Tools -->
+            <!-- Master Header with Quick Tools -->
             <div class="bg-slate-950 px-5 py-4 flex flex-wrap items-center justify-between gap-3 text-white border-b-2 border-red-600">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center font-black text-xl shadow">
@@ -304,62 +291,25 @@
                 </div>
 
                 <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                    <!-- NS Shorts -->
-                    <a
-                        href="/admin/shorts"
-                        class="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white text-xs px-3 py-1.5 rounded-xl font-bold transition shadow flex items-center gap-1"
-                    >
-                        <span>⚡ Shorts</span>
+                    <a href="/admin/shorts" class="bg-gradient-to-r from-red-600 to-rose-600 text-white text-xs px-3 py-1.5 rounded-xl font-bold shadow">
+                        ⚡ Shorts
                     </a>
-
-                    <!-- Digital Express -->
-                    <a
-                        href="/admin/digital-express"
-                        class="bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs px-3 py-1.5 rounded-xl font-black transition shadow flex items-center gap-1"
-                    >
-                        <span>🚀 Express</span>
+                    <a href="/admin/digital-express" class="bg-amber-500 text-slate-950 text-xs px-3 py-1.5 rounded-xl font-black shadow">
+                        🚀 Express
                     </a>
-
-                    <!-- పోర్టల్స్ లాంచర్ -->
-                    <a
-                        href="/admin/portals"
-                        class="bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs px-3 py-1.5 rounded-xl font-bold border border-slate-700 transition flex items-center gap-1"
-                    >
-                        <span>🔐 పోర్టల్స్</span>
+                    <a href="/admin/portals" class="bg-slate-800 text-amber-300 text-xs px-3 py-1.5 rounded-xl font-bold border border-slate-700">
+                        🔐 పోర్టల్స్
                     </a>
-
-                    <!-- ప్రింట్ ఆర్డర్లు డెస్క్ -->
-                    <a
-                        href="/admin/print-orders"
-                        class="bg-emerald-700 hover:bg-emerald-600 text-white text-xs px-3 py-1.5 rounded-xl font-bold transition shadow flex items-center gap-1"
-                    >
-                        <span>🖨️ ప్రింట్ ఆర్డర్స్</span>
+                    <a href="/admin/print-orders" class="bg-emerald-700 text-white text-xs px-3 py-1.5 rounded-xl font-bold shadow">
+                        🖨️ ప్రింట్ ఆర్డర్స్
                     </a>
-
-                    <!-- E-Paper Clips -->
-                    <a 
-                        href="/admin/clips" 
-                        class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold px-3 py-1.5 rounded-xl border border-slate-700 transition"
-                    >
+                    <a href="/admin/clips" class="bg-slate-800 text-slate-200 text-xs font-bold px-3 py-1.5 rounded-xl border border-slate-700">
                         📰 క్లిప్స్
                     </a>
-
-                    <!-- లైవ్ పోర్టల్ -->
-                    <a
-                        href="/news"
-                        target="_blank"
-                        rel="noreferrer"
-                        class="bg-slate-800 hover:bg-slate-700 text-xs px-2.5 py-1.5 rounded-xl font-bold transition border border-slate-700"
-                    >
+                    <a href="/news" target="_blank" rel="noreferrer" class="bg-slate-800 text-xs px-2.5 py-1.5 rounded-xl font-bold border border-slate-700">
                         పోర్టల్ ↗
                     </a>
-
-                    <!-- లాగౌట్ -->
-                    <button
-                        type="button"
-                        on:click={handleLogout}
-                        class="bg-rose-950 hover:bg-rose-900 text-rose-300 text-xs px-2.5 py-1.5 rounded-xl font-bold transition border border-rose-900 cursor-pointer"
-                    >
+                    <button type="button" on:click={handleLogout} class="bg-rose-950 text-rose-300 text-xs px-2.5 py-1.5 rounded-xl font-bold border border-rose-900 cursor-pointer">
                         లాగౌట్
                     </button>
                 </div>
@@ -372,11 +322,11 @@
                     </div>
                 {/if}
 
-                <!-- ⚡ స్మార్ట్ ఆటో-ఫార్మాట్ మ్యాజిక్ బాక్స్ -->
+                <!-- ⚡ స్మార్ట్ సింగిల్-హెడ్‌లైన్ బాక్స్ -->
                 <div class="bg-gradient-to-r from-red-50 via-orange-50 to-amber-50 p-5 rounded-2xl border-2 border-red-200 space-y-3">
                     <div class="flex flex-wrap items-center justify-between gap-2">
                         <label for="magic-box" class="text-xs font-black text-red-950 uppercase tracking-wider flex items-center gap-1.5">
-                            <span>⚡ స్మార్ట్ సింగిల్-హెడ్‌లైన్ బాక్స్ (వార్త మొత్తం ఇక్కడ పేస్ట్ చేయండి)</span>
+                            <span>⚡ స్మార్ట్ సింగిల్-హెడ్‌లైన్ బాక్స్ (మొత్తం వార్త ఇక్కడ పేస్ట్ చేయండి)</span>
                         </label>
                         <button
                             type="button"
@@ -390,7 +340,7 @@
                         id="magic-box"
                         bind:value={rawNewsInput}
                         rows="4"
-                        placeholder="పూర్తి వార్తను ఇక్కడ పేస్ట్ చేయండి... మొదటి లైన్ ఆటోమేటిక్‌గా ప్రధాన హెడ్‌లైన్ అవుతుంది, మిగిలినది కథనం అవుతుంది!"
+                        placeholder="పూర్తి వార్తను ఇక్కడ పేస్ట్ చేయండి... మొదటి లైన్ ఆటోమేటిక్‌గా సింగిల్ బోల్డ్ హెడ్‌లైన్ అవుతుంది, మిగిలిన భాగం కథనం అవుతుంది!"
                         class="w-full px-4 py-3 rounded-xl border border-red-200 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-red-500 focus:outline-none leading-relaxed"
                     ></textarea>
                 </div>
@@ -453,15 +403,13 @@
                         </div>
                     </div>
 
-                    <!-- 📰 ప్రధాన సింగిల్ హెడ్‌లైన్ మాత్రమే -->
+                    <!-- ప్రధాన హెడ్‌లైన్ మాత్రమే -->
                     <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2">
                         <div class="flex items-center justify-between">
                             <label for="headline" class="block text-xs sm:text-sm font-black text-slate-900">
                                 ప్రధాన హెడ్‌లైన్ (Single Bold Headline) *
                             </label>
-                            
-                            <!-- 9 Colors Palette Indicator -->
-                            <div class="flex items-center gap-1" title="ఈ 9 దినపత్రిక రాయల్ రంగుల్లో ఒకటి పోర్టల్‌లో ఆర్టికల్ ప్రకారం ఆటోమేటిక్‌గా మారుతుంది">
+                            <div class="flex items-center gap-1" title="9 రంగుల్లో ఒకటి పోర్టల్‌లో ఆటోమేటిక్‌గా వస్తుంది">
                                 <span class="text-[10px] text-slate-500 font-bold mr-1">రంగులు:</span>
                                 {#each headlineColors as c}
                                     <span style="background-color: {c}; width: 8px; height: 8px; border-radius: 50%; display: inline-block;"></span>
@@ -473,7 +421,7 @@
                             id="headline"
                             type="text"
                             bind:value={headline}
-                            placeholder="వార్త ప్రధాన ముఖ్యాంశం (సింగిల్ లైన్)"
+                            placeholder="వార్త ప్రధాన ముఖ్యాంశం"
                             class="w-full px-4 py-3 rounded-xl border border-slate-300 font-black text-base text-red-950 focus:ring-2 focus:ring-red-500 focus:outline-none"
                             required
                         />
@@ -496,7 +444,7 @@
                             <input
                                 type="text"
                                 bind:value={image_caption_1}
-                                placeholder="ఫోటో 1 వివరణ / క్యాప్షన్ (చిత్రంలో ఉన్నవారు)"
+                                placeholder="ఫోటో 1 వివరణ / క్యాప్షన్"
                                 class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-medium focus:ring-2 focus:ring-red-500"
                             />
                         </div>
@@ -522,20 +470,81 @@
                         </div>
                     </div>
 
-                    <!-- వార్త పూర్తి కథనం (Content) -->
+                    <!-- 🎨 ఫోటో డిజైన్ / లేఅవుట్ ఎంపిక (ఇక్కడే అడ్మిన్ ఎంచుకుంటారు) -->
+                    <div class="bg-gradient-to-r from-red-50/50 via-slate-50 to-amber-50/50 p-4 rounded-2xl border-2 border-red-200 space-y-3">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                                <h3 class="text-xs sm:text-sm font-black text-slate-900 flex items-center gap-1.5">
+                                    <span>🖼️</span>
+                                    <span>ఫోటో డిజైన్ & అమరిక (పేపర్‌లో ఎలా కనిపించాలి?)</span>
+                                </h3>
+                                <p class="text-[11px] text-slate-500">పోర్టల్‌లో వార్త ఏ స్టైల్‌లో కనిపించాలో ఇక్కడే నిర్ణయించండి</p>
+                            </div>
+                            <button
+                                type="button"
+                                on:click={() => is_rounded = !is_rounded}
+                                class="text-xs px-3 py-1 rounded-xl font-bold border transition {is_rounded ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-300'}"
+                            >
+                                {is_rounded ? '✓ గుండ్రటి అంచులు (Rounded)' : 'షార్ప్ అంచులు (Sharp)'}
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-bold">
+                            <!-- 1. Full Width -->
+                            <button
+                                type="button"
+                                on:click={() => image_layout = 'full'}
+                                class="p-3 rounded-xl border text-left transition {image_layout === 'full' ? 'bg-white border-red-600 text-red-950 ring-2 ring-red-500 shadow' : 'bg-white/80 border-slate-200 text-slate-600 hover:border-slate-300'}"
+                            >
+                                <div class="flex items-center justify-between mb-1">
+                                    <span>విశాలమైనది (Full Width)</span>
+                                    <span class="text-base">📱</span>
+                                </div>
+                                <p class="text-[10px] text-slate-500 font-normal">ఫోటో పెద్దదిగా పైన ఉండి, కింద కథనం వస్తుంది</p>
+                            </button>
+
+                            <!-- 2. Side-by-Text -->
+                            <button
+                                type="button"
+                                on:click={() => image_layout = 'side'}
+                                class="p-3 rounded-xl border text-left transition {image_layout === 'side' ? 'bg-white border-red-600 text-red-950 ring-2 ring-red-500 shadow' : 'bg-white/80 border-slate-200 text-slate-600 hover:border-slate-300'}"
+                            >
+                                <div class="flex items-center justify-between mb-1">
+                                    <span>న్యూస్‌పేపర్ సైడ్ (Side)</span>
+                                    <span class="text-base">📰</span>
+                                </div>
+                                <p class="text-[10px] text-slate-500 font-normal">నేటి దర్శిని స్టైల్: ఫోటో ఎడమవైపు, పక్కనే కథనం</p>
+                            </button>
+
+                            <!-- 3. Clubbed Grid -->
+                            <button
+                                type="button"
+                                on:click={() => image_layout = 'grid'}
+                                class="p-3 rounded-xl border text-left transition {image_layout === 'grid' ? 'bg-white border-red-600 text-red-950 ring-2 ring-red-500 shadow' : 'bg-white/80 border-slate-200 text-slate-600 hover:border-slate-300'}"
+                            >
+                                <div class="flex items-center justify-between mb-1">
+                                    <span>పక్కపక్కనే క్లబ్ (Club)</span>
+                                    <span class="text-base">🖼️</span>
+                                </div>
+                                <p class="text-[10px] text-slate-500 font-normal">రెండు ఫోటోలు సమానంగా పక్కపక్కనే వస్తాయి</p>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- వార్త పూర్తి కథనం -->
                     <div>
                         <label for="content" class="block text-xs sm:text-sm font-bold text-slate-900 mb-1">వార్త పూర్తి కథనం (Content) *</label>
                         <textarea
                             id="content"
                             bind:value={content}
                             rows="7"
-                            placeholder="వార్త పూర్తి వివరాలు పేరాగ్రాఫ్‌ల రూపంలో ఇక్కడ నమోదు చేయండి..."
+                            placeholder="వార్త పూర్తి సమాచారం పేరాగ్రాఫ్‌ల రూపంలో..."
                             class="w-full px-4 py-3 rounded-2xl border border-slate-300 text-xs sm:text-sm leading-relaxed focus:ring-2 focus:ring-red-500 focus:outline-none"
                             required
                         ></textarea>
                     </div>
 
-                    <!-- టిక్కర్ & యూట్యూబ్ వీడియో -->
+                    <!-- లైవ్ టిక్కర్ & యూట్యూబ్ వీడియో -->
                     <div class="flex flex-wrap items-center justify-between gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200">
                         <div class="flex items-center gap-2">
                             <input
