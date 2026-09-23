@@ -29,16 +29,19 @@
         goto('/admin/login');
     }
 
+    // 9 ట్రెండింగ్ హెడ్‌లైన్ కలర్స్ ప్రివ్యూ
+    const headlineColors = [
+        '#dc2626', '#1d4ed8', '#047857', '#7c3aed', 
+        '#c2410c', '#0f766e', '#be123c', '#4338ca', '#831843'
+    ];
+
     // Smart Input Box
     let rawNewsInput = '';
 
-    // Form Fields
+    // Form Fields (కేవలం సింగిల్ హెడ్‌లైన్ మాత్రమే)
     let location_town = 'ముత్తారం';
     let custom_town = '';
     let headline = '';
-    let subline_1 = '';
-    let subline_2 = '';
-    let subline_3 = '';
     let news_tone = 'soft';
     let alert_type = 'none';
     let category = 'రాజకీయాలు';
@@ -91,14 +94,13 @@
         'ప్రపంచ వార్తలు'
     ];
 
-    // మెరుగుపరిచిన స్మార్ట్ ఆటో-ఫార్మాట్ ఫంక్షన్
+    // ⚡ ఆధునిక స్మార్ట్ సింగిల్ హెడ్‌లైన్ ఆటో-పార్సర్
     function autoParseNews() {
         if (!rawNewsInput || !rawNewsInput.trim()) {
             alert('దయచేసి ముందుగా పైన ఉన్న బాక్స్‌లో వార్త టెక్స్ట్‌ను పేస్ట్ చేయండి!');
             return;
         }
 
-        // లైన్ల వారీగా విభజించి ఖాళీలను తొలగించడం
         let lines = rawNewsInput
             .split(/\r?\n/)
             .map(l => l.trim())
@@ -106,67 +108,41 @@
 
         if (lines.length === 0) return;
 
-        // ఒకవేళ ఎంటర్‌లు లేకుండా ఒకే పెద్ద పేరాగా పేస్ట్ చేస్తే
-        if (lines.length === 1 && lines[0].length > 90) {
+        // 1. మొదటి లైన్ ఎల్లప్పుడూ సింగిల్ మెయిన్ హెడ్‌లైన్
+        headline = lines[0]
+            .replace(/^[*#•■✦\d+.\-\)]+\s*/, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        // 2. మిగిలిన మొత్తం భాగం క్లీన్ బాడీ కంటెంట్
+        let fullBody = lines.slice(1).join('\n\n').trim();
+
+        // ఒకవేళ ఎంటర్‌లు లేకుండా ఒకే పెద్ద పేరాగా పేస్ట్ చేసి ఉంటే
+        if (lines.length === 1 && lines[0].length > 80) {
             const sentences = lines[0].split(/(?<=[।!?.\n])\s+/);
             if (sentences.length > 1) {
                 headline = sentences[0].replace(/^[*#•■✦-]+\s*/, '').trim();
-                content = sentences.slice(1).join('\n\n').trim();
+                fullBody = sentences.slice(1).join('\n\n').trim();
             } else {
                 headline = lines[0].substring(0, 80).trim();
-                content = lines[0];
+                fullBody = lines[0];
             }
-            subline_1 = '';
-            subline_2 = '';
-            subline_3 = '';
-        } else {
-            // బహుళ లైన్లు ఉన్నప్పుడు
-            headline = lines[0]
-                .replace(/^[*#•■✦-]+\s*/, '')
-                .replace(/\s+/g, ' ')
-                .trim();
-
-            let sublines = [];
-            let bodyStartIndex = 1;
-
-            for (let i = 1; i < Math.min(lines.length, 5); i++) {
-                const line = lines[i];
-                const isBullet = /^([•\-\*■✦]|\d+[\.\)])\s*/.test(line);
-                const isShort = line.length < 85 && !line.includes('వివరాల్లోకి వెళ్తే') && !line.includes(':') && !line.includes('ప్రతినిధి');
-
-                if (isBullet || isShort) {
-                    const cleaned = line.replace(/^([•\-\*■✦]|\d+[\.\)])\s*/, '').trim();
-                    if (cleaned) {
-                        sublines.push(cleaned);
-                        bodyStartIndex = i + 1;
-                    }
-                } else {
-                    break;
-                }
-            }
-
-            subline_1 = sublines[0] || '';
-            subline_2 = sublines[1] || '';
-            subline_3 = sublines[2] || '';
-
-            let remaining = lines.slice(bodyStartIndex);
-            let fullBody = remaining.join('\n\n');
-
-            // లొకేషన్ ప్రిఫిక్స్ ఉంటే (ఉదా: ముత్తారం :) గుర్తించి బాడీ నుండి తీసివేయడం
-            const townMatch = fullBody.match(/^([\u0C00-\u0C7F\w\s]+)\s*[:：\-–]\s*(.*)/s);
-            if (townMatch && townMatch[1] && townMatch[1].length < 25) {
-                const detectedTown = townMatch[1].trim();
-                if (towns.includes(detectedTown)) {
-                    location_town = detectedTown;
-                } else {
-                    location_town = 'ఇతర ఊరు (Type Below)';
-                    custom_town = detectedTown;
-                }
-                fullBody = townMatch[2].trim();
-            }
-
-            content = fullBody || (lines.length > 1 ? lines.slice(1).join('\n\n') : headline);
         }
+
+        // లొకేషన్ ప్రిఫిక్స్ ఉంటే (ఉదా: ముత్తారం : లేదా పెద్దపల్లి (NS News) :) బాడీ నుండి వేరు చేయడం
+        const townMatch = fullBody.match(/^([\u0C00-\u0C7F\w\s\(\)]+)\s*[:：\-–]\s*(.*)/s);
+        if (townMatch && townMatch[1] && townMatch[1].length < 35) {
+            const rawTown = townMatch[1].replace(/\(.*?\)/g, '').trim();
+            if (towns.includes(rawTown)) {
+                location_town = rawTown;
+            } else if (rawTown) {
+                location_town = 'ఇతర ఊరు (Type Below)';
+                custom_town = rawTown;
+            }
+            fullBody = townMatch[2].trim();
+        }
+
+        content = fullBody || headline;
 
         // లొకేషన్ ఆటో-డిటెక్షన్
         const fullText = rawNewsInput;
@@ -178,21 +154,20 @@
         }
 
         // కేటగిరీ ఆటో-డిటెక్షన్
-        if (fullText.includes('పాఠశాల') || fullText.includes('విద్యార్థు') || fullText.includes('ఉపాధ్యాయు') || fullText.includes('డిఈవో') || fullText.includes('బడి') || fullText.includes('కళాశాల')) {
+        if (fullText.includes('పాఠశాల') || fullText.includes('విద్యార్థు') || fullText.includes('ఉపాధ్యాయు') || fullText.includes('డిఈవో') || fullText.includes('బడి') || fullText.includes('కళాశాల') || fullText.includes('పరీక్ష')) {
             category = 'విద్య & ఉద్యోగాలు';
-        } else if (fullText.includes('మంత్రి') || fullText.includes('ఎమ్మెల్యే') || fullText.includes('ఎంపీ') || fullText.includes('పార్టీ') || fullText.includes('కాంగ్రెస్') || fullText.includes('బీజేపీ') || fullText.includes('బీఆర్ఎస్')) {
+        } else if (fullText.includes('మంత్రి') || fullText.includes('ఎమ్మెల్యే') || fullText.includes('ఎంపీ') || fullText.includes('పార్టీ') || fullText.includes('కాంగ్రెస్') || fullText.includes('బీజేపీ') || fullText.includes('బీఆర్ఎస్') || fullText.includes('ప్రభుత్వ')) {
             category = 'రాజకీయాలు';
-        } else if (fullText.includes('రైతు') || fullText.includes('వ్యవసాయ') || fullText.includes('పంట') || fullText.includes('వరి')) {
+        } else if (fullText.includes('రైతు') || fullText.includes('వ్యవసాయ') || fullText.includes('పంట') || fullText.includes('వరి') || fullText.includes('వర్షం') || fullText.includes('ఎరువు')) {
             category = 'వాతావరణం & పర్యావరణం';
-        } else if (fullText.includes('వైద్యం') || fullText.includes('ఆసుపత్రి') || fullText.includes('డాక్టర్') || fullText.includes('ఆరోగ్య')) {
+        } else if (fullText.includes('వైద్యం') || fullText.includes('ఆసుపత్రి') || fullText.includes('డాక్టర్') || fullText.includes('ఆరోగ్య') || fullText.includes('చికిత్స')) {
             category = 'ఆరోగ్యం';
-        } else if (fullText.includes('క్రికెట్') || fullText.includes('మ్యాచ్') || fullText.includes('క్రీడ')) {
+        } else if (fullText.includes('క్రికెట్') || fullText.includes('మ్యాచ్') || fullText.includes('క్రీడ') || fullText.includes('టోర్నమెంట్')) {
             category = 'క్రీడలు & గేమ్స్';
+        } else if (fullText.includes('వ్యాపారం') || fullText.includes('మార్కెట్') || fullText.includes('బ్యాంక్') || fullText.includes('బడ్జెట్')) {
+            category = 'వ్యాపారం & ఫైనాన్స్';
         }
     }
-
-    // బటన్ ఏ పేరుతో పిలిచినా పనిచేసేలా అలియాస్
-    const handleAutoFormat = autoParseNews;
 
     /**
      * @param {Event} e
@@ -258,9 +233,9 @@
                 {
                     location_town: finalLocation,
                     headline,
-                    subline_1: subline_1 || null,
-                    subline_2: subline_2 || null,
-                    subline_3: subline_3 || null,
+                    subline_1: null,
+                    subline_2: null,
+                    subline_3: null,
                     news_tone,
                     alert_type,
                     category,
@@ -279,11 +254,9 @@
             statusMsg = 'వార్త విజయవంతంగా పబ్లిష్ అయ్యింది!';
             statusType = 'success';
 
+            // ఫారమ్ రీసెట్ చేయడం
             rawNewsInput = '';
             headline = '';
-            subline_1 = '';
-            subline_2 = '';
-            subline_3 = '';
             content = '';
             imageFile1 = null;
             imagePreview1 = null;
@@ -304,298 +277,296 @@
 </script>
 
 <svelte:head>
-	<title>NS News Smart Control Desk | A.S.V Enterprises</title>
+    <title>NS News Smart Control Desk | A.S.V Enterprises</title>
 </svelte:head>
 
 {#if authChecking}
-	<div class="min-h-screen bg-slate-900 flex items-center justify-center text-white font-sans">
-		<div class="text-center space-y-3">
-			<div class="w-8 h-8 border-4 border-red-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-			<p class="text-xs text-slate-400 font-medium">సెక్యూరిటీ చెక్ అవుతోంది...</p>
-		</div>
-	</div>
+    <div class="min-h-screen bg-slate-900 flex items-center justify-center text-white font-sans">
+        <div class="text-center space-y-3">
+            <div class="w-8 h-8 border-4 border-red-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+            <p class="text-xs text-slate-400 font-medium">సెక్యూరిటీ చెక్ అవుతోంది...</p>
+        </div>
+    </div>
 {:else}
-	<div class="min-h-screen bg-slate-100 py-8 px-4 sm:px-6 font-sans">
-		<div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-			<!-- Master Header with Logout -->
-			<!-- Master Header with Logout & Shorts -->
-            <div class="bg-slate-950 px-6 py-4 flex items-center justify-between text-white border-b-2 border-red-600">
+    <div class="min-h-screen bg-slate-100 py-6 px-3 sm:px-6 font-sans">
+        <div class="max-w-5xl mx-auto bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+            
+            <!-- Master Header with All Tools -->
+            <div class="bg-slate-950 px-5 py-4 flex flex-wrap items-center justify-between gap-3 text-white border-b-2 border-red-600">
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center font-black text-xl shadow">
+                    <div class="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center font-black text-xl shadow">
                         NS
                     </div>
                     <div>
-                        <h1 class="text-lg font-bold">NS News Smart Control Desk</h1>
-                        <p class="text-xs text-slate-400">తెలుగు దినపత్రిక డిజిటల్ నెట్‌వర్క్ • A.S.V Enterprises</p>
+                        <h1 class="text-base sm:text-lg font-black tracking-wide">NS News Smart Control Desk</h1>
+                        <p class="text-[11px] text-slate-400">తెలుగు దినపత్రిక డిజిటల్ నెట్‌వర్క్ • A.S.V Enterprises</p>
                     </div>
                 </div>
-                <div class="flex items-center gap-2">
-                    <!-- ⚡ NS Shorts అడ్మిన్ బటన్ -->
+
+                <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                    <!-- NS Shorts -->
                     <a
                         href="/admin/shorts"
-                        class="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white text-xs px-3 py-2 rounded-xl font-extrabold transition-all shadow flex items-center gap-1.5"
+                        class="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white text-xs px-3 py-1.5 rounded-xl font-bold transition shadow flex items-center gap-1"
                     >
-                        <span class="text-amber-300 animate-pulse">⚡</span>
-                        <span>NS Shorts</span>
+                        <span>⚡ Shorts</span>
                     </a>
-					<a
-  href="/admin/digital-express"
-  class="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 text-xs px-3 py-2 rounded-xl font-black transition-all shadow flex items-center gap-1.5"
->
-  <span>🚀</span>
-  <span>Digital Express</span>
-</a>
 
-<a
-  href="/admin/portals"
-  class="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow flex items-center gap-1.5 transition"
->
-  <span>🔐</span>
-  <span>పోర్టల్స్ లాంచర్</span>
-</a>
+                    <!-- Digital Express -->
+                    <a
+                        href="/admin/digital-express"
+                        class="bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs px-3 py-1.5 rounded-xl font-black transition shadow flex items-center gap-1"
+                    >
+                        <span>🚀 Express</span>
+                    </a>
+
+                    <!-- పోర్టల్స్ లాంచర్ -->
+                    <a
+                        href="/admin/portals"
+                        class="bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs px-3 py-1.5 rounded-xl font-bold border border-slate-700 transition flex items-center gap-1"
+                    >
+                        <span>🔐 పోర్టల్స్</span>
+                    </a>
+
+                    <!-- ప్రింట్ ఆర్డర్లు డెస్క్ -->
+                    <a
+                        href="/admin/print-orders"
+                        class="bg-emerald-700 hover:bg-emerald-600 text-white text-xs px-3 py-1.5 rounded-xl font-bold transition shadow flex items-center gap-1"
+                    >
+                        <span>🖨️ ప్రింట్ ఆర్డర్స్</span>
+                    </a>
+
+                    <!-- E-Paper Clips -->
+                    <a 
+                        href="/admin/clips" 
+                        class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold px-3 py-1.5 rounded-xl border border-slate-700 transition"
+                    >
+                        📰 క్లిప్స్
+                    </a>
+
+                    <!-- లైవ్ పోర్టల్ -->
                     <a
                         href="/news"
                         target="_blank"
-                        class="bg-slate-800 hover:bg-slate-700 text-xs px-3 py-2 rounded-xl font-bold transition-all border border-slate-700"
+                        rel="noreferrer"
+                        class="bg-slate-800 hover:bg-slate-700 text-xs px-2.5 py-1.5 rounded-xl font-bold transition border border-slate-700"
                     >
-                        పోర్టల్
+                        పోర్టల్ ↗
                     </a>
+
+                    <!-- లాగౌట్ -->
                     <button
                         type="button"
                         on:click={handleLogout}
-                        class="bg-slate-800 hover:bg-red-600 text-xs px-3 py-2 rounded-xl font-bold transition-all border border-slate-700 hover:border-red-600"
+                        class="bg-rose-950 hover:bg-rose-900 text-rose-300 text-xs px-2.5 py-1.5 rounded-xl font-bold transition border border-rose-900 cursor-pointer"
                     >
                         లాగౌట్
                     </button>
-					<!-- E-Paper Clips పేజీకి వెళ్లే బటన్ -->
-<a 
-  href="/admin/clips" 
-  class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white text-xs md:text-sm font-bold px-4 py-2.5 rounded-xl shadow-sm transition"
->
-  📰 E-Paper Clips Upload Desk →
-</a>
-
-
                 </div>
             </div>
-			<div class="p-6 sm:p-8 space-y-6">
-				{#if statusMsg}
-					<div class="p-4 rounded-xl text-sm font-semibold {statusType === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}">
-						{statusMsg}
-					</div>
-				{/if}
 
-				<!-- Smart Auto-Parser Magic Box -->
-				<div class="bg-gradient-to-r from-red-50 via-orange-50 to-amber-50 p-5 rounded-2xl border-2 border-red-200 space-y-3">
-					<div class="flex items-center justify-between">
-						<label for="magic-box" class="text-xs font-black text-red-950 uppercase tracking-wider flex items-center gap-1.5">
-							⚡ స్మార్ట్ ఆటో-ఫార్మాట్ బాక్స్ (మొత్తం వార్త ఇక్కడ పేస్ట్ చేయండి)
-						</label>
-						<button
-							type="button"
-							on:click={autoParseNews}
-							class="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-4 py-2 rounded-xl shadow transition-all active:scale-95"
-						>
-							✨ ఆటో ఫార్మాట్ చేయండి
-						</button>
-					</div>
-					<textarea
-						id="magic-box"
-						bind:value={rawNewsInput}
-						rows="4"
-						placeholder="మీ వద్ద ఉన్న పూర్తి వార్తను (హెడ్‌లైన్ + బుల్లెట్లు + కథనం) ఇక్కడ పేస్ట్ చేసి 'ఆటో ఫార్మాట్ చేయండి' బటన్ నొక్కండి..."
-						class="w-full px-4 py-3 rounded-xl border border-red-200 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-red-500 focus:outline-none leading-relaxed"
-					></textarea>
-				</div>
+            <div class="p-5 sm:p-8 space-y-6">
+                {#if statusMsg}
+                    <div class="p-4 rounded-2xl text-sm font-bold {statusType === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'}">
+                        {statusMsg}
+                    </div>
+                {/if}
 
-				<form on:submit|preventDefault={handleSubmit} class="space-y-6">
-					<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
-						<div>
-							<label for="town-select" class="block text-xs font-bold text-slate-700 mb-1">లొకేషన్ / ఊరు *</label>
-							<select
-								id="town-select"
-								bind:value={location_town}
-								class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold bg-white focus:ring-2 focus:ring-red-500"
-							>
-								{#each towns as t}
-									<option value={t}>{t}</option>
-								{/each}
-							</select>
-							{#if location_town === 'ఇతర ఊరు (Type Below)'}
-								<input
-									type="text"
-									bind:value={custom_town}
-									placeholder="ఊరి పేరు టైప్ చేయండి (ఉదా: మంథని)"
-									class="mt-2 w-full px-3 py-1.5 rounded-lg border border-red-300 text-xs font-semibold focus:ring-2 focus:ring-red-500"
-									required
-								/>
-							{/if}
-						</div>
+                <!-- ⚡ స్మార్ట్ ఆటో-ఫార్మాట్ మ్యాజిక్ బాక్స్ -->
+                <div class="bg-gradient-to-r from-red-50 via-orange-50 to-amber-50 p-5 rounded-2xl border-2 border-red-200 space-y-3">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <label for="magic-box" class="text-xs font-black text-red-950 uppercase tracking-wider flex items-center gap-1.5">
+                            <span>⚡ స్మార్ట్ సింగిల్-హెడ్‌లైన్ బాక్స్ (వార్త మొత్తం ఇక్కడ పేస్ట్ చేయండి)</span>
+                        </label>
+                        <button
+                            type="button"
+                            on:click={autoParseNews}
+                            class="bg-red-600 hover:bg-red-700 text-white font-black text-xs px-4 py-2 rounded-xl shadow transition active:scale-95 cursor-pointer"
+                        >
+                            ✨ ఆటో ఫార్మాట్ చేయండి
+                        </button>
+                    </div>
+                    <textarea
+                        id="magic-box"
+                        bind:value={rawNewsInput}
+                        rows="4"
+                        placeholder="పూర్తి వార్తను ఇక్కడ పేస్ట్ చేయండి... మొదటి లైన్ ఆటోమేటిక్‌గా ప్రధాన హెడ్‌లైన్ అవుతుంది, మిగిలినది కథనం అవుతుంది!"
+                        class="w-full px-4 py-3 rounded-xl border border-red-200 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-red-500 focus:outline-none leading-relaxed"
+                    ></textarea>
+                </div>
 
-						<div>
-							<label for="news-cat" class="block text-xs font-bold text-slate-700 mb-1">కేటగిరీ *</label>
-							<select
-								id="news-cat"
-								bind:value={category}
-								class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold bg-white focus:ring-2 focus:ring-red-500"
-							>
-								{#each categories as cat}
-									<option value={cat}>{cat}</option>
-								{/each}
-							</select>
-						</div>
+                <form on:submit|preventDefault={handleSubmit} class="space-y-6">
+                    
+                    <!-- లొకేషన్, కేటగిరీ, అలర్ట్ -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                        <div>
+                            <label for="town-select" class="block text-xs font-bold text-slate-700 mb-1">లొకేషన్ / ఊరు *</label>
+                            <select
+                                id="town-select"
+                                bind:value={location_town}
+                                class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold bg-white focus:ring-2 focus:ring-red-500"
+                            >
+                                {#each towns as t}
+                                    <option value={t}>{t}</option>
+                                {/each}
+                            </select>
+                            {#if location_town === 'ఇతర ఊరు (Type Below)'}
+                                <input
+                                    type="text"
+                                    bind:value={custom_town}
+                                    placeholder="ఊరి పేరు టైప్ చేయండి (ఉదా: కాళేశ్వరం)"
+                                    class="mt-2 w-full px-3 py-1.5 rounded-lg border border-red-300 text-xs font-semibold focus:ring-2 focus:ring-red-500"
+                                    required
+                                />
+                            {/if}
+                        </div>
 
-						<div>
-							<span class="block text-xs font-bold text-slate-700 mb-1">న్యూస్ అలర్ట్</span>
-							<div class="flex gap-1">
-								<label class="flex-1 cursor-pointer">
-									<input type="radio" bind:group={alert_type} value="none" class="sr-only peer" />
-									<div class="text-center py-2 text-xs font-bold rounded-lg border border-slate-300 peer-checked:bg-slate-900 peer-checked:text-white">సాధారణం</div>
-								</label>
-								<label class="flex-1 cursor-pointer">
-									<input type="radio" bind:group={alert_type} value="breaking" class="sr-only peer" />
-									<div class="text-center py-2 text-xs font-bold rounded-lg border border-red-300 peer-checked:bg-red-600 peer-checked:text-white text-red-700">బ్రేకింగ్</div>
-								</label>
-								<label class="flex-1 cursor-pointer">
-									<input type="radio" bind:group={alert_type} value="flash" class="sr-only peer" />
-									<div class="text-center py-2 text-xs font-bold rounded-lg border border-amber-300 peer-checked:bg-amber-500 peer-checked:text-white text-amber-700">ఫ్లాష్</div>
-								</label>
-							</div>
-						</div>
-					</div>
+                        <div>
+                            <label for="news-cat" class="block text-xs font-bold text-slate-700 mb-1">కేటగిరీ *</label>
+                            <select
+                                id="news-cat"
+                                bind:value={category}
+                                class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold bg-white focus:ring-2 focus:ring-red-500"
+                            >
+                                {#each categories as cat}
+                                    <option value={cat}>{cat}</option>
+                                {/each}
+                            </select>
+                        </div>
 
-					<div class="space-y-3">
-						<div>
-							<label for="headline" class="block text-sm font-bold text-slate-900 mb-1">ప్రధాన హెడ్‌లైన్ *</label>
-							<input
-								id="headline"
-								type="text"
-								bind:value={headline}
-								placeholder="వార్త ప్రధాన ముఖ్యాంశం"
-								class="w-full px-4 py-3 rounded-xl border border-slate-300 font-bold text-base text-red-950 focus:ring-2 focus:ring-red-500 focus:outline-none"
-								required
-							/>
-						</div>
+                        <div>
+                            <span class="block text-xs font-bold text-slate-700 mb-1">న్యూస్ అలర్ట్ రకం</span>
+                            <div class="flex gap-1">
+                                <label class="flex-1 cursor-pointer">
+                                    <input type="radio" bind:group={alert_type} value="none" class="sr-only peer" />
+                                    <div class="text-center py-2 text-xs font-bold rounded-lg border border-slate-300 peer-checked:bg-slate-900 peer-checked:text-white">సాధారణం</div>
+                                </label>
+                                <label class="flex-1 cursor-pointer">
+                                    <input type="radio" bind:group={alert_type} value="breaking" class="sr-only peer" />
+                                    <div class="text-center py-2 text-xs font-bold rounded-lg border border-red-300 peer-checked:bg-red-600 peer-checked:text-white text-red-700">బ్రేకింగ్</div>
+                                </label>
+                                <label class="flex-1 cursor-pointer">
+                                    <input type="radio" bind:group={alert_type} value="flash" class="sr-only peer" />
+                                    <div class="text-center py-2 text-xs font-bold rounded-lg border border-amber-300 peer-checked:bg-amber-500 peer-checked:text-white text-amber-700">ఫ్లాష్</div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
 
-						<div>
-							<label for="sub1" class="block text-xs font-bold text-slate-700 mb-1">సబ్‌లైన్ 1 (ముఖ్యమైన పాయింట్)</label>
-							<input
-								id="sub1"
-								type="text"
-								bind:value={subline_1}
-								placeholder="సబ్‌లైన్ 1"
-								class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold focus:ring-2 focus:ring-red-500 focus:outline-none"
-							/>
-						</div>
+                    <!-- 📰 ప్రధాన సింగిల్ హెడ్‌లైన్ మాత్రమే -->
+                    <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <label for="headline" class="block text-xs sm:text-sm font-black text-slate-900">
+                                ప్రధాన హెడ్‌లైన్ (Single Bold Headline) *
+                            </label>
+                            
+                            <!-- 9 Colors Palette Indicator -->
+                            <div class="flex items-center gap-1" title="ఈ 9 దినపత్రిక రాయల్ రంగుల్లో ఒకటి పోర్టల్‌లో ఆర్టికల్ ప్రకారం ఆటోమేటిక్‌గా మారుతుంది">
+                                <span class="text-[10px] text-slate-500 font-bold mr-1">రంగులు:</span>
+                                {#each headlineColors as c}
+                                    <span style="background-color: {c}; width: 8px; height: 8px; border-radius: 50%; display: inline-block;"></span>
+                                {/each}
+                            </div>
+                        </div>
 
-						<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-							<div>
-								<label for="sub2" class="block text-xs font-medium text-slate-600 mb-1">సబ్‌లైన్ 2 (ఐచ్ఛికం)</label>
-								<input
-									id="sub2"
-									type="text"
-									bind:value={subline_2}
-									placeholder="సబ్‌లైన్ 2"
-									class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-red-500 focus:outline-none"
-								/>
-							</div>
-							<div>
-								<label for="sub3" class="block text-xs font-medium text-slate-600 mb-1">సబ్‌లైన్ 3 (ఐచ్ఛికం)</label>
-								<input
-									id="sub3"
-									type="text"
-									bind:value={subline_3}
-									placeholder="సబ్‌లైన్ 3"
-									class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-red-500 focus:outline-none"
-								/>
-							</div>
-						</div>
-					</div>
+                        <input
+                            id="headline"
+                            type="text"
+                            bind:value={headline}
+                            placeholder="వార్త ప్రధాన ముఖ్యాంశం (సింగిల్ లైన్)"
+                            class="w-full px-4 py-3 rounded-xl border border-slate-300 font-black text-base text-red-950 focus:ring-2 focus:ring-red-500 focus:outline-none"
+                            required
+                        />
+                    </div>
 
-					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
-						<div class="space-y-2">
-							<label for="photo1" class="block text-xs font-bold text-slate-900">ఫోటో 1 (ప్రధాన చిత్రం)</label>
-							<input
-								id="photo1"
-								type="file"
-								accept="image/*"
-								on:change={(e) => handleImageSelect(e, 1)}
-								class="w-full text-xs text-slate-500 file:mr-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-red-100 file:text-red-700"
-							/>
-							{#if imagePreview1}
-								<img src={imagePreview1} alt="Preview 1" class="h-28 w-full object-contain rounded-lg border border-slate-300 bg-white" />
-							{/if}
-							<input
-								type="text"
-								bind:value={image_caption_1}
-								placeholder="ఫోటో 1 క్యాప్షన్ (చిత్రంలో ఎవరెవరు ఉన్నారు)"
-								class="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs font-medium focus:ring-2 focus:ring-red-500"
-							/>
-						</div>
+                    <!-- ఫోటో 1 & ఫోటో 2 -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                        <div class="space-y-2">
+                            <label for="photo1" class="block text-xs font-bold text-slate-900">ఫోటో 1 (ప్రధాన చిత్రం)</label>
+                            <input
+                                id="photo1"
+                                type="file"
+                                accept="image/*"
+                                on:change={(e) => handleImageSelect(e, 1)}
+                                class="w-full text-xs text-slate-500 file:mr-2 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-red-100 file:text-red-700"
+                            />
+                            {#if imagePreview1}
+                                <img src={imagePreview1} alt="Preview 1" class="h-28 w-full object-contain rounded-xl border border-slate-300 bg-white" />
+                            {/if}
+                            <input
+                                type="text"
+                                bind:value={image_caption_1}
+                                placeholder="ఫోటో 1 వివరణ / క్యాప్షన్ (చిత్రంలో ఉన్నవారు)"
+                                class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-medium focus:ring-2 focus:ring-red-500"
+                            />
+                        </div>
 
-						<div class="space-y-2">
-							<label for="photo2" class="block text-xs font-bold text-slate-900">ఫోటో 2 (రెండవ చిత్రం - ఐచ్ఛికం)</label>
-							<input
-								id="photo2"
-								type="file"
-								accept="image/*"
-								on:change={(e) => handleImageSelect(e, 2)}
-								class="w-full text-xs text-slate-500 file:mr-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-200 file:text-slate-700"
-							/>
-							{#if imagePreview2}
-								<img src={imagePreview2} alt="Preview 2" class="h-28 w-full object-contain rounded-lg border border-slate-300 bg-white" />
-							{/if}
-							<input
-								type="text"
-								bind:value={image_caption_2}
-								placeholder="ఫోటో 2 క్యాప్షన్"
-								class="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs font-medium focus:ring-2 focus:ring-red-500"
-							/>
-						</div>
-					</div>
+                        <div class="space-y-2">
+                            <label for="photo2" class="block text-xs font-bold text-slate-900">ఫోటో 2 (రెండవ చిత్రం - ఐచ్ఛికం)</label>
+                            <input
+                                id="photo2"
+                                type="file"
+                                accept="image/*"
+                                on:change={(e) => handleImageSelect(e, 2)}
+                                class="w-full text-xs text-slate-500 file:mr-2 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-slate-200 file:text-slate-700"
+                            />
+                            {#if imagePreview2}
+                                <img src={imagePreview2} alt="Preview 2" class="h-28 w-full object-contain rounded-xl border border-slate-300 bg-white" />
+                            {/if}
+                            <input
+                                type="text"
+                                bind:value={image_caption_2}
+                                placeholder="ఫోటో 2 వివరణ / క్యాప్షన్"
+                                class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-medium focus:ring-2 focus:ring-red-500"
+                            />
+                        </div>
+                    </div>
 
-					<div>
-						<label for="content" class="block text-sm font-bold text-slate-900 mb-1">వార్త పూర్తి కథనం (Content) *</label>
-						<textarea
-							id="content"
-							bind:value={content}
-							rows="7"
-							placeholder="వార్త పూర్తి సమాచారం పేరాగ్రాఫ్‌ల రూపంలో..."
-							class="w-full px-4 py-3 rounded-xl border border-slate-300 text-sm leading-relaxed focus:ring-2 focus:ring-red-500 focus:outline-none"
-							required
-						></textarea>
-					</div>
+                    <!-- వార్త పూర్తి కథనం (Content) -->
+                    <div>
+                        <label for="content" class="block text-xs sm:text-sm font-bold text-slate-900 mb-1">వార్త పూర్తి కథనం (Content) *</label>
+                        <textarea
+                            id="content"
+                            bind:value={content}
+                            rows="7"
+                            placeholder="వార్త పూర్తి వివరాలు పేరాగ్రాఫ్‌ల రూపంలో ఇక్కడ నమోదు చేయండి..."
+                            class="w-full px-4 py-3 rounded-2xl border border-slate-300 text-xs sm:text-sm leading-relaxed focus:ring-2 focus:ring-red-500 focus:outline-none"
+                            required
+                        ></textarea>
+                    </div>
 
-					<div class="flex flex-wrap items-center justify-between gap-4">
-						<div class="flex items-center gap-2">
-							<input
-								id="ticker-check"
-								type="checkbox"
-								bind:checked={show_in_ticker}
-								class="w-4 h-4 text-red-600 rounded border-slate-300"
-							/>
-							<label for="ticker-check" class="text-xs font-bold text-slate-700 cursor-pointer">లైవ్ న్యూస్ టిక్కర్‌లో చూపించు</label>
-						</div>
+                    <!-- టిక్కర్ & యూట్యూబ్ వీడియో -->
+                    <div class="flex flex-wrap items-center justify-between gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                        <div class="flex items-center gap-2">
+                            <input
+                                id="ticker-check"
+                                type="checkbox"
+                                bind:checked={show_in_ticker}
+                                class="w-4 h-4 text-red-600 rounded border-slate-300 focus:ring-0 cursor-pointer"
+                            />
+                            <label for="ticker-check" class="text-xs font-bold text-slate-700 cursor-pointer">లైవ్ న్యూస్ టిక్కర్‌లో చూపించు</label>
+                        </div>
 
-						<div class="flex-1 max-w-xs">
-							<input
-								type="url"
-								bind:value={youtube_url}
-								placeholder="యూట్యూబ్ వీడియో లింక్ (ఐచ్ఛికం)"
-								class="w-full px-3.5 py-2 rounded-lg border border-slate-300 text-xs focus:ring-2 focus:ring-red-500"
-							/>
-						</div>
-					</div>
+                        <div class="flex-1 max-w-xs">
+                            <input
+                                type="url"
+                                bind:value={youtube_url}
+                                placeholder="యూట్యూబ్ వీడియో లింక్ (ఐచ్ఛికం)"
+                                class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-red-500"
+                            />
+                        </div>
+                    </div>
 
-					<button
-						type="submit"
-						disabled={isUploading}
-						class="w-full bg-slate-950 hover:bg-slate-900 disabled:opacity-50 text-white font-bold py-3.5 rounded-xl transition-all shadow-md text-base"
-					>
-						{isUploading ? 'అప్‌లోడ్ అవుతోంది...' : 'వార్తను పబ్లిష్ చేయండి'}
-					</button>
-				</form>
-			</div>
-		</div>
-	</div>
+                    <!-- పబ్లిష్ బటన్ -->
+                    <button
+                        type="submit"
+                        disabled={isUploading}
+                        class="w-full bg-slate-950 hover:bg-slate-900 disabled:opacity-50 text-white font-black py-3.5 rounded-2xl transition shadow-lg text-sm sm:text-base cursor-pointer"
+                    >
+                        {isUploading ? 'వార్త అప్‌లోడ్ అవుతోంది... దయచేసి వేచి ఉండండి' : '🚀 వార్తను పబ్లిష్ చేయండి'}
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
 {/if}
