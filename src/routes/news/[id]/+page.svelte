@@ -7,22 +7,88 @@
   let loading = true;
   let downloadingClip = false;
 
-  // 1. Eenadu Style 9 Royal Colors for Headlines
+  // 1. హెడ్‌లైన్స్ & కలర్ థీమ్స్ కోసం 9 రాయల్ రంగులు
   const headlineColors = [
-    '#b91c1c', // Deep Red (Eenadu style)
-    '#1d4ed8', // Royal Blue
-    '#047857', // Forest Green
-    '#7c3aed', // Purple
-    '#c2410c', // Burnt Orange
-    '#0f766e', // Deep Teal
-    '#be123c', // Cherry Rose
-    '#1e293b', // Slate Dark
-    '#831843'  // Maroon
+    '#b91c1c', // 1. Deep Crimson Red
+    '#1d4ed8', // 2. Royal Blue
+    '#047857', // 3. Emerald Green
+    '#7c3aed', // 4. Royal Purple
+    '#c2410c', // 5. Burnt Orange
+    '#0f766e', // 6. Deep Teal
+    '#be123c', // 7. Cherry Rose
+    '#1e293b', // 8. Dark Slate
+    '#831843'  // 9. Wine Maroon
   ];
 
   $: currentHeadlineColor = article?.id ? headlineColors[article.id % headlineColors.length] : headlineColors[0];
 
-  // 2. English Article Auto Detection
+  // 2. కలర్ టెక్స్ట్ & ముఖ్యాంశాల స్మార్ట్ ఫార్మాటర్
+  function formatNewsContent(rawText, themeColor) {
+    if (!rawText) return '';
+
+    // పేరాగ్రాఫ్‌ల వారీగా విభజించడం
+    const paragraphs = rawText.split(/\n\s*\n/);
+
+    return paragraphs.map((para, pIdx) => {
+      let lines = para.split('\n').map(l => l.trim()).filter(Boolean);
+      if (lines.length === 0) return '';
+
+      // A. బుల్లెట్ పాయింట్లు ఉంటే Eenadu మోడల్ "ముఖ్యాంశాలు" కలర్ బాక్స్
+      const isBulletList = lines.every(l => /^([•\-\*■✦]|\d+[\.\)])\s*/.test(l));
+      if (isBulletList) {
+        const itemsHtml = lines.map(l => {
+          const clean = l.replace(/^([•\-\*■✦]|\d+[\.\)])\s*/, '');
+          const formatted = applyInlineColors(clean, themeColor);
+          return `<li style="margin-bottom: 6px; display: flex; align-items: flex-start; gap: 8px;">
+            <span style="color: ${themeColor}; font-weight: 900; font-size: 13px; line-height: 1.3;">✦</span>
+            <span>${formatted}</span>
+          </li>`;
+        }).join('');
+
+        return `<div style="background-color: #fff9f5; border-left: 4px solid ${themeColor}; border-radius: 0 12px 12px 0; padding: 12px 16px; margin: 16px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+          <div style="font-size: 12px; font-weight: 900; color: ${themeColor}; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px; display: flex; align-items: center; gap: 4px;">
+            <span>📌</span> <span>ముఖ్యాంశాలు (Key Highlights):</span>
+          </div>
+          <ul style="list-style: none; padding: 0; margin: 0; font-weight: 600; color: #1e293b; line-height: 1.6;">
+            ${itemsHtml}
+          </ul>
+        </div>`;
+      }
+
+      // B. చిన్న సింగిల్ లైన్ ఉంటే ఆటోమేటిక్ అంతర శీర్షిక (Colored Subheading)
+      if (lines.length === 1 && lines[0].length < 65 && !lines[0].endsWith('.') && (lines[0].endsWith(':') || lines[0].endsWith('?') || !lines[0].includes('.'))) {
+        return `<h3 style="color: ${themeColor}; font-size: 17.5px; font-weight: 900; margin: 22px 0 10px 0; font-family: 'Ramabhadra', sans-serif; display: flex; align-items: center; gap: 8px;">
+          <span style="display: inline-block; width: 5px; height: 18px; background-color: ${themeColor}; border-radius: 3px;"></span>
+          <span>${applyInlineColors(lines[0], themeColor)}</span>
+        </h3>`;
+      }
+
+      // C. సాధారణ పేరాగ్రాఫ్ (ఇన్‌లైన్ రంగులతో)
+      const paraText = lines.join(' ');
+      const formattedPara = applyInlineColors(paraText, themeColor);
+
+      if (pIdx === 0) {
+        // మొదటి లీడ్ పేరా కాస్త ముదురు రంగులో
+        return `<p style="margin-bottom: 14px; color: #0f172a; font-weight: 600; text-align: justify; line-height: 1.75;">${formattedPara}</p>`;
+      }
+
+      return `<p style="margin-bottom: 14px; color: #1e293b; text-align: justify; line-height: 1.75;">${formattedPara}</p>`;
+    }).join('');
+  }
+
+  // ఇన్‌లైన్ కలర్ ట్యాగ్స్ ప్రాసెసింగ్ ([red], [blue], *పదం*)
+  function applyInlineColors(text, themeColor) {
+    return text
+      .replace(/\[red\](.*?)\[\/red\]/gi, `<span style="color: #dc2626; font-weight: 800;">$1</span>`)
+      .replace(/\[blue\](.*?)\[\/blue\]/gi, `<span style="color: #1d4ed8; font-weight: 800;">$1</span>`)
+      .replace(/\[green\](.*?)\[\/green\]/gi, `<span style="color: #047857; font-weight: 800;">$1</span>`)
+      .replace(/\[orange\](.*?)\[\/orange\]/gi, `<span style="color: #ea580c; font-weight: 800;">$1</span>`)
+      .replace(/\[purple\](.*?)\[\/purple\]/gi, `<span style="color: #7c3aed; font-weight: 800;">$1</span>`)
+      .replace(/\*\*(.*?)\*\*/g, `<strong style="color: ${themeColor}; font-weight: 800;">$1</strong>`)
+      .replace(/\*([^*\n]+)\*/g, `<strong style="color: ${themeColor}; font-weight: 800;">$1</strong>`);
+  }
+
+  // 3. ఇంగ్లీష్ వార్త అయితే ఆటో-డిటెక్షన్
   $: isEnglishArticle = (() => {
     if (!article) return false;
     const sampleText = ((article.headline || '') + ' ' + (article.content || '')).substring(0, 200);
@@ -31,13 +97,13 @@
     return hasEnglish && !hasTelugu;
   })();
 
-  // 3. High Clarity & Slower English Voice Reader
+  // 4. స్పష్టమైన & నిదానమైన ఇంగ్లీష్ ఆడియో రీడర్ (Slow & Clear Voice)
   let isSpeaking = false;
   let isPaused = false;
 
   function toggleSpeech() {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-      alert('Ee browser lo audio reader support ledu.');
+      alert('ఈ బ్రౌజర్‌లో ఆడియో రీడర్ సపోర్ట్ లేదు.');
       return;
     }
 
@@ -56,12 +122,10 @@
     const textToRead = `${article.headline || ''}. ${article.content || ''}`;
     const utterance = new SpeechSynthesisUtterance(textToRead);
 
-    // Speed ni 0.84 ki taggincham (Slow & Clear Audio)
-    utterance.rate = 0.84;
+    utterance.rate = 0.84; // ప్రశాంతంగా, స్పష్టంగా చదివే వేగం
     utterance.pitch = 1.0;
     utterance.lang = 'en-US';
 
-    // Best natural English voice select cheyadam
     const voices = window.speechSynthesis.getVoices();
     const naturalVoice = voices.find(v => 
       v.lang.startsWith('en') && 
@@ -91,12 +155,12 @@
     stopSpeech();
   });
 
-  // 4. Eenadu Style Font Sizing (A- A A+)
+  // 5. ఫాంట్ సైజ్ కంట్రోలర్ (A- A A+)
   let fontSizeIndex = 1;
   const fontSizes = [
-    { label: 'A-', style: 'font-size: 14px; line-height: 1.7;' },
-    { label: 'A',  style: 'font-size: 16.5px; line-height: 1.75;' },
-    { label: 'A+', style: 'font-size: 19.5px; line-height: 1.8;' }
+    { label: 'A-', style: 'font-size: 14.5px;' },
+    { label: 'A',  style: 'font-size: 16.5px;' },
+    { label: 'A+', style: 'font-size: 19.5px;' }
   ];
 
   let copyFeedback = false;
@@ -129,14 +193,12 @@
     }
   });
 
-  // Reading time calculate cheyadam
   $: readingTime = (() => {
     if (!article?.content) return 1;
     const words = article.content.trim().split(/\s+/).length;
     return Math.max(1, Math.ceil(words / 150));
   })();
 
-  // Tags create cheyadam
   $: articleTags = (() => {
     if (!article) return [];
     const set = new Set();
@@ -153,7 +215,7 @@
       const script = document.createElement('script');
       script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js';
       script.onload = () => resolve(window.htmlToImage);
-      script.onerror = () => reject(new Error('html-to-image load avvaledu'));
+      script.onerror = () => reject(new Error('html-to-image లోడ్ కాలేదు'));
       document.head.appendChild(script);
     });
   }
@@ -181,7 +243,7 @@
       link.click();
       document.body.removeChild(link);
     } catch (err) {
-      alert('PNG download error: ' + err.message);
+      alert('PNG download ఎర్రర్: ' + err.message);
     } finally {
       downloadingClip = false;
     }
@@ -221,7 +283,7 @@
       copyFeedback = true;
       setTimeout(() => copyFeedback = false, 2000);
     } catch (e) {
-      alert('Link copy avvaledu');
+      alert('లింక్ కాపీ కాలేదు');
     }
   }
 </script>
@@ -234,7 +296,7 @@
 
 <div class="min-h-screen bg-[#f4f6f9] font-sans pb-16 text-slate-900">
   
-  <!-- Eenadu Style Top Header -->
+  <!-- హెడర్ -->
   <header class="no-print bg-[#0a0f1d] text-white py-3 px-4 shadow-md sticky top-0 z-40 border-b-2 border-red-600">
     <div class="max-w-4xl mx-auto flex items-center justify-between">
       <div class="flex items-center gap-3">
@@ -268,10 +330,8 @@
       </div>
     {:else}
 
-      <!-- Eenadu Style Breadcrumb & Action Strip -->
+      <!-- బ్రెడ్‌క్రంబ్స్ & పేపర్ క్లిప్ బటన్లు -->
       <div class="no-print flex flex-wrap items-center justify-between gap-3 text-xs bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
-        
-        <!-- Breadcrumb Links -->
         <div class="flex items-center gap-1.5 text-slate-500 font-medium">
           <a href="/" class="hover:text-red-600 transition">హోమ్</a>
           <span>›</span>
@@ -280,7 +340,6 @@
           <span class="text-red-700 font-bold">{article.location_town || 'తెలంగాణ'}</span>
         </div>
 
-        <!-- PNG Clip & Print Buttons -->
         <div class="flex items-center gap-2">
           <button
             type="button"
@@ -301,16 +360,15 @@
             <span>🖨️ ప్రింట్ / PDF</span>
           </button>
         </div>
-
       </div>
 
-      <!-- 📰 Eenadu Portal Style Card (No Face Cut - Fully Contained Photo) -->
+      <!-- 📰 ఈనాడు పోర్టల్ మోడల్ కార్డ్ -->
       <article 
         id="news-printable-area" 
         style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; box-shadow: 0 4px 15px -3px rgba(0, 0, 0, 0.05);"
       >
         
-        <!-- 1. Eenadu Style Big Bold Headline -->
+        <!-- 1. ప్రధాన శీర్షిక (Headline) -->
         <div style="margin-bottom: 14px;">
           <h1 
             style="color: {currentHeadlineColor}; font-size: 26px; line-height: 1.35; font-weight: 900; margin: 0; font-family: 'Ramabhadra', 'Noto Sans Telugu', sans-serif; letter-spacing: -0.01em;"
@@ -319,10 +377,8 @@
           </h1>
         </div>
 
-        <!-- 2. Eenadu Info & Byline Strip -->
+        <!-- 2. ఇన్ఫో & బైలైన్ స్ట్రిప్ -->
         <div style="border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; padding: 8px 4px; margin-bottom: 16px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; background-color: #fafbfc;">
-          
-          <!-- Left: Reporter / Source Info -->
           <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; color: #475569;">
             <span style="color: #b91c1c; font-weight: 900;">By NS News Network</span>
             <span>•</span>
@@ -336,10 +392,8 @@
             </span>
           </div>
 
-          <!-- Right: Font Size Toggler & WhatsApp Quick Icon -->
+          <!-- ఫాంట్ సైజ్ & వాట్సాప్ ఐకాన్ -->
           <div style="display: flex; align-items: center; gap: 10px;">
-            
-            <!-- Font Size Buttons (A- A A+) -->
             <div class="no-print" style="display: flex; align-items: center; gap: 2px; background-color: #e2e8f0; padding: 2px; border-radius: 6px;">
               {#each fontSizes as fs, idx}
                 <button
@@ -352,7 +406,6 @@
               {/each}
             </div>
 
-            <!-- WhatsApp Icon -->
             <button
               type="button"
               on:click={shareWhatsApp}
@@ -361,12 +414,10 @@
             >
               📲
             </button>
-
           </div>
-
         </div>
 
-        <!-- 3. English News Audio Reader (Clear & Slowed Voice) -->
+        <!-- 3. ఇంగ్లీష్ ఆడియో రీడర్ (Slow & Clear) -->
         {#if isEnglishArticle}
           <div class="no-print" style="margin-bottom: 16px; background: linear-gradient(to right, #f0fdf4, #ecfdf5); border: 1px solid #a7f3d0; padding: 10px 14px; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
             <div style="display: flex; align-items: center; gap: 8px;">
@@ -397,7 +448,7 @@
           </div>
         {/if}
 
-        <!-- 4. Photo 1 (Face Cut Problem Completely Solved) -->
+        <!-- 4. ప్రధాన ఫోటో (Face Cut లేకుండా పూర్తి ఫోటో) -->
         {#if article.image_url}
           <div style="margin-bottom: 16px; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background-color: #f8fafc; text-align: center;">
             <img
@@ -414,18 +465,22 @@
           </div>
         {/if}
 
-        <!-- 5. News Body Content (Eenadu Clean Typography) -->
+        <!-- 5. వార్తా కథనం (కలర్ టెక్స్ట్, ముఖ్యాంశాల బాక్స్ & అంతర శీర్షికలతో) -->
         <div style="margin-bottom: 18px;">
-          <p style="font-size: 13.5px; font-weight: 900; color: #b91c1c; margin: 0 0 8px 0;">
-            {article.location_town || 'ముత్తారం'} (NS News) :
-          </p>
+          <!-- రిపోర్టర్ & లొకేషన్ బ్యాడ్జ్ -->
+          <div style="display: inline-block; background-color: #fef2f2; border-left: 3px solid #b91c1c; padding: 3px 8px; border-radius: 0 6px 6px 0; margin-bottom: 10px;">
+            <span style="font-size: 13px; font-weight: 900; color: #b91c1c;">
+              {article.location_town || 'ముత్తారం'} (NS News ప్రతినిధి) :
+            </span>
+          </div>
 
-          <div style="color: #1e293b; {fontSizes[fontSizeIndex].style} white-space: pre-line; text-align: justify; font-family: 'Noto Sans Telugu', sans-serif;">
-            {article.content}
+          <!-- డైనమిక్ ఫార్మాటెడ్ కలర్ టెక్స్ట్ -->
+          <div style="{fontSizes[fontSizeIndex].style} font-family: 'Noto Sans Telugu', sans-serif;">
+            {@html formatNewsContent(article.content, currentHeadlineColor)}
           </div>
         </div>
 
-        <!-- 6. Photo 2 (If available - No Face Cut) -->
+        <!-- 6. రెండవ ఫోటో (ఉంటే) -->
         {#if article.image_url_2}
           <div style="margin-bottom: 18px; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background-color: #f8fafc; text-align: center;">
             <img
@@ -442,7 +497,7 @@
           </div>
         {/if}
 
-        <!-- 7. Eenadu Style Topic Tags Bar -->
+        <!-- 7. టాపిక్స్ / Tags -->
         {#if articleTags.length > 0}
           <div style="margin-bottom: 18px; padding-top: 12px; border-top: 1px solid #e2e8f0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px;">
             <span style="font-size: 11px; font-weight: 800; color: #64748b; margin-right: 4px;">టాపిక్స్ / Tags:</span>
@@ -454,7 +509,7 @@
           </div>
         {/if}
 
-        <!-- 8. Social Media Share Strip (Eenadu Style) -->
+        <!-- 8. సోషల్ మీడియా షేరింగ్ బార్ -->
         <div style="border-top: 1px solid #e2e8f0; padding-top: 14px; margin-bottom: 14px;">
           <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;">
             <span style="font-size: 11.5px; font-weight: 800; color: #334155;">
@@ -480,7 +535,7 @@
           </div>
         </div>
 
-        <!-- 9. Eenadu Disclaimer & Color Dots Footer -->
+        <!-- 9. కాపీరైట్ & కలర్ డాట్స్ ఫుటర్ -->
         <div style="border-top: 2px solid #0f172a; padding-top: 10px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; font-size: 10px; color: #64748b; font-weight: 600; gap: 6px;">
           <div>
             <span>గమనిక: ఈ వెబ్‌సైట్‌లోని వార్తా సమాచారం A.S.V. Enterprises & NS News ప్రతినిధుల ద్వారా సేకరించబడినది.</span>
