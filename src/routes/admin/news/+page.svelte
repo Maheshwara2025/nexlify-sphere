@@ -289,6 +289,12 @@
                     <a href="/admin/shorts" class="bg-gradient-to-r from-red-600 to-rose-600 text-white text-xs px-3 py-1.5 rounded-xl font-bold shadow">
                         ⚡ Shorts
                     </a>
+                    <a href="/admin/contractor"
+  class="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 text-xs px-3 py-1.5 rounded-xl font-black transition-all shadow flex items-center gap-1.5"
+>
+  <span>🏗️</span>
+  <span>Contractor 360°</span>
+</a>
                     <a href="/admin/digital-express" class="bg-amber-500 text-slate-950 text-xs px-3 py-1.5 rounded-xl font-black shadow">
                         🚀 Express
                     </a>
