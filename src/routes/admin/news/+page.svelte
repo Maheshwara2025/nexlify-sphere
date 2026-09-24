@@ -295,6 +295,12 @@
   <span>🏗️</span>
   <span>Contractor 360°</span>
 </a>
+<a href="/admin/card-maker"
+  class="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white text-xs px-3 py-1.5 rounded-xl font-black transition shadow flex items-center gap-1.5"
+>
+  <span>🎨</span>
+  <span>Card Studio</span>
+</a>
                     <a href="/admin/digital-express" class="bg-amber-500 text-slate-950 text-xs px-3 py-1.5 rounded-xl font-black shadow">
                         🚀 Express
                     </a>
