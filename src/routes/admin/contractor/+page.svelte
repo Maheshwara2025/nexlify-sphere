@@ -4,25 +4,28 @@
   import { onMount } from 'svelte';
 
   let authChecking = true;
+
+  // Active Navigation Tab
   let activeTab = 'quick_entry'; 
   // 'quick_entry', 'eng_calc', 'mbook', 'vendor_bills', 'own_invoice', 'album', 'contacts', 'dashboard'
 
+  // Projects Master
   let projects = [];
   let selectedProjectId = null;
   let loading = true;
 
-  // 1. Quick Entry State
+  // 1. Quick Entry State (GD Master)
   let q_date = new Date().toISOString().split('T')[0];
-  let q_type = 'Pooja_Petty';
-  let q_stage = 'Inauguration';
+  let q_type = 'Pooja_Petty'; // 'Pooja_Petty', 'Material_Inward', 'Labour_Attendance', 'JCB_Tractor', 'Material_Used'
+  let q_stage = 'Inauguration'; // 'Inauguration', 'Trench', 'PCC', 'Basement', 'Pillars', 'Brickwork', 'Plastering'
   let q_desc = 'శంకుస్థాపన పూజ, కొబ్బరికాయలు, పసుపు, కుంకుమ, సున్నం ఖర్చులు';
   let q_party = 'పూజా సామాగ్రి';
   let q_total = '';
   let q_paid = '';
   let q_mode = 'Cash';
-  let q_bill_status = 'Paid';
+  let q_bill_status = 'Paid'; // 'Paid', 'Credit', 'Partial'
 
-  // Self Voucher Toggle (Bills lenappudu swayam rasheedu)
+  // Self Voucher Toggle (బిల్లులు లేని చిన్న ఖర్చులకు స్వయం రశీదు)
   let is_self_voucher = true;
   let self_voucher_no = `VCH-${Date.now().toString().slice(-6)}`;
 
@@ -34,7 +37,7 @@
   let q_male_labour = '';
   let q_female_labour = '';
 
-  // Multiple Photos Support
+  // Multiple Site Photos
   /** @type {File[]} */
   let sitePhotoFiles = [];
   /** @type {string[]} */
@@ -67,7 +70,7 @@
   let inv_no = `ASV/GP/${new Date().getFullYear()}/01`;
   let inv_date = new Date().toISOString().split('T')[0];
   let inv_client = 'గ్రామ పంచాయతీ కార్యదర్శి / సర్పంచ్ గారు';
-  let inv_addr = 'గ్రామ పంచాయతీ ముత్తారం, పెద్దపల్లి జిల్లా';
+  let inv_addr = 'గ్రామ పంచాయతీ ముత్తారం, పెద్దపల్లి జిల్లా, తెలంగాణ';
   let inv_work = 'గ్రామ పంచాయతీ ప్రాకార (కాంపౌండ్ వాల్) నిర్మాణం';
   let inv_sac = '9954';
   let inv_items = [
@@ -77,18 +80,16 @@
   let inv_gst_rate = 18;
   let showPrintInvoice = false;
 
-  // 5. Site Emergency Contacts
-  let siteContacts = [
-    { role: 'పంచాయతీ ఏఈ (AE)', name: 'ఇంజనీరింగ్ అధికారి', phone: '9989851608', icon: '🏛️' },
-    { role: 'పంచాయతీ సెక్రటరీ', name: 'గ్రామ పంచాయతీ కార్యదర్శి', phone: '9989851608', icon: '📋' },
-    { role: 'గ్రామ సర్పంచ్', name: 'సర్పంచ్ గారు', phone: '9989851608', icon: '👑' },
-    { role: 'జేసీబీ ఆపరేటర్', name: 'జేసీబీ డ్రైవర్', phone: '9989851608', icon: '🚜' },
-    { role: 'ఇసుక / ట్రాక్టర్ సప్లయర్', name: 'ట్రాక్టర్ యజమాని', phone: '9989851608', icon: '🚚' },
-    { role: 'సిమెంట్ & స్టీల్ డీలర్', name: 'శ్రీ లక్ష్మి ట్రేడర్స్', phone: '9989851608', icon: '🏪' },
-    { role: 'హెడ్ తాపీ మేస్త్రీ', name: 'మేస్త్రీ రాజు', phone: '9989851608', icon: '👷' }
-  ];
+  // 5. Dynamic Site Emergency Contacts (Supabase Driven)
+  let siteContacts = [];
+  let isContactModalOpen = false;
+  let editingContactId = null;
+  let c_role = '';
+  let c_name = '';
+  let c_phone = '';
+  let c_icon = '👷';
 
-  // Records Loaded from DB
+  // DB Records
   let gdEntries = [];
   let materialStock = [];
   let vendorDues = [];
@@ -139,12 +140,122 @@
 
       const { data: mb } = await supabase.from('contractor_mbook').select('*').eq('project_id', selectedProjectId).order('id', { ascending: false });
       mb_items = mb || [];
+
+      await loadContacts();
     } catch (e) {
       console.error(e);
     }
   }
 
-  // Upload helper for single file
+  // Contacts Management (Load, Insert Default, Save, Edit, Delete)
+  async function loadContacts() {
+    if (!selectedProjectId) return;
+    try {
+      const { data, error } = await supabase
+        .from('contractor_contacts')
+        .select('*')
+        .eq('project_id', selectedProjectId)
+        .order('id', { ascending: true });
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        const defaultContacts = [
+          { project_id: selectedProjectId, role: 'పంచాయతీ ఏఈ (AE)', name: 'ఇంజనీరింగ్ అధికారి', phone: '9989851608', icon: '🏛️' },
+          { project_id: selectedProjectId, role: 'పంచాయతీ సెక్రటరీ', name: 'గ్రామ పంచాయతీ కార్యదర్శి', phone: '9989851608', icon: '📋' },
+          { project_id: selectedProjectId, role: 'గ్రామ సర్పంచ్', name: 'సర్పంచ్ గారు', phone: '9989851608', icon: '👑' },
+          { project_id: selectedProjectId, role: 'జేసీబీ ఆపరేటర్', name: 'జేసీబీ డ్రైవర్', phone: '9989851608', icon: '🚜' },
+          { project_id: selectedProjectId, role: 'ఇసుక / ట్రాక్టర్ సప్లయర్', name: 'ట్రాక్టర్ యజమాని', phone: '9989851608', icon: '🚚' },
+          { project_id: selectedProjectId, role: 'సిమెంట్ & స్టీల్ డీలర్', name: 'శ్రీ లక్ష్మి ట్రేడర్స్', phone: '9989851608', icon: '🏪' },
+          { project_id: selectedProjectId, role: 'హెడ్ తాపీ మేస్త్రీ', name: 'మేస్త్రీ రాజు', phone: '9989851608', icon: '👷' }
+        ];
+        await supabase.from('contractor_contacts').insert(defaultContacts);
+        const res = await supabase.from('contractor_contacts').select('*').eq('project_id', selectedProjectId);
+        siteContacts = res.data || [];
+      } else {
+        siteContacts = data;
+      }
+    } catch (e) {
+      console.error('Contacts load error:', e);
+    }
+  }
+
+  async function saveContact() {
+    if (!c_role.trim() || !c_name.trim() || !c_phone.trim()) {
+      alert('దయచేసి హోదా, పేరు మరియు ఫోన్ నంబర్ నమోదు చేయండి!');
+      return;
+    }
+
+    try {
+      if (editingContactId) {
+        const { error } = await supabase
+          .from('contractor_contacts')
+          .update({
+            role: c_role.trim(),
+            name: c_name.trim(),
+            phone: c_phone.trim(),
+            icon: c_icon
+          })
+          .eq('id', editingContactId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('contractor_contacts')
+          .insert([{
+            project_id: selectedProjectId,
+            role: c_role.trim(),
+            name: c_name.trim(),
+            phone: c_phone.trim(),
+            icon: c_icon
+          }]);
+        if (error) throw error;
+      }
+
+      c_role = '';
+      c_name = '';
+      c_phone = '';
+      c_icon = '👷';
+      editingContactId = null;
+      isContactModalOpen = false;
+
+      await loadContacts();
+      alert('✓ కాంటాక్ట్ వివరాలు భద్రపరచబడ్డాయి!');
+    } catch (err) {
+      alert('లోపం: ' + err.message);
+    }
+  }
+
+  function startEditContact(c) {
+    editingContactId = c.id;
+    c_role = c.role;
+    c_name = c.name;
+    c_phone = c.phone;
+    c_icon = c.icon || '👷';
+    isContactModalOpen = true;
+  }
+
+  async function deleteContact(id, name) {
+    if (!confirm(`నిజంగా '${name}' కాంటాక్ట్‌ను తొలగించాలనుకుంటున్నారా?`)) return;
+    try {
+      const { error } = await supabase.from('contractor_contacts').delete().eq('id', id);
+      if (error) throw error;
+      await loadContacts();
+      alert('కాంటాక్ట్ తొలగించబడింది!');
+    } catch (err) {
+      alert('లోపం: ' + err.message);
+    }
+  }
+
+  function openNewContactModal() {
+    editingContactId = null;
+    c_role = '';
+    c_name = '';
+    c_phone = '';
+    c_icon = '👷';
+    isContactModalOpen = true;
+  }
+
+  // File Upload Helper
   async function uploadContractorDoc(file, folder) {
     const ext = file.name.split('.').pop();
     const cleanPath = `${folder}/${Date.now()}_${Math.random().toString(36).substring(2, 6)}.${ext}`;
@@ -154,7 +265,6 @@
     return data.publicUrl;
   }
 
-  // Multiple Photos Picker Handler
   function handleMultipleSitePhotos(e) {
     const input = /** @type {HTMLInputElement} */ (e.target);
     if (input.files) {
@@ -191,13 +301,12 @@
     }
   }
 
-  // Submit Quick GD Entry
+  // Quick Action Submission
   async function handleQuickSubmit() {
     if (!selectedProjectId) return;
     isSubmitting = true;
 
     try {
-      // 1. Upload All Selected Site Photos
       let siteUrls = [];
       for (const file of sitePhotoFiles) {
         const url = await uploadContractorDoc(file, 'site_stages');
@@ -205,12 +314,10 @@
       }
       const finalSitePhotoString = siteUrls.join(',');
 
-      // 2. Handle Bill or Self Voucher
       let finalBillUrl = null;
       if (billPhotoFile) {
         finalBillUrl = await uploadContractorDoc(billPhotoFile, 'bills');
       } else if (is_self_voucher) {
-        // Tag as self-generated voucher
         finalBillUrl = `SELF_VOUCHER|${self_voucher_no}|${q_party}|${q_total || 0}`;
       }
 
@@ -247,7 +354,6 @@
       const { error } = await supabase.from('contractor_gd_entries').insert([payload]);
       if (error) throw error;
 
-      // Reset
       q_total = '';
       q_paid = '';
       q_mat_qty = '';
@@ -268,6 +374,38 @@
     }
   }
 
+  // M-Book Submission
+  async function handleMBookSubmit() {
+    if (!selectedProjectId) return;
+    try {
+      const { error } = await supabase.from('contractor_mbook').insert([{
+        project_id: selectedProjectId,
+        item_desc: `[${mb_stage}] ${mb_item_name}`,
+        length: Number(mb_l) || 0,
+        breadth: Number(mb_b) || 0,
+        depth: Number(mb_d) || 0,
+        unit: mb_unit,
+        rate: Number(mb_rate) || 0
+      }]);
+      if (error) throw error;
+      mb_l = '';
+      mb_b = '';
+      mb_d = '';
+      await refreshAllRecords();
+      alert('M-Book కొలత రికార్డ్ అయింది!');
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  function addInvoiceItem() {
+    inv_items = [...inv_items, { desc: '', qty: 1, unit: 'LS', rate: 0 }];
+  }
+
+  function removeInvoiceItem(index) {
+    inv_items = inv_items.filter((_, i) => i !== index);
+  }
+
   // Deductions & Invoice Computations
   $: invSubtotal = inv_items.reduce((s, it) => s + (Number(it.qty) * Number(it.rate)), 0);
   $: invTax = (invSubtotal * inv_gst_rate) / 100;
@@ -278,6 +416,7 @@
   $: dedFsd = invSubtotal * 0.05;
   $: netBankPayable = invGrandTotal - (dedGstTds + dedItTds + dedCess + dedFsd);
 
+  // Financial Metrics
   $: totalCredits = cashbookRecords.filter(c => c.entry_type === 'Credit').reduce((s, c) => s + Number(c.amount || 0), 0);
   $: totalDebits = cashbookRecords.filter(c => c.entry_type === 'Debit').reduce((s, c) => s + Number(c.amount || 0), 0);
   $: cashBalance = totalCredits - totalDebits;
@@ -917,6 +1056,34 @@
                 </div>
               </div>
 
+              <!-- Bill Items Configuration -->
+              <div class="space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="font-black text-slate-900">బిల్లు ఐటమ్స్ (Bill Items):</span>
+                  <button type="button" on:click={addInvoiceItem} class="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold px-3 py-1 rounded-lg">+ ఐటమ్ చేర్చండి</button>
+                </div>
+
+                {#each inv_items as item, idx}
+                  <div class="grid grid-cols-12 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200 items-center">
+                    <div class="col-span-12 sm:col-span-6">
+                      <input type="text" bind:value={item.desc} placeholder="పని పేరు / వివరణ" class="w-full bg-white border border-slate-300 rounded-lg p-1.5 font-bold" />
+                    </div>
+                    <div class="col-span-3 sm:col-span-2">
+                      <input type="number" bind:value={item.qty} placeholder="Qty" class="w-full bg-white border border-slate-300 rounded-lg p-1.5 font-mono" />
+                    </div>
+                    <div class="col-span-4 sm:col-span-2">
+                      <input type="number" bind:value={item.rate} placeholder="Rate ₹" class="w-full bg-white border border-slate-300 rounded-lg p-1.5 font-mono" />
+                    </div>
+                    <div class="col-span-4 sm:col-span-1 text-right font-mono font-black text-slate-900">
+                      ₹{(Number(item.qty) * Number(item.rate)).toLocaleString('en-IN')}
+                    </div>
+                    <div class="col-span-1 text-right">
+                      <button type="button" on:click={() => removeInvoiceItem(idx)} class="text-red-600 font-bold">×</button>
+                    </div>
+                  </div>
+                {/each}
+              </div>
+
               <!-- Deductions Audit Card -->
               <div class="bg-amber-50 border border-amber-200 p-4 rounded-2xl space-y-2">
                 <span class="font-black text-amber-950 block">🏛️ ప్రభుత్వ కట్టింపుల ఆడిట్ (Deductions Audit):</span>
@@ -1027,33 +1194,167 @@
         </div>
       {/if}
 
-      <!-- TAB 7: SITE EMERGENCY CONTACTS -->
+      <!-- TAB 7: SITE EMERGENCY CONTACTS (ADD, EDIT, DELETE, CALL, WHATSAPP) -->
       {#if activeTab === 'contacts'}
         <div class="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-4">
-          <div class="border-b pb-3">
-            <h3 class="text-sm font-black text-slate-900">📞 సైట్ అత్యవసర కాంటాక్ట్స్ డైరెక్టరీ</h3>
-            <p class="text-xs text-slate-500">అధికారులు, డీలర్లు మరియు మేస్త్రీలకు 1-ట్యాప్ కాల్ & వాట్సాప్</p>
+          
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
+            <div>
+              <h3 class="text-sm font-black text-slate-900 flex items-center gap-2">
+                <span>📞 సైట్ అత్యవసర కాంటాక్ట్స్ డైరెక్టరీ</span>
+              </h3>
+              <p class="text-xs text-slate-500">అధికారులు, డీలర్లు, మేస్త్రీల ఫోన్ నంబర్లు మేనేజ్ చేసుకోండి</p>
+            </div>
+
+            <!-- + Kotha Contact Button -->
+            <button
+              type="button"
+              on:click={openNewContactModal}
+              class="bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black px-4 py-2 rounded-xl shadow flex items-center gap-1.5 transition cursor-pointer"
+            >
+              <span>+ కొత్త కాంటాక్ట్ చేర్చండి</span>
+            </button>
           </div>
 
+          <!-- Add / Edit Modal Box -->
+          {#if isContactModalOpen}
+            <div class="bg-amber-50/70 border-2 border-amber-300 p-4 rounded-2xl space-y-3">
+              <div class="flex justify-between items-center">
+                <span class="text-xs font-black text-amber-950">
+                  {editingContactId ? '✏️ కాంటాక్ట్ ఎడిట్ చేయండి' : '+ కొత్త కాంటాక్ట్ వివరాలు'}
+                </span>
+                <button
+                  type="button"
+                  on:click={() => isContactModalOpen = false}
+                  class="text-xs text-slate-500 hover:text-black font-bold"
+                >
+                  ✕ రద్దు చేయండి
+                </button>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs font-bold">
+                <div>
+                  <label class="block text-[11px] text-slate-700 mb-1">ఐకాన్ (Emoji)</label>
+                  <select bind:value={c_icon} class="w-full bg-white border border-slate-300 rounded-xl p-2">
+                    <option value="🏛️">🏛️ అధికారి (AE/Govt)</option>
+                    <option value="📋">📋 సెక్రటరీ (Secretary)</option>
+                    <option value="👑">👑 సర్పంచ్ (Sarpanch)</option>
+                    <option value="🚜">🚜 జేసీబీ / ట్రాక్టర్</option>
+                    <option value="🚚">🚚 మెటీరియల్ సప్లయర్</option>
+                    <option value="🏪">🏪 సిమెంట్/స్టీల్ డీలర్</option>
+                    <option value="👷">👷 మేస్త్రీ / కూలీ</option>
+                    <option value="⚡">⚡ ఎలక్ట్రీషియన్ / ప్లంబర్</option>
+                    <option value="📞">📞 ఇతర కాంటాక్ట్</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="block text-[11px] text-slate-700 mb-1">హోదా / కేటగిరీ *</label>
+                  <input
+                    type="text"
+                    bind:value={c_role}
+                    placeholder="ఉదా: పంచాయతీ ఏఈ (AE)"
+                    class="w-full bg-white border border-slate-300 rounded-xl p-2"
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-[11px] text-slate-700 mb-1">వ్యక్తి / షాప్ పేరు *</label>
+                  <input
+                    type="text"
+                    bind:value={c_name}
+                    placeholder="ఉదా: సురేష్ రావు గారు"
+                    class="w-full bg-white border border-slate-300 rounded-xl p-2"
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-[11px] text-slate-700 mb-1">మొబైల్ నంబర్ *</label>
+                  <input
+                    type="tel"
+                    bind:value={c_phone}
+                    placeholder="10 అంకెల నంబర్"
+                    class="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div class="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  on:click={() => isContactModalOpen = false}
+                  class="bg-slate-200 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-xl"
+                >
+                  క్యాన్సిల్
+                </button>
+                <button
+                  type="button"
+                  on:click={saveContact}
+                  class="bg-slate-950 text-white text-xs font-black px-4 py-1.5 rounded-xl shadow"
+                >
+                  {editingContactId ? 'అప్‌డేట్ చేయండి' : 'సేవ్ చేయండి'}
+                </button>
+              </div>
+            </div>
+          {/if}
+
+          <!-- Contacts Grid Cards -->
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {#each siteContacts as c}
-              <div class="bg-slate-50 border border-slate-200 p-4 rounded-2xl flex items-center justify-between text-xs">
-                <div class="flex items-center gap-2.5">
-                  <span class="text-2xl">{c.icon}</span>
-                  <div>
-                    <h4 class="font-black text-slate-900">{c.role}</h4>
-                    <p class="text-[11px] text-slate-500">{c.name}</p>
-                    <p class="text-[11px] font-mono font-bold text-slate-700">{c.phone}</p>
+            {#each siteContacts as c (c.id)}
+              <div class="bg-slate-50 border border-slate-200 p-4 rounded-2xl flex flex-col justify-between text-xs space-y-3 hover:border-slate-300 transition shadow-sm">
+                
+                <div class="flex items-start justify-between">
+                  <div class="flex items-center gap-2.5">
+                    <span class="text-2xl p-2 bg-white rounded-xl border border-slate-200 shadow-sm">{c.icon || '📞'}</span>
+                    <div>
+                      <h4 class="font-black text-slate-900 text-xs">{c.role}</h4>
+                      <p class="text-[11px] text-slate-600 font-medium">{c.name}</p>
+                      <p class="text-xs font-mono font-black text-slate-800 pt-0.5">{c.phone}</p>
+                    </div>
+                  </div>
+
+                  <!-- Edit / Delete Controls -->
+                  <div class="flex items-center gap-1">
+                    <button
+                      type="button"
+                      on:click={() => startEditContact(c)}
+                      class="w-7 h-7 bg-white hover:bg-slate-200 text-slate-700 rounded-lg flex items-center justify-center font-bold border border-slate-200 shadow-sm transition"
+                      title="ఎడిట్ చేయండి"
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      type="button"
+                      on:click={() => deleteContact(c.id, c.name)}
+                      class="w-7 h-7 bg-white hover:bg-rose-100 text-rose-600 rounded-lg flex items-center justify-center font-bold border border-slate-200 shadow-sm transition"
+                      title="తొలగించండి"
+                    >
+                      🗑️
+                    </button>
                   </div>
                 </div>
 
-                <div class="flex items-center gap-1.5">
-                  <a href="tel:{c.phone}" class="w-8 h-8 bg-blue-600 text-white rounded-xl flex items-center justify-center font-bold shadow">📞</a>
-                  <a href="https://api.whatsapp.com/send?phone=91{c.phone}" target="_blank" class="w-8 h-8 bg-emerald-600 text-white rounded-xl flex items-center justify-center font-bold shadow">💬</a>
+                <!-- 1-Click Call & WhatsApp Action Buttons -->
+                <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200">
+                  <a
+                    href="tel:{c.phone}"
+                    class="bg-blue-600 hover:bg-blue-700 text-white font-black py-2 rounded-xl flex items-center justify-center gap-1 shadow transition"
+                  >
+                    <span>📞 కాల్</span>
+                  </a>
+                  <a
+                    href="https://api.whatsapp.com/send?phone=91{c.phone.replace(/\D/g,'')}"
+                    target="_blank"
+                    class="bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2 rounded-xl flex items-center justify-center gap-1 shadow transition"
+                  >
+                    <span>💬 WhatsApp</span>
+                  </a>
                 </div>
+
               </div>
             {/each}
           </div>
+
         </div>
       {/if}
 
