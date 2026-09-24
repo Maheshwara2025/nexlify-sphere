@@ -4,52 +4,56 @@
   import { onMount } from 'svelte';
 
   let authChecking = true;
-
-  // Active Navigation Tab
   let activeTab = 'quick_entry'; 
   // 'quick_entry', 'eng_calc', 'mbook', 'vendor_bills', 'own_invoice', 'album', 'contacts', 'dashboard'
 
-  // Projects Master
   let projects = [];
   let selectedProjectId = null;
   let loading = true;
 
-  // 1. Quick Entry State (GD Master)
+  // 1. Quick Entry State
   let q_date = new Date().toISOString().split('T')[0];
-  let q_type = 'Pooja_Petty'; // 'Pooja_Petty', 'Material_Inward', 'Labour_Attendance', 'Material_Used', 'JCB_Tractor'
-  let q_stage = 'Inauguration'; // 'Inauguration', 'Trench', 'PCC', 'Basement', 'Pillars', 'Brickwork', 'Plastering'
-  let q_desc = '';
+  let q_type = 'Pooja_Petty';
+  let q_stage = 'Inauguration';
+  let q_desc = 'శంకుస్థాపన పూజ, కొబ్బరికాయలు, పసుపు, కుంకుమ, సున్నం ఖర్చులు';
   let q_party = 'పూజా సామాగ్రి';
   let q_total = '';
   let q_paid = '';
   let q_mode = 'Cash';
-  let q_bill_status = 'Paid'; // 'Paid', 'Credit', 'Partial'
+  let q_bill_status = 'Paid';
 
-  // Sub-states
+  // Self Voucher Toggle (Bills lenappudu swayam rasheedu)
+  let is_self_voucher = true;
+  let self_voucher_no = `VCH-${Date.now().toString().slice(-6)}`;
+
+  // Materials & Labour State
   let q_mat_name = 'సిమెంట్ బస్తాలు';
   let q_mat_qty = '';
   let q_mat_unit = 'బస్తాలు';
   let q_masons = '';
   let q_male_labour = '';
   let q_female_labour = '';
-  let q_hours = ''; // JCB hours or tractor trips
 
-  // Photos
-  let sitePhotoFile = null;
-  let sitePhotoPreview = null;
+  // Multiple Photos Support
+  /** @type {File[]} */
+  let sitePhotoFiles = [];
+  /** @type {string[]} */
+  let sitePhotoPreviews = [];
+  
+  /** @type {File | null} */
   let billPhotoFile = null;
   let billPhotoPreview = null;
   let isSubmitting = false;
 
   // 2. Civil Engineering Estimator
-  let calc_wall_length = 100; // Feet
-  let calc_pillar_gap = 10;   // Feet
-  let calc_wall_height = 5;   // Feet
+  let calc_wall_length = 100;
+  let calc_pillar_gap = 10;
+  let calc_wall_height = 5;
   $: calc_total_pillars = Math.floor(calc_wall_length / calc_pillar_gap) + 1;
-  $: calc_brick_estimate = Math.round(calc_wall_length * calc_wall_height * 10); // ~10 bricks per sq.ft (9" wall)
+  $: calc_brick_estimate = Math.round(calc_wall_length * calc_wall_height * 10);
   $: calc_cement_estimate = Math.round((calc_wall_length * calc_wall_height * 0.035) + (calc_total_pillars * 1.25));
 
-  // 3. M-Book Measurements State
+  // 3. M-Book State
   let mb_items = [];
   let mb_stage = 'Trench';
   let mb_item_name = 'పునాది మట్టి తవ్వకం (Earthwork Excavation for Trench & Pillars)';
@@ -140,7 +144,7 @@
     }
   }
 
-  // File Upload Helper
+  // Upload helper for single file
   async function uploadContractorDoc(file, folder) {
     const ext = file.name.split('.').pop();
     const cleanPath = `${folder}/${Date.now()}_${Math.random().toString(36).substring(2, 6)}.${ext}`;
@@ -150,26 +154,41 @@
     return data.publicUrl;
   }
 
-  function handleFilePick(e, target) {
+  // Multiple Photos Picker Handler
+  function handleMultipleSitePhotos(e) {
     const input = /** @type {HTMLInputElement} */ (e.target);
-    if (input.files && input.files[0]) {
-      const file = input.files[0];
-      if (target === 'site') {
-        sitePhotoFile = file;
-        sitePhotoPreview = URL.createObjectURL(file);
-      } else {
-        billPhotoFile = file;
-        billPhotoPreview = URL.createObjectURL(file);
-      }
+    if (input.files) {
+      const newFiles = Array.from(input.files);
+      sitePhotoFiles = [...sitePhotoFiles, ...newFiles];
+      const newPreviews = newFiles.map(f => URL.createObjectURL(f));
+      sitePhotoPreviews = [...sitePhotoPreviews, ...newPreviews];
     }
   }
 
-  // Quick Action Selection Helper
+  function removeSitePhoto(index) {
+    sitePhotoFiles.splice(index, 1);
+    sitePhotoPreviews.splice(index, 1);
+    sitePhotoFiles = [...sitePhotoFiles];
+    sitePhotoPreviews = [...sitePhotoPreviews];
+  }
+
+  function handleBillPhoto(e) {
+    const input = /** @type {HTMLInputElement} */ (e.target);
+    if (input.files && input.files[0]) {
+      billPhotoFile = input.files[0];
+      billPhotoPreview = URL.createObjectURL(billPhotoFile);
+      is_self_voucher = false;
+    }
+  }
+
   function setQuickType(type, stage, party, defaultDesc = '') {
     q_type = type;
     q_stage = stage;
     q_party = party;
     q_desc = defaultDesc;
+    if (type === 'Pooja_Petty') {
+      is_self_voucher = true;
+    }
   }
 
   // Submit Quick GD Entry
@@ -178,11 +197,22 @@
     isSubmitting = true;
 
     try {
-      let siteUrl = null;
-      let billUrl = null;
+      // 1. Upload All Selected Site Photos
+      let siteUrls = [];
+      for (const file of sitePhotoFiles) {
+        const url = await uploadContractorDoc(file, 'site_stages');
+        siteUrls.push(url);
+      }
+      const finalSitePhotoString = siteUrls.join(',');
 
-      if (sitePhotoFile) siteUrl = await uploadContractorDoc(sitePhotoFile, 'stages');
-      if (billPhotoFile) billUrl = await uploadContractorDoc(billPhotoFile, 'bills');
+      // 2. Handle Bill or Self Voucher
+      let finalBillUrl = null;
+      if (billPhotoFile) {
+        finalBillUrl = await uploadContractorDoc(billPhotoFile, 'bills');
+      } else if (is_self_voucher) {
+        // Tag as self-generated voucher
+        finalBillUrl = `SELF_VOUCHER|${self_voucher_no}|${q_party}|${q_total || 0}`;
+      }
 
       const totalVal = Number(q_total) || 0;
       let paidVal = Number(q_paid) || 0;
@@ -210,8 +240,8 @@
         masons_count: parseInt(q_masons) || 0,
         labour_count: (parseInt(q_male_labour) || 0) + (parseInt(q_female_labour) || 0),
         work_progress_desc: fullDescription,
-        site_photo_url: siteUrl,
-        receipt_photo_url: billUrl
+        site_photo_url: finalSitePhotoString || null,
+        receipt_photo_url: finalBillUrl
       };
 
       const { error } = await supabase.from('contractor_gd_entries').insert([payload]);
@@ -222,41 +252,19 @@
       q_paid = '';
       q_mat_qty = '';
       q_desc = '';
-      sitePhotoFile = null;
-      sitePhotoPreview = null;
+      sitePhotoFiles = [];
+      sitePhotoPreviews = [];
       billPhotoFile = null;
       billPhotoPreview = null;
+      self_voucher_no = `VCH-${Date.now().toString().slice(-6)}`;
 
       await refreshAllRecords();
-      alert('✓ సైట్ ఎంట్రీ రికార్డ్ అయింది! సంబంధిత టేబుల్స్ ఆటో-అప్‌డేట్ అయ్యాయి.');
+      alert('✓ సైట్ ఎంట్రీ విజయవంతంగా నమోదైంది! స్టాక్, క్యాష్‌బుక్ ఆటో-అప్‌డేట్ అయ్యాయి.');
     } catch (e) {
+      console.error(e);
       alert('లోపం: ' + e.message);
     } finally {
       isSubmitting = false;
-    }
-  }
-
-  // Submit M-Book Entry
-  async function handleMBookSubmit() {
-    if (!selectedProjectId) return;
-    try {
-      const { error } = await supabase.from('contractor_mbook').insert([{
-        project_id: selectedProjectId,
-        item_desc: `[${mb_stage}] ${mb_item_name}`,
-        length: Number(mb_l) || 0,
-        breadth: Number(mb_b) || 0,
-        depth: Number(mb_d) || 0,
-        unit: mb_unit,
-        rate: Number(mb_rate) || 0
-      }]);
-      if (error) throw error;
-      mb_l = '';
-      mb_b = '';
-      mb_d = '';
-      await refreshAllRecords();
-      alert('M-Book కొలత రికార్డ్ అయింది!');
-    } catch (err) {
-      alert(err.message);
     }
   }
 
@@ -264,20 +272,18 @@
   $: invSubtotal = inv_items.reduce((s, it) => s + (Number(it.qty) * Number(it.rate)), 0);
   $: invTax = (invSubtotal * inv_gst_rate) / 100;
   $: invGrandTotal = invSubtotal + invTax;
-  $: dedGstTds = invSubtotal * 0.02; // 2%
-  $: dedItTds = invSubtotal * 0.01;  // 1%
-  $: dedCess = invSubtotal * 0.01;   // 1%
-  $: dedFsd = invSubtotal * 0.05;    // 5%
+  $: dedGstTds = invSubtotal * 0.02;
+  $: dedItTds = invSubtotal * 0.01;
+  $: dedCess = invSubtotal * 0.01;
+  $: dedFsd = invSubtotal * 0.05;
   $: netBankPayable = invGrandTotal - (dedGstTds + dedItTds + dedCess + dedFsd);
 
-  // Financial Summary
   $: totalCredits = cashbookRecords.filter(c => c.entry_type === 'Credit').reduce((s, c) => s + Number(c.amount || 0), 0);
   $: totalDebits = cashbookRecords.filter(c => c.entry_type === 'Debit').reduce((s, c) => s + Number(c.amount || 0), 0);
   $: cashBalance = totalCredits - totalDebits;
   $: totalDues = vendorDues.reduce((s, v) => s + (Number(v.total_billed || 0) - Number(v.total_paid || 0)), 0);
   $: totalMBookCost = mb_items.reduce((s, m) => s + Number(m.total_cost || 0), 0);
 
-  // WhatsApp DPR Share
   function sendDPRWhatsApp() {
     const selectedProj = projects.find(p => p.id === selectedProjectId);
     let msg = `*🏗️ డైలీ వర్క్ ప్రోగ్రెస్ రిపోర్ట్ (DPR)*\n`;
@@ -289,7 +295,7 @@
       msg += `${idx + 1}. [${e.entry_category}] ${e.work_progress_desc || e.party_name} - ₹${e.paid_amount || e.total_amount}\n`;
     });
     msg += `\n💵 *చేతిలో నికర నిల్వ:* ₹${cashBalance.toLocaleString('en-IN')}`;
-    msg += `\n📸 సైట్ ఫోటోలు & ఎం-బుక్ కొలతలు పోర్టల్ లో భద్రపరచబడ్డాయి.`;
+    msg += `\n📸 సైట్ ఫోటోలు & వోచర్లు పోర్టల్ లో భద్రపరచబడ్డాయి.`;
 
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank');
   }
@@ -317,7 +323,7 @@
           <div>
             <div class="flex items-center gap-2">
               <h1 class="text-sm sm:text-base font-black tracking-wide text-white">A.S.V. CONTRACTOR 360° ERP</h1>
-              <span class="text-[9px] bg-amber-500/20 text-amber-300 font-bold px-1.5 py-0.5 rounded border border-amber-500/40">CIVIL SUITE</span>
+              <span class="text-[9px] bg-amber-500/20 text-amber-300 font-bold px-1.5 py-0.5 rounded border border-amber-500/40">PRO SUITE</span>
             </div>
             <p class="text-[10px] text-slate-400 font-mono">GSTIN: <span class="text-amber-400 font-bold">36AMXPA2915K1ZR</span> • A.S.V. Enterprises</p>
           </div>
@@ -344,11 +350,11 @@
 
     <main class="max-w-7xl mx-auto p-3 sm:p-5 space-y-4">
 
-      <!-- Visual Stage Tracker Bar -->
+      <!-- Stage Tracker Banner -->
       <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-2 overflow-x-auto text-[11px] font-bold">
         <span class="text-xs font-black text-slate-900 shrink-0 flex items-center gap-1.5">
           <span>🚩</span>
-          <span>ప్రహరీ నిర్మాణ దశలు:</span>
+          <span>ప్రహరీ నిర్మాణ దశ:</span>
         </span>
         <div class="flex items-center gap-1.5 whitespace-nowrap">
           <span class="px-2.5 py-1 rounded-xl bg-amber-500 text-slate-950 font-black shadow-sm">1. శంకుస్థాపన ✓</span>
@@ -374,7 +380,7 @@
           on:click={() => activeTab = 'quick_entry'}
           class="px-3.5 py-2.5 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap {activeTab === 'quick_entry' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-600 hover:bg-slate-100'}"
         >
-          <span>⚡ డైలీ క్విక్ ఎంట్రీ (One-Touch)</span>
+          <span>⚡ డైలీ క్విక్ ఎంట్రీ</span>
         </button>
 
         <button
@@ -434,7 +440,7 @@
         </button>
       </nav>
 
-      <!-- TAB 1: ONE-TOUCH QUICK ENTRY DESK -->
+      <!-- TAB 1: QUICK ENTRY WITH MULTIPLE PHOTOS & SELF-VOUCHER -->
       {#if activeTab === 'quick_entry'}
         <div class="bg-white border border-slate-200 rounded-3xl p-4 sm:p-7 shadow-sm space-y-5">
           
@@ -455,9 +461,8 @@
             </button>
           </div>
 
-          <!-- Quick Action Selection Cards -->
+          <!-- Quick Type Selection Cards -->
           <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-xs font-bold">
-            
             <button
               type="button"
               on:click={() => setQuickType('Pooja_Petty', 'Inauguration', 'పూజా సామాగ్రి', 'శంకుస్థాపన పూజ, కొబ్బరికాయలు, పసుపు, కుంకుమ, సున్నం ఖర్చులు')}
@@ -490,12 +495,12 @@
 
             <button
               type="button"
-              on:click={() => setQuickType('JCB_Tractor', 'Trench', 'జేసీబీ / ట్రాక్టర్ కిరాయి')}
-              class="p-3 rounded-2xl border text-left transition {q_type === 'JCB_Tractor' ? 'bg-purple-50 border-purple-500 text-purple-950 ring-2 ring-purple-500 shadow' : 'bg-slate-50 border-slate-200 text-slate-700'}"
+              on:click={() => setQuickType('Daily_Expense', 'Trench', 'జేసీబీ / ట్రాక్టర్ కిరాయి', 'పునాది గుంతల తవ్వకం & మట్టి తోలకం')}
+              class="p-3 rounded-2xl border text-left transition {q_type === 'Daily_Expense' ? 'bg-purple-50 border-purple-500 text-purple-950 ring-2 ring-purple-500 shadow' : 'bg-slate-50 border-slate-200 text-slate-700'}"
             >
               <span class="text-2xl block mb-1">🚜</span>
               <span class="block">జేసీబీ / ట్రాక్టర్ కిరాయి</span>
-              <span class="text-[10px] text-slate-500 font-normal">గుంతల తవ్వకం & మట్టి తోలకం</span>
+              <span class="text-[10px] text-slate-500 font-normal">గుంతల తవ్వకం & రవాణా</span>
             </button>
 
             <button
@@ -507,12 +512,11 @@
               <span class="block">సైట్ పని & వాడకం</span>
               <span class="text-[10px] text-slate-500 font-normal">వాడిన సిమెంట్, పూర్తి చేసిన గోడ</span>
             </button>
-
           </div>
 
           <form on:submit|preventDefault={handleQuickSubmit} class="space-y-4 pt-1">
             
-            <!-- Date & Construction Stage -->
+            <!-- Date & Stage -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label class="block text-xs font-bold text-slate-700 mb-1">తేదీ *</label>
@@ -554,10 +558,10 @@
               </div>
             {/if}
 
-            <!-- Labour Attendance Details -->
+            <!-- Labour Details -->
             {#if q_type === 'Labour_Attendance'}
               <div class="bg-emerald-50/70 border border-emerald-200 p-4 rounded-2xl space-y-3">
-                <span class="text-xs font-black text-emerald-950 block">👷 కూలీల హాజరు లెక్క:</span>
+                <span class="text-xs font-black text-emerald-950 block">👷 కూలీల హాజరు వివరాలు:</span>
                 <div class="grid grid-cols-3 gap-3">
                   <div>
                     <label class="block text-[11px] font-bold text-slate-700 mb-1">తాపీ మేస్త్రీలు</label>
@@ -575,11 +579,12 @@
               </div>
             {/if}
 
-            <!-- Financials: Paid, Credit, Partial -->
+            <!-- Payment & Bill Status -->
             {#if q_type !== 'Material_Used'}
               <div class="bg-slate-50 border border-slate-200 p-4 rounded-2xl space-y-3">
                 <div class="flex flex-wrap items-center justify-between gap-2">
-                  <span class="text-xs font-black text-slate-900">💰 చెల్లింపు & బాకీ స్థితి:</span>
+                  <span class="text-xs font-black text-slate-900">💰 ఖర్చు & చెల్లింపు లెక్క:</span>
+                  
                   <div class="flex items-center gap-1 text-[11px] font-bold">
                     <button type="button" on:click={() => q_bill_status = 'Paid'} class="px-2.5 py-1 rounded-xl transition {q_bill_status === 'Paid' ? 'bg-emerald-700 text-white' : 'bg-slate-200 text-slate-700'}">✓ మొత్తం ఇచ్చాం (Paid)</button>
                     <button type="button" on:click={() => q_bill_status = 'Credit'} class="px-2.5 py-1 rounded-xl transition {q_bill_status === 'Credit' ? 'bg-amber-700 text-white' : 'bg-slate-200 text-slate-700'}">⏳ పూర్తి బాకీ (Credit)</button>
@@ -589,12 +594,12 @@
 
                 <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
                   <div>
-                    <label class="block text-[11px] font-bold text-slate-700 mb-1">వ్యక్తి / షాప్ పేరు</label>
+                    <label class="block text-[11px] font-bold text-slate-700 mb-1">ఎవరికి ఇచ్చారు / షాప్ పేరు</label>
                     <input type="text" bind:value={q_party} placeholder="ఎవరికి చెల్లించారు" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-bold" />
                   </div>
 
                   <div>
-                    <label class="block text-[11px] font-bold text-slate-700 mb-1">మొత్తం బిల్లు విలువ (₹)</label>
+                    <label class="block text-[11px] font-bold text-slate-700 mb-1">మొత్తం ఖర్చు / బిల్లు (₹)</label>
                     <input type="number" step="any" bind:value={q_total} placeholder="0" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-bold font-mono" />
                   </div>
 
@@ -606,7 +611,7 @@
                   {/if}
 
                   <div>
-                    <label class="block text-[11px] font-bold text-slate-700 mb-1">చెల్లింపు మార్గం</label>
+                    <label class="block text-[11px] font-bold text-slate-700 mb-1">చెల్లింపు విధానం</label>
                     <select bind:value={q_mode} class="w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-bold">
                       <option value="Cash">నగదు (Cash)</option>
                       <option value="UPI">PhonePe / GPay</option>
@@ -619,7 +624,7 @@
 
             <!-- Work Description -->
             <div>
-              <label class="block text-xs font-bold text-slate-700 mb-1">పని పురోగతి / వివరాలు (Work Notes)</label>
+              <label class="block text-xs font-bold text-slate-700 mb-1">వివరాలు / పని పురోగతి (Description)</label>
               <textarea
                 bind:value={q_desc}
                 rows="2"
@@ -628,29 +633,92 @@
               ></textarea>
             </div>
 
-            <!-- Mandatory Photos (Site & Bill) -->
+            <!-- PHOTOS & SELF-VOUCHER SECTION -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div class="border-2 border-dashed border-slate-300 bg-slate-50 p-3 rounded-2xl text-center">
-                <input type="file" id="site-cam" accept="image/*" capture="environment" on:change={(e) => handleFilePick(e, 'site')} class="hidden" />
-                <label for="site-cam" class="cursor-pointer block">
-                  <span class="text-2xl block">📷</span>
-                  <span class="text-xs font-bold text-slate-700 block">సైట్ ఫోటో తీయండి (శంకుస్థాపన / పని ఫోటో)</span>
-                  {#if sitePhotoPreview}
-                    <img src={sitePhotoPreview} alt="Site Preview" class="h-20 mx-auto mt-2 rounded-xl object-contain border border-slate-300 bg-white" />
-                  {/if}
+              
+              <!-- 1. MULTIPLE SITE PHOTOS PICKER -->
+              <div class="border-2 border-dashed border-slate-300 bg-slate-50 p-4 rounded-2xl text-center space-y-2">
+                <input
+                  type="file"
+                  id="multi-site-cam"
+                  accept="image/*"
+                  multiple
+                  on:change={handleMultipleSitePhotos}
+                  class="hidden"
+                />
+                <label for="multi-site-cam" class="cursor-pointer block">
+                  <span class="text-3xl block mb-1">📸</span>
+                  <span class="text-xs font-black text-slate-800 block">సైట్ ఫోటోలు తీయండి (Multiple Photos)</span>
+                  <span class="text-[10px] text-slate-500">శంకుస్థాపన పూజ, తవ్వకం ఫోటోలు ఎన్ని అయినా ఒకేసారి ఎంచుకోవచ్చు</span>
                 </label>
+
+                <!-- Selected Previews -->
+                {#if sitePhotoPreviews.length > 0}
+                  <div class="flex flex-wrap gap-2 pt-2 justify-center">
+                    {#each sitePhotoPreviews as prev, idx}
+                      <div class="relative group">
+                        <img src={prev} alt="Site Preview" class="w-16 h-16 object-cover rounded-xl border border-slate-300 shadow-sm" />
+                        <button
+                          type="button"
+                          on:click={() => removeSitePhoto(idx)}
+                          class="absolute -top-1.5 -right-1.5 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold shadow"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    {/each}
+                  </div>
+                {/if}
               </div>
 
-              <div class="border-2 border-dashed border-slate-300 bg-slate-50 p-3 rounded-2xl text-center">
-                <input type="file" id="bill-cam" accept="image/*,.pdf" on:change={(e) => handleFilePick(e, 'bill')} class="hidden" />
-                <label for="bill-cam" class="cursor-pointer block">
-                  <span class="text-2xl block">🧾</span>
-                  <span class="text-xs font-bold text-slate-700 block">బిల్లు / కొబ్బరికాయ రశీదు ఫోటో</span>
-                  {#if billPhotoPreview}
-                    <img src={billPhotoPreview} alt="Bill Preview" class="h-20 mx-auto mt-2 rounded-xl object-contain border border-slate-300 bg-white" />
-                  {/if}
-                </label>
+              <!-- 2. BILL UPLOAD OR AUTO SELF-VOUCHER SLIP -->
+              <div class="border-2 border-dashed border-slate-300 bg-slate-50 p-4 rounded-2xl space-y-3">
+                <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+                  <span class="text-xs font-black text-slate-800">🧾 రశీదు / బిల్లు సదుపాయం</span>
+                  
+                  <!-- Self Voucher Switch -->
+                  <label class="flex items-center gap-1.5 cursor-pointer text-[11px] font-bold bg-amber-100 text-amber-950 px-2 py-1 rounded-lg">
+                    <input type="checkbox" bind:checked={is_self_voucher} class="w-3.5 h-3.5 text-amber-600 rounded" />
+                    <span>బిల్లు లేదు (Auto Self Voucher)</span>
+                  </label>
+                </div>
+
+                {#if is_self_voucher}
+                  <!-- Generated Self Cash Voucher Card Preview -->
+                  <div class="bg-white border border-amber-300 rounded-xl p-3 text-[11px] font-mono space-y-1 text-slate-800 shadow-sm">
+                    <div class="flex justify-between border-b border-slate-100 pb-1 font-sans">
+                      <span class="font-black text-amber-950 text-xs">A.S.V. ENTERPRISES - SELF VOUCHER</span>
+                      <span class="text-[9px] bg-slate-100 px-1.5 py-0.5 rounded font-bold">చిల్లర ఖర్చు స్లిప్</span>
+                    </div>
+                    <div class="flex justify-between pt-1">
+                      <span>వోచర్ నంబర్: <strong>{self_voucher_no}</strong></span>
+                      <span>తేదీ: {q_date}</span>
+                    </div>
+                    <div>
+                      <span>ఖర్చు వివరాలు: <strong>{q_party || 'పూజా సామాగ్రి'}</strong> ({q_desc || 'సాధారణ ఖర్చు'})</span>
+                    </div>
+                    <div class="flex justify-between border-t border-slate-100 pt-1 font-bold font-sans">
+                      <span>చెల్లించిన మొత్తం: <strong class="text-emerald-700 text-xs">₹{q_total || 0}</strong> ({q_mode})</span>
+                      <span class="text-[9px] text-slate-500">Passed by: Contractor</span>
+                    </div>
+                  </div>
+                  <p class="text-[10px] text-slate-500 text-center">దుకాణంలో బిల్లు ఇవ్వనప్పుడు ఈ ఆటో-స్లిప్ అధికారిక రశీదుగా సేవ్ అవుతుంది.</p>
+                {:else}
+                  <!-- Manual Bill Upload -->
+                  <div class="text-center pt-2">
+                    <input type="file" id="bill-pic-in" accept="image/*,.pdf" on:change={handleBillPhoto} class="hidden" />
+                    <label for="bill-pic-in" class="cursor-pointer block">
+                      <span class="text-2xl block">🧾</span>
+                      <span class="text-xs font-bold text-slate-700 block">బిల్లు ఫోటో అప్‌లోడ్ చేయండి</span>
+                      {#if billPhotoPreview}
+                        <img src={billPhotoPreview} alt="Bill Preview" class="h-16 mx-auto mt-2 rounded-xl object-contain border border-slate-300 bg-white" />
+                      {/if}
+                    </label>
+                  </div>
+                {/if}
+
               </div>
+
             </div>
 
             <button
@@ -658,7 +726,7 @@
               disabled={isSubmitting}
               class="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 font-black py-3.5 rounded-2xl shadow-lg transition text-sm cursor-pointer"
             >
-              {isSubmitting ? 'ఎంట్రీ సేవ్ అవుతోంది...' : '🚀 సేవ్ చేయండి (ఆటో-ట్రిగ్గర్ అప్‌డేట్)'}
+              {isSubmitting ? 'ఎంట్రీ సేవ్ అవుతోంది... దయచేసి వేచి ఉండండి' : '🚀 సేవ్ చేయండి (ఆటో-ట్రిగ్గర్ అప్‌డేట్)'}
             </button>
 
           </form>
@@ -691,7 +759,6 @@
             </div>
           </div>
 
-          <!-- Calculated Results -->
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div class="bg-amber-50 border border-amber-200 p-4 rounded-2xl space-y-1">
               <span class="text-[11px] font-bold text-amber-900 block">మొత్తం రావలసిన పిల్లర్లు:</span>
@@ -711,22 +778,10 @@
               <p class="text-[10px] text-emerald-800 font-medium">గోడ కట్టడం + ఫుటింగ్ కాంక్రీట్‌కు</p>
             </div>
           </div>
-
-          <!-- Engineering Recommendations -->
-          <div class="bg-slate-50 border border-slate-200 p-4 rounded-2xl space-y-2 text-xs text-slate-700 leading-relaxed">
-            <h4 class="font-black text-slate-900 flex items-center gap-1.5">
-              <span>📌</span> <span>ఏఈ గారి ఎం-బుక్ రికార్డు కోసం సివిల్ ప్రమాణాలు (Civil Standards):</span>
-            </h4>
-            <ul class="space-y-1 list-disc pl-5 font-medium">
-              <li><strong>పిల్లర్ గుంతల సైజు:</strong> కనీసం 2.5 అడుగుల వెడల్పు, 3.0 అడుగుల లోతు (గట్టి నేల వచ్చేవరకు).</li>
-              <li><strong>పునాది బెడ్ కాంక్రీట్ (PCC 1:4:8):</strong> 4 నుండి 6 అంగుళాల మందం తప్పనిసరిగా వేయాలి.</li>
-              <li><strong>బేస్‌మెంట్ రాతి కట్టడం:</strong> గ్రౌండ్ లెవెల్ కంటే కనీసం 1.5 అడుగుల ఎత్తు ఉండాలి.</li>
-            </ul>
-          </div>
         </div>
       {/if}
 
-      <!-- TAB 3: M-BOOK RECORDING -->
+      <!-- TAB 3: M-BOOK -->
       {#if activeTab === 'mbook'}
         <div class="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-4">
           <div class="flex items-center justify-between border-b pb-3">
@@ -740,7 +795,6 @@
             </div>
           </div>
 
-          <!-- M-Book Input Form -->
           <form on:submit|preventDefault={handleMBookSubmit} class="bg-slate-50 p-4 rounded-2xl border border-slate-200 grid grid-cols-2 sm:grid-cols-6 gap-2 text-xs">
             <div class="col-span-2">
               <label class="block font-bold text-slate-700 mb-1">పని వివరణ</label>
@@ -767,7 +821,6 @@
             </button>
           </form>
 
-          <!-- Measurements Table -->
           <div class="overflow-x-auto">
             <table class="w-full text-xs text-left border-collapse">
               <thead class="bg-slate-100 font-bold text-slate-700 border-b">
@@ -795,7 +848,7 @@
         </div>
       {/if}
 
-      <!-- TAB 4: VENDOR BILLS (INWARD) -->
+      <!-- TAB 4: VENDOR BILLS -->
       {#if activeTab === 'vendor_bills'}
         <div class="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-4">
           <div class="flex items-center justify-between border-b pb-3">
@@ -820,18 +873,9 @@
                   </span>
                 </div>
                 <div class="text-xs space-y-1 font-mono pt-1 border-t border-slate-200">
-                  <div class="flex justify-between text-slate-500">
-                    <span>మొత్తం బిల్లు:</span>
-                    <span>₹{Number(v.total_billed).toLocaleString('en-IN')}</span>
-                  </div>
-                  <div class="flex justify-between text-slate-500">
-                    <span>చెల్లించినది:</span>
-                    <span class="text-emerald-700">₹{Number(v.total_paid).toLocaleString('en-IN')}</span>
-                  </div>
-                  <div class="flex justify-between font-black text-slate-900 pt-1 border-t border-slate-200">
-                    <span>ఇవ్వాల్సిన బాకీ:</span>
-                    <span class="text-amber-800 text-sm">₹{due.toLocaleString('en-IN')}</span>
-                  </div>
+                  <div class="flex justify-between text-slate-500"><span>మొత్తం బిల్లు:</span> <span>₹{Number(v.total_billed).toLocaleString('en-IN')}</span></div>
+                  <div class="flex justify-between text-slate-500"><span>చెల్లించినది:</span> <span class="text-emerald-700">₹{Number(v.total_paid).toLocaleString('en-IN')}</span></div>
+                  <div class="flex justify-between font-black text-slate-900 pt-1 border-t border-slate-200"><span>ఇవ్వాల్సిన బాకీ:</span> <span class="text-amber-800 text-sm">₹{due.toLocaleString('en-IN')}</span></div>
                 </div>
               </div>
             {/each}
@@ -839,7 +883,7 @@
         </div>
       {/if}
 
-      <!-- TAB 5: OWN GST TAX INVOICE MAKER (A.S.V. ENTERPRISES) -->
+      <!-- TAB 5: OWN GST TAX INVOICE & RA BILL MAKER -->
       {#if activeTab === 'own_invoice'}
         <div class="bg-white border border-slate-200 rounded-3xl p-5 sm:p-7 shadow-sm space-y-5">
           <div class="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
@@ -895,7 +939,7 @@
                   </div>
                 </div>
                 <div class="flex justify-between items-center pt-2 border-t border-amber-200 font-bold">
-                  <span>బ్యాంక్ ఖాతాలో జమ అయ్యే నికర సొమ్ము (Net Realizable):</span>
+                  <span>బ్యాంక్ ఖాతాలో జమ అయ్యే నికర సొమ్ము:</span>
                   <span class="text-sm font-black text-emerald-800 font-mono">₹{netBankPayable.toLocaleString('en-IN')}</span>
                 </div>
               </div>
@@ -917,7 +961,6 @@
                 </div>
               </div>
 
-              <!-- Bill Items Table -->
               <table class="w-full text-left border-collapse">
                 <thead>
                   <tr class="border-y border-slate-900 bg-slate-50 font-bold">
@@ -956,24 +999,29 @@
         </div>
       {/if}
 
-      <!-- TAB 6: STAGE-WISE PHOTO ALBUM -->
+      <!-- TAB 6: STAGE-WISE PHOTO ALBUM (ALL PHOTOS GALLERY) -->
       {#if activeTab === 'album'}
         <div class="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-4">
           <div class="border-b pb-3">
             <h3 class="text-sm font-black text-slate-900">📸 ప్రహరీ నిర్మాణ దశలవారీ ఫోటో ఆల్బమ్</h3>
-            <p class="text-xs text-slate-500">శంకుస్థాపన పూజ నుండి పూర్తయ్యే వరకు అధికారిక ఫోటో రికార్డులు</p>
+            <p class="text-xs text-slate-500">శంకుస్థాపన పూజ, గుంతల తవ్వకం నుండి గోడ పూర్తయ్యే వరకు అధికారిక గ్యాలరీ</p>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {#each gdEntries.filter(g => g.site_photo_url) as photo}
-              <div class="bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-                <img src={photo.site_photo_url} alt="Site Stage" class="w-full h-44 object-cover" />
-                <div class="p-3 text-xs space-y-1">
-                  <span class="font-bold text-slate-900 block">{photo.work_progress_desc || 'సైట్ ప్రోగ్రెస్'}</span>
-                  <p class="text-[10px] text-slate-500 font-mono">📅 {photo.entry_date}</p>
-                  <a href={photo.site_photo_url} target="_blank" class="text-[11px] text-blue-600 font-bold block underline">పూర్తి సైజు చూడండి ↗</a>
-                </div>
-              </div>
+            {#each gdEntries as entry}
+              {#if entry.site_photo_url}
+                {@const photos = entry.site_photo_url.split(',')}
+                {#each photos as singlePic}
+                  <div class="bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                    <img src={singlePic} alt="Site Stage" class="w-full h-44 object-cover" />
+                    <div class="p-3 text-xs space-y-1">
+                      <span class="font-bold text-slate-900 block">{entry.work_progress_desc || 'సైట్ ప్రోగ్రెస్'}</span>
+                      <p class="text-[10px] text-slate-500 font-mono">📅 {entry.entry_date}</p>
+                      <a href={singlePic} target="_blank" class="text-[11px] text-blue-600 font-bold block pt-1 underline">పూర్తి సైజు చూడండి ↗</a>
+                    </div>
+                  </div>
+                {/each}
+              {/if}
             {/each}
           </div>
         </div>
@@ -1000,12 +1048,8 @@
                 </div>
 
                 <div class="flex items-center gap-1.5">
-                  <a href="tel:{c.phone}" class="w-8 h-8 bg-blue-600 text-white rounded-xl flex items-center justify-center font-bold shadow" title="కాల్ చేయండి">
-                    📞
-                  </a>
-                  <a href="https://api.whatsapp.com/send?phone=91{c.phone}" target="_blank" class="w-8 h-8 bg-emerald-600 text-white rounded-xl flex items-center justify-center font-bold shadow" title="వాట్సాప్">
-                    💬
-                  </a>
+                  <a href="tel:{c.phone}" class="w-8 h-8 bg-blue-600 text-white rounded-xl flex items-center justify-center font-bold shadow">📞</a>
+                  <a href="https://api.whatsapp.com/send?phone=91{c.phone}" target="_blank" class="w-8 h-8 bg-emerald-600 text-white rounded-xl flex items-center justify-center font-bold shadow">💬</a>
                 </div>
               </div>
             {/each}
