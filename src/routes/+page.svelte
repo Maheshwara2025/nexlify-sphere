@@ -12,7 +12,7 @@
   let loadingNews = true;
   let activeClipModal = null;
 
-  // 8 CSC & Citizen Utility Services (Direct WhatsApp Inquiry)
+  // 8 CSC & Citizen Utility Services
   const citizenServices = [
     {
       id: 'aadhaar',
@@ -120,24 +120,24 @@
   async function loadHomeData() {
     loadingNews = true;
     try {
-      // 1. Fetch Latest News Articles
+      // Fetch Latest News with location for Ticker & Cards
       let { data: newsData } = await supabase
         .from('news_articles')
         .select('id, headline, title, category, location_town, image_url, created_at')
         .order('id', { ascending: false })
-        .limit(6);
+        .limit(10);
 
       if (!newsData || newsData.length === 0) {
         const res = await supabase
           .from('news')
           .select('id, title, headline, category, location_town, image_url, created_at')
           .order('id', { ascending: false })
-          .limit(6);
+          .limit(10);
         newsData = res.data;
       }
       latestNews = newsData || [];
 
-      // 2. Fetch Latest Press Clips
+      // Fetch Latest Press Clips
       const { data: clipsData } = await supabase
         .from('news_articles')
         .select('id, headline, title, image_url, created_at')
@@ -169,7 +169,7 @@
 
 <div class="min-h-screen bg-[#f8fafc] text-slate-900 font-sans pb-24">
   
-  <!-- 1. STATUTORY TOP HEADER STRIP (CLEAN LIGHT/SLATE BAR) -->
+  <!-- 1. STATUTORY TOP HEADER STRIP (CLEAN SLATE BAR) -->
   <div class="bg-slate-900 text-slate-200 border-b border-slate-800 text-[11px] py-1.5 px-3">
     <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
       
@@ -213,7 +213,7 @@
         </div>
       </a>
 
-      <!-- Clean Public Navigation (NO CONTRACTOR INTERNAL LINK) -->
+      <!-- Clean Public Navigation -->
       <div class="flex items-center gap-2">
         <a href="/news" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3.5 py-2 rounded-xl font-black transition shadow flex items-center gap-1.5">
           <span>📰</span> <span>తాజా వార్తలు</span>
@@ -231,38 +231,46 @@
     </div>
   </header>
 
-  <!-- 3. LIVE BREAKING NEWS RUNNING TICKER (100% Syntax Clean) -->
-  <div class="bg-white border-b border-slate-200 text-slate-900 flex items-center overflow-hidden py-2 px-3 shadow-sm">
-    <div class="bg-red-600 text-white font-black text-xs px-3 py-1 rounded-lg shrink-0 flex items-center gap-1.5 shadow mr-2 z-10">
-      <span class="w-2 h-2 rounded-full bg-white animate-pulse"></span>
-      <span class="tracking-wide">తాజా వార్తలు</span>
+  <!-- 3. UNIFIED RED LIVE NEWS TICKER (EXACT MATCH WITH /news) -->
+  <div class="bg-[#b91c1c] text-white flex items-center overflow-hidden py-1.5 px-3 shadow-md border-y border-red-800">
+    
+    <!-- Left Black Badge -->
+    <div class="bg-black text-white font-black text-xs px-2.5 py-1 rounded shrink-0 flex items-center gap-1.5 shadow mr-2 z-10">
+      <span class="text-red-500 font-black text-sm leading-none">+</span>
+      <span class="tracking-wide">లైవ్ న్యూస్</span>
     </div>
 
+    <!-- Scrolling Ticker Track -->
     <marquee 
       behavior="scroll" 
       direction="left" 
       scrollamount="6" 
-      class="text-xs sm:text-sm font-bold text-slate-800 tracking-wide"
+      class="text-xs sm:text-[13px] font-bold tracking-wide"
     >
       {#if latestNews.length > 0}
         {#each latestNews as item}
-          <a href="/news/{item.id}" class="hover:text-red-600 mx-4 text-slate-900 transition">
-            🔴 {item.headline || item.title}
+          <a href="/news/{item.id}" class="hover:underline mx-4 text-white inline-flex items-center gap-1.5">
+            <span class="text-yellow-300 font-black">[{item.location_town || 'తాజా వార్త'}]</span>
+            <span class="text-white font-medium">{item.headline || item.title}</span>
           </a>
-          <span class="text-red-500 font-bold mx-2">•</span>
+          <span class="text-yellow-400 font-bold mx-2">•</span>
         {/each}
       {:else}
-        <span class="mx-4 text-slate-600">🔴 A.S.V. Enterprises & NS News: ముత్తారం మరియు తెలంగాణ వార్తల కోసం చూస్తూనే ఉండండి...</span>
+        <span class="mx-4 text-white inline-flex items-center gap-1.5">
+          <span class="text-yellow-300 font-black">[ముత్తారం]</span>
+          <span>A.S.V. Enterprises & NS News: తాజా ముత్తారం మరియు తెలంగాణ వార్తల కోసం చూస్తూనే ఉండండి...</span>
+        </span>
       {/if}
     </marquee>
+
   </div>
 
   <main class="max-w-7xl mx-auto px-3 sm:px-6 py-6 space-y-8">
 
-    <!-- 4. ALL-IN-ONE GRAND HERO BANNER (CLEAN LIGHT BACKGROUND) -->
+    <!-- 4. ALL-IN-ONE GRAND HERO BANNER (CLEAN LIGHT THEME) -->
     <section class="relative bg-gradient-to-br from-white via-slate-50 to-blue-50/40 rounded-3xl p-6 sm:p-10 shadow-sm border border-slate-200/80 overflow-hidden">
       
-      <!-- Subtle Decorative Circles -->
+      <!-- Ambient Backdrops -->
       <div class="absolute -right-20 -top-20 w-72 h-72 bg-red-100/50 rounded-full blur-2xl pointer-events-none"></div>
       <div class="absolute -left-20 -bottom-20 w-72 h-72 bg-blue-100/50 rounded-full blur-2xl pointer-events-none"></div>
 
@@ -480,7 +488,7 @@
       </section>
     {/if}
 
-    <!-- 8. CIVIL CONTRACTING & CONSTRUCTION SERVICES SHOWCASE (PUBLIC INQUIRY ONLY) -->
+    <!-- 8. CIVIL CONTRACTING & CONSTRUCTION SERVICES (PUBLIC INQUIRY ONLY) -->
     <section class="bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-slate-950 rounded-3xl p-6 sm:p-8 shadow-md flex flex-wrap items-center justify-between gap-4">
       <div class="max-w-2xl space-y-1.5">
         <div class="flex items-center gap-2">
@@ -504,7 +512,7 @@
       </div>
     </section>
 
-    <!-- 9. CONTACT & CENTER FOOTER (WHITE PROFESSIONAL CARD) -->
+    <!-- 9. CONTACT & CENTER FOOTER (WHITE CARD) -->
     <footer class="bg-white border border-slate-200 rounded-3xl p-6 sm:p-9 shadow-sm space-y-6">
       <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
         
