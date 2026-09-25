@@ -8,47 +8,73 @@
   // 1. Published News Articles (For 1-Click Linking)
   let publishedArticles = [];
   let selectedArticleId = '';
-  let loadingArticles = false;
 
   // 2. Aspect Ratios & Card Dimensions
   let selectedRatio = '1:1'; // '1:1', '4:5', '9:16', '16:9'
   const ratioConfigs = {
-    '1:1': { width: 480, height: 480, label: '1:1 Square (WhatsApp / FB / X)' },
+    '1:1': { width: 500, height: 500, label: '1:1 Square (WhatsApp / FB / X)' },
     '4:5': { width: 440, height: 550, label: '4:5 Portrait (Instagram Feed)' },
     '9:16': { width: 380, height: 640, label: '9:16 Vertical (Status / Reels)' },
-    '16:9': { width: 560, height: 315, label: '16:9 Wide (YouTube / Web)' }
+    '16:9': { width: 580, height: 326, label: '16:9 Wide (YouTube / Web)' }
   };
 
-  // 3. Brand Templates
+  // 3. Brand Presets
   let selectedTemplate = 'jwala'; // 'jwala', 'ratna', 'darshini', 'vigyan', 'champion'
 
-  // 4. Content State
-  let badgeText = 'తాజా వార్త';
-  let locationTag = 'ముత్తారం';
+  // 4. Inbuilt Category Combo Box Options
+  const categoryOptions = [
+    'తాజా వార్త',
+    'బ్రేకింగ్ న్యూస్',
+    'రాజకీయం',
+    'సంక్షేమ పథకాలు',
+    'విద్య & ఉద్యోగాలు',
+    'వ్యవసాయం / రైతు',
+    'క్రైమ్ & అలర్ట్',
+    'జిల్లా వార్తలు',
+    'ఆధ్యాత్మికం',
+    'క్రీడలు / సినిమా',
+    'కస్టమ్ (Custom)'
+  ];
+  let selectedCategoryChoice = 'తాజా వార్త';
+  let customCategoryText = '';
+  $: badgeText = selectedCategoryChoice === 'కస్టమ్ (Custom)' ? (customCategoryText || 'వార్త') : selectedCategoryChoice;
+
+  // 5. Inbuilt Location Options (Default: న్యూస్ డెస్క్)
+  const locationOptions = [
+    'న్యూస్ డెస్క్',
+    'ముత్తారం',
+    'పెద్దపల్లి',
+    'కరీంనగర్',
+    'హైదరాబాద్',
+    'తెలంగాణ',
+    'కస్టమ్ (Custom)'
+  ];
+  let selectedLocationChoice = 'న్యూస్ డెస్క్';
+  let customLocationText = '';
+  $: locationTag = selectedLocationChoice === 'కస్టమ్ (Custom)' ? (customLocationText || 'న్యూస్ డెస్క్') : selectedLocationChoice;
+
+  // 6. Content State
   let headline = 'కొత్త పింఛన్లపై మరో గుడ్‌న్యూస్.. మళ్లీ గడువు పెంచిన ప్రభుత్వం!';
   let summary = `• అర్హులైన లబ్ధిదారులకు దరఖాస్తు చేసుకోవడానికి ప్రభుత్వం మరో అవకాశం కల్పించింది.
 • గ్రామ పంచాయతీ మరియు మున్సిపల్ కార్యాలయాల్లో ప్రత్యేక హెల్ప్‌డెస్క్‌లు ఏర్పాటు.
 • దరఖాస్తుదారులు ఆధార్, రేషన్ కార్డు మరియు బ్యాంక్ వివరాలతో సంప్రదించాలి.`;
-  let targetNewsUrl = 'https://www.nexlifynucleus.in';
-  let showQrCode = true;
 
-  // 5. Typography & Color Controls
+  // 7. Typography Controls (Headline up to 36px, Body up to 26px)
   let selectedFont = "'Ramabhadra', sans-serif";
-  let headlineFontSize = 18; // in px
-  let summaryFontSize = 12;  // in px
+  let headlineFontSize = 30; // in px (default around 30-33px)
+  let summaryFontSize = 20;  // in px (default up to 24px)
   let headlineColor = '#facc15';      // Bright Yellow
   let headlineBgColor = '#000000';    // Black
-  let summaryColor = '#f1f5f9';       // Slate Light
+  let summaryColor = '#f8fafc';       // Slate Light
   let cardBgColor = '#090d16';        // Pitch Dark
 
-  // 6. Photo Uploads
+  // 8. Image Controls (Focus & Photo Height Slider)
   let mainPhotoPreview = 'https://images.unsplash.com/photo-1577495508048-b635879837f1?w=800&auto=format&fit=crop&q=80';
   let insetPhotoPreview = null;
   let showInsetCircle = false;
+  let imagePosition = 'center'; // 'center', 'top', 'bottom'
+  let photoHeightPercent = 46;  // 35% to 60%
   let isGenerating = false;
-
-  // Computed QR Code Image URL (Using high-reliability dynamic QR API)
-  $: qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&margin=4&data=${encodeURIComponent(targetNewsUrl)}`;
 
   onMount(async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -60,9 +86,8 @@
     await fetchPublishedArticles();
   });
 
-  // Fetch News from Supabase for 1-Click Linking
+  // Fetch Published News from Supabase
   async function fetchPublishedArticles() {
-    loadingArticles = true;
     try {
       let { data } = await supabase
         .from('news_articles')
@@ -77,8 +102,6 @@
       publishedArticles = data || [];
     } catch (e) {
       console.error('Fetch articles error:', e);
-    } finally {
-      loadingArticles = false;
     }
   }
 
@@ -88,12 +111,14 @@
     if (!art) return;
 
     headline = art.headline || art.title || headline;
-    locationTag = art.location_town || locationTag;
+    if (art.location_town) {
+      selectedLocationChoice = 'కస్టమ్ (Custom)';
+      customLocationText = art.location_town;
+    }
     if (art.image_url) {
       mainPhotoPreview = art.image_url;
     }
 
-    // Auto extract first 3 concise lines from content
     if (art.content) {
       const cleanLines = art.content
         .split('\n')
@@ -106,10 +131,6 @@
         summary = cleanLines.join('\n');
       }
     }
-
-    // Connect Smart QR code directly to this published news
-    targetNewsUrl = `https://www.nexlifynucleus.in/news/${art.id}`;
-    showQrCode = true;
   }
 
   function handleMainPhoto(e) {
@@ -140,7 +161,7 @@
     });
   }
 
-  // Mobile-Optimized High Quality JPEG Download Engine with Web Share API
+  // Mobile-Optimized High-Quality JPEG Download Engine
   async function downloadCardAsJpeg() {
     if (isGenerating) return;
     isGenerating = true;
@@ -151,28 +172,25 @@
 
       const hti = await loadHtmlToImage();
       
-      // Generate clean, mobile-compatible JPEG with 95% quality and 2.5x pixel ratio
       const dataUrl = await hti.toJpeg(node, {
-        quality: 0.95,
+        quality: 0.96,
         pixelRatio: 2.5,
         backgroundColor: cardBgColor || '#000000'
       });
 
-      // Convert dataUrl to Blob for robust mobile compatibility
       const res = await fetch(dataUrl);
       const blob = await res.blob();
       const fileName = `NS_News_Card_${Date.now()}.jpg`;
       const file = new File([blob], fileName, { type: 'image/jpeg' });
 
-      // If mobile supports native Web Share API with files, trigger native system sheet
+      // Mobile Native Web Share API
       if (typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
           files: [file],
           title: headline,
-          text: `${headline}\n\nపూర్తి కథనం: ${targetNewsUrl}`
+          text: `${headline}\n\nతాజా వార్తల కోసం: https://www.nexlifynucleus.in`
         });
       } else {
-        // Fallback: standard browser download
         const link = document.createElement('a');
         link.download = fileName;
         link.href = URL.createObjectURL(blob);
@@ -188,17 +206,16 @@
   }
 
   function shareDirectWhatsApp() {
-    const text = `*${headline}*\n\n📍 ${locationTag} | NS News Network\n\nపూర్తి వివరాలు చదవండి:\n👉 ${targetNewsUrl}\n\n_A.S.V. Enterprises & NS Media_`;
+    const text = `*${headline}*\n\n${summary}\n\n📍 ${locationTag} | NS News Network\n👉 https://www.nexlifynucleus.in\n\n_A.S.V. Enterprises & NS Media_`;
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
   }
 
-  // Preset Template Styles Auto-Setter
   function applyPresetStyle(style) {
     selectedTemplate = style;
     if (style === 'jwala') {
       headlineColor = '#facc15';
       headlineBgColor = '#000000';
-      summaryColor = '#f1f5f9';
+      summaryColor = '#f8fafc';
       cardBgColor = '#090d16';
     } else if (style === 'ratna') {
       headlineColor = '#ffffff';
@@ -212,18 +229,18 @@
       cardBgColor = '#1e3a8a';
     } else if (style === 'vigyan') {
       headlineColor = '#0f172a';
-      headlineBgColor = '#f1f5f9';
-      summaryColor = '#1e293b';
+      headlineBgColor = '#e2e8f0';
+      summaryColor = '#0f172a';
       cardBgColor = '#ffffff';
     }
   }
 </script>
 
 <svelte:head>
-  <title>NS News Picture Card Studio | Advanced Pro Creator</title>
+  <title>NS News Picture Card Studio Pro</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Gidugu&family=Noto+Sans+Telugu:wght@400;600;700;800;900&family=Ramabhadra&family=Suranna&family=Tenali+Ramakrishna&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Dhurjati&family=Gidugu&family=Mandali&family=Montserrat:wght@700;800;900&family=Noto+Sans+Telugu:wght@400;600;700;800;900&family=Oswald:wght@600;700&family=Peddana&family=Poppins:wght@700;800&family=Ramabhadra&family=Roboto:wght@700;900&family=Suranna&display=swap" rel="stylesheet">
 </svelte:head>
 
 {#if authChecking}
@@ -242,7 +259,7 @@
             <h1 class="text-sm sm:text-base font-black tracking-wide text-white font-['Ramabhadra']">
               PICTURE NEWS CARD STUDIO PRO
             </h1>
-            <p class="text-[10px] text-slate-400">స్మార్ట్ QR కోడ్ & అడ్వాన్స్‌డ్ టైపోగ్రఫీ ఎడిటర్ • JPEG మొబైల్ డౌన్‌లోడ్</p>
+            <p class="text-[10px] text-slate-400">అడ్వాన్స్‌డ్ టైపోగ్రఫీ ఎడిటర్ • హెచ్‌డీ JPEG మొబైల్ డౌన్‌లోడ్</p>
           </div>
         </div>
 
@@ -262,7 +279,7 @@
       <!-- LEFT SIDE: CONTROLS & STUDIO PANEL (5 Columns) -->
       <section class="lg:col-span-5 bg-[#131b2e] border border-slate-800 rounded-3xl p-5 shadow-2xl space-y-5">
         
-        <!-- 1. AUTO LINK FROM PUBLISHED MAIN NEWS -->
+        <!-- 1. AUTO LINK FROM MAIN NEWS -->
         <div class="bg-slate-900/90 border border-amber-500/40 p-3.5 rounded-2xl space-y-2">
           <div class="flex items-center justify-between">
             <label class="block text-xs font-black text-amber-400 uppercase tracking-wide flex items-center gap-1.5">
@@ -348,43 +365,54 @@
           </div>
         </div>
 
-        <!-- 4. ADVANCED TYPOGRAPHY & COLOR PICKER CONTROLS -->
+        <!-- 4. ADVANCED TYPOGRAPHY & FONT SELECTION -->
         <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 space-y-3.5 text-xs">
           <span class="font-black text-amber-400 block border-b border-slate-800 pb-1.5">
-            🎨 ఫాంట్, సైజు & రంగుల కంట్రోల్స్ (Custom Typography)
+            🎨 ఫాంట్, సైజు & రంగుల కంట్రోల్స్ (Font & Sizing)
           </span>
 
-          <!-- Telugu Font Family Selector -->
+          <!-- Telugu & English Font Family Selector -->
           <div>
-            <label class="block font-bold text-slate-400 mb-1">తెలుగు ఫాంట్ శైలి (Font Selection)</label>
+            <label class="block font-bold text-slate-400 mb-1">ఫాంట్ ఎంపిక (Telugu & English Fonts)</label>
             <select
               bind:value={selectedFont}
-              class="w-full bg-slate-950 border border-slate-700 text-white text-xs font-bold p-2 rounded-xl"
+              class="w-full bg-slate-950 border border-slate-700 text-white text-xs font-bold p-2.5 rounded-xl"
             >
-              <option value="'Ramabhadra', sans-serif">రామభద్ర (Ramabhadra - ముదురు హెడ్‌లైన్లకు బెస్ట్)</option>
-              <option value="'Noto Sans Telugu', sans-serif">నోటో సాన్స్ తెలుగు (Noto Sans - క్లియర్ & మోడ్రన్)</option>
-              <option value="'Suranna', serif">సూరన్న (Suranna - క్లాసిక్ పత్రిక ఫాంట్)</option>
-              <option value="'Gidugu', sans-serif">గిడుగు (Gidugu - రౌండెడ్ స్టైలిష్)</option>
-              <option value="'Tenali Ramakrishna', sans-serif">తెనాలి రామకృష్ణ (Tenali Ramakrishna)</option>
+              <optgroup label="తెలుగు ఫాంట్లు (Telugu Fonts)">
+                <option value="'Ramabhadra', sans-serif">రామభద్ర (Ramabhadra - ప్రముఖ బోల్డ్ న్యూస్ ఫాంట్)</option>
+                <option value="'Noto Sans Telugu', sans-serif">నోటో సాన్స్ (Noto Sans - మోడ్రన్ & స్పష్టమైనది)</option>
+                <option value="'Suranna', serif">సూరన్న (Suranna - క్లాసిక్ పత్రిక ఫాంట్)</option>
+                <option value="'Gidugu', sans-serif">గిడుగు (Gidugu - స్టైలిష్ రౌండెడ్)</option>
+                <option value="'Mandali', sans-serif">మండలి (Mandali - క్లీన్ రీడింగ్)</option>
+                <option value="'Dhurjati', sans-serif">ధూర్జటి (Dhurjati - సాంప్రదాయక)</option>
+                <option value="'Peddana', serif">పెద్దన (Peddana - అధికారిక లుక్)</option>
+              </optgroup>
+              <optgroup label="ఇంగ్లీష్ ఫాంట్లు (English & Display)">
+                <option value="'Montserrat', sans-serif">Montserrat (Ultra Bold & Premium)</option>
+                <option value="'Oswald', sans-serif">Oswald (Tall & Breaking News Style)</option>
+                <option value="'Bebas Neue', sans-serif">Bebas Neue (Impact Headline)</option>
+                <option value="'Poppins', sans-serif">Poppins (Modern Clean)</option>
+                <option value="'Roboto', sans-serif">Roboto (Universal Clear)</option>
+              </optgroup>
             </select>
           </div>
 
-          <!-- Font Size Adjusters -->
+          <!-- Font Size Adjusters (Headline up to 36px, Body up to 26px) -->
           <div class="grid grid-cols-2 gap-3">
             <div>
               <div class="flex justify-between text-slate-400 font-bold mb-1">
                 <span>శీర్షిక సైజు</span>
-                <span class="text-white font-mono">{headlineFontSize}px</span>
+                <span class="text-amber-400 font-mono font-black">{headlineFontSize}px</span>
               </div>
-              <input type="range" min="14" max="28" bind:value={headlineFontSize} class="w-full accent-red-600 cursor-pointer" />
+              <input type="range" min="18" max="36" bind:value={headlineFontSize} class="w-full accent-red-600 cursor-pointer" />
             </div>
 
             <div>
               <div class="flex justify-between text-slate-400 font-bold mb-1">
                 <span>సారాంశం సైజు</span>
-                <span class="text-white font-mono">{summaryFontSize}px</span>
+                <span class="text-blue-400 font-mono font-black">{summaryFontSize}px</span>
               </div>
-              <input type="range" min="9" max="18" bind:value={summaryFontSize} class="w-full accent-blue-600 cursor-pointer" />
+              <input type="range" min="12" max="26" bind:value={summaryFontSize} class="w-full accent-blue-600 cursor-pointer" />
             </div>
           </div>
 
@@ -424,36 +452,94 @@
           </div>
         </div>
 
-        <!-- 5. PHOTO UPLOADS -->
-        <div class="grid grid-cols-2 gap-3">
-          <div class="border-2 border-dashed border-slate-700 bg-slate-900/60 p-3 rounded-2xl text-center">
-            <input type="file" id="main-photo-in" accept="image/*" on:change={handleMainPhoto} class="hidden" />
-            <label for="main-photo-in" class="cursor-pointer block">
-              <span class="text-xl block">📷</span>
-              <span class="text-xs font-bold text-slate-200 block">ప్రధాన ఫోటో మార్చండి</span>
-            </label>
+        <!-- 5. IMAGE CONTROLS (FOCUS & HEIGHT ADJUSTMENT) -->
+        <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 space-y-3 text-xs">
+          <span class="font-black text-amber-400 block border-b border-slate-800 pb-1.5">
+            🖼️ ఫోటో ఫోకస్ & పరిమాణం (Image Adjustment)
+          </span>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block font-bold text-slate-400 mb-1">ఫోటో ఫోకస్ (Position)</label>
+              <select bind:value={imagePosition} class="w-full bg-slate-950 border border-slate-700 text-white text-xs font-bold p-2 rounded-xl">
+                <option value="center">సెంటర్ (Center Focus)</option>
+                <option value="top">పైభాగం (Top - ముఖాలు కట్ కాకుండా)</option>
+                <option value="bottom">క్రింది భాగం (Bottom Focus)</option>
+              </select>
+            </div>
+
+            <div>
+              <div class="flex justify-between text-slate-400 font-bold mb-1">
+                <span>ఫోటో ఎత్తు (%)</span>
+                <span class="text-white font-mono">{photoHeightPercent}%</span>
+              </div>
+              <input type="range" min="35" max="60" bind:value={photoHeightPercent} class="w-full accent-amber-500 cursor-pointer" />
+            </div>
           </div>
 
-          <div class="border-2 border-dashed border-slate-700 bg-slate-900/60 p-3 rounded-2xl text-center">
-            <input type="file" id="inset-photo-in" accept="image/*" on:change={handleInsetPhoto} class="hidden" />
-            <label for="inset-photo-in" class="cursor-pointer block">
-              <span class="text-xl block">👤</span>
-              <span class="text-xs font-bold text-slate-200 block">సర్కిల్ లీడర్ ఫోటో</span>
-            </label>
+          <!-- Photo Pickers -->
+          <div class="grid grid-cols-2 gap-3 pt-1">
+            <div class="border-2 border-dashed border-slate-700 bg-slate-950 p-3 rounded-2xl text-center">
+              <input type="file" id="main-photo-in" accept="image/*" on:change={handleMainPhoto} class="hidden" />
+              <label for="main-photo-in" class="cursor-pointer block">
+                <span class="text-xl block">📷</span>
+                <span class="text-xs font-bold text-slate-200 block">ప్రధాన ఫోటో మార్చండి</span>
+              </label>
+            </div>
+
+            <div class="border-2 border-dashed border-slate-700 bg-slate-950 p-3 rounded-2xl text-center">
+              <input type="file" id="inset-photo-in" accept="image/*" on:change={handleInsetPhoto} class="hidden" />
+              <label for="inset-photo-in" class="cursor-pointer block">
+                <span class="text-xl block">👤</span>
+                <span class="text-xs font-bold text-slate-200 block">సర్కిల్ లీడర్ ఫోటో</span>
+              </label>
+            </div>
           </div>
         </div>
 
-        <!-- 6. TEXT INPUTS & SMART QR TOGGLE -->
+        <!-- 6. INBUILT COMBO BOXES & TEXT INPUTS -->
         <div class="space-y-3 text-xs">
-          <div class="grid grid-cols-2 gap-2">
-            <div>
-              <label class="block font-bold text-slate-400 mb-1">కేటగిరీ బ్యాడ్జ్</label>
-              <input type="text" bind:value={badgeText} class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold" />
-            </div>
-            <div>
-              <label class="block font-bold text-slate-400 mb-1">ఊరు / లొకేషన్</label>
-              <input type="text" bind:value={locationTag} class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold" />
-            </div>
+          
+          <!-- Category Combo Box -->
+          <div>
+            <label class="block font-bold text-slate-400 mb-1">వార్త కేటగిరీ (Inbuilt Category Combo Box)</label>
+            <select
+              bind:value={selectedCategoryChoice}
+              class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold"
+            >
+              {#each categoryOptions as cat}
+                <option value={cat}>{cat}</option>
+              {/each}
+            </select>
+            {#if selectedCategoryChoice === 'కస్టమ్ (Custom)'}
+              <input
+                type="text"
+                bind:value={customCategoryText}
+                placeholder="మీ సొంత కేటగిరీ టైప్ చేయండి..."
+                class="w-full mt-2 bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-white font-bold"
+              />
+            {/if}
+          </div>
+
+          <!-- Location Combo Box (Default: న్యూస్ డెస్క్) -->
+          <div>
+            <label class="block font-bold text-slate-400 mb-1">లొకేషన్ / విలేఖరి (Default: న్యూస్ డెస్క్)</label>
+            <select
+              bind:value={selectedLocationChoice}
+              class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold"
+            >
+              {#each locationOptions as loc}
+                <option value={loc}>{loc}</option>
+              {/each}
+            </select>
+            {#if selectedLocationChoice === 'కస్టమ్ (Custom)'}
+              <input
+                type="text"
+                bind:value={customLocationText}
+                placeholder="మీ ఊరు / లొకేషన్ టైప్ చేయండి..."
+                class="w-full mt-2 bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-white font-bold"
+              />
+            {/if}
           </div>
 
           <div>
@@ -467,34 +553,14 @@
           </div>
 
           <div>
-            <label class="block font-bold text-slate-400 mb-1">సారాంశం (Summary Points) *</label>
+            <label class="block font-bold text-slate-400 mb-1">సారాంశం (Summary Points - కార్డ్ బాటమ్ వరకు వస్తుంది) *</label>
             <textarea
               bind:value={summary}
-              rows="3"
+              rows="4"
               class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white text-xs leading-relaxed"
             ></textarea>
           </div>
 
-          <!-- Smart QR Code Config -->
-          <div class="bg-slate-900 p-3 rounded-2xl border border-slate-800 space-y-2">
-            <div class="flex items-center justify-between">
-              <label class="flex items-center gap-2 cursor-pointer font-bold text-slate-300">
-                <input type="checkbox" bind:checked={showQrCode} class="w-4 h-4 text-red-600 rounded" />
-                <span>🏁 స్మార్ట్ QR కోడ్ ఆన్ చేయండి (Scan for Full News)</span>
-              </label>
-            </div>
-            {#if showQrCode}
-              <div>
-                <label class="block text-[10px] text-slate-400 mb-1">QR కోడ్ స్కాన్ చేయగానే ఓపెన్ అయ్యే వెబ్‌సైట్ లింక్:</label>
-                <input
-                  type="text"
-                  bind:value={targetNewsUrl}
-                  placeholder="https://www.nexlifynucleus.in/news/..."
-                  class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-white text-xs font-mono"
-                />
-              </div>
-            {/if}
-          </div>
         </div>
 
         <!-- 7. MOBILE OPTIMIZED JPEG DOWNLOAD & SHARE BUTTONS -->
@@ -525,10 +591,10 @@
         
         <div class="w-full mb-3 flex items-center justify-between text-xs text-slate-400 px-2 font-bold">
           <span>🔍 లైవ్ కార్డు ప్రివ్యూ ({ratioConfigs[selectedRatio].label})</span>
-          <span class="text-amber-400">JPEG మోడ్ • 100% ఆటో-ఫిట్</span>
+          <span class="text-amber-400">JPEG మోడ్ • బాటమ్ ఫిల్ లేఅవుట్</span>
         </div>
 
-        <!-- CARD RENDER CONTAINER -->
+        <!-- CARD RENDER CONTAINER (No Scanner, 100% Bottom Fit) -->
         <div class="overflow-hidden p-2 flex items-center justify-center w-full">
           
           <div
@@ -542,13 +608,16 @@
             "
           >
 
-            <!-- 1. TOP PHOTO CONTAINER -->
-            <div class="relative w-full overflow-hidden bg-black flex-shrink-0" style="height: {selectedRatio === '1:1' ? '50%' : selectedRatio === '4:5' ? '46%' : selectedRatio === '9:16' ? '42%' : '52%'};">
+            <!-- 1. TOP PHOTO CONTAINER (Focused & Adjustable Height) -->
+            <div
+              class="relative w-full overflow-hidden bg-black flex-shrink-0"
+              style="height: {photoHeightPercent}%;"
+            >
               <img
                 src={mainPhotoPreview}
                 alt="News Feature"
                 crossorigin="anonymous"
-                class="w-full h-full object-cover"
+                style="width: 100%; height: 100%; object-fit: cover; object-position: {imagePosition};"
               />
 
               <!-- Top Branding Strip -->
@@ -571,51 +640,46 @@
               {/if}
             </div>
 
-            <!-- 2. HEADLINE TITLE BAND -->
+            <!-- 2. HEADLINE TITLE BAND (Font Size up to 33px+) -->
             <div
-              class="px-3.5 py-2.5 shadow-md flex-shrink-0"
+              class="px-4 py-2.5 shadow-md flex-shrink-0"
               style="background-color: {headlineBgColor};"
             >
               <h2
                 class="font-black leading-snug tracking-tight m-0 text-center"
-                style="color: {headlineColor}; font-size: {headlineFontSize}px; font-family: {selectedFont};"
+                style="
+                  color: {headlineColor};
+                  font-size: {headlineFontSize}px;
+                  font-family: {selectedFont};
+                "
               >
                 {headline}
               </h2>
             </div>
 
-            <!-- 3. SUMMARY BODY & SMART QR SECTION -->
-            <div class="flex-1 p-3.5 flex flex-col justify-between overflow-hidden" style="background-color: {cardBgColor};">
+            <!-- 3. SUMMARY BODY (Full Width & Expands to Bottom) -->
+            <div
+              class="flex-1 px-4 py-3 flex flex-col justify-between overflow-hidden"
+              style="background-color: {cardBgColor};"
+            >
               
-              <div class="flex items-start gap-3">
-                <!-- Summary Text -->
-                <div
-                  class="flex-1 leading-relaxed font-medium whitespace-pre-line line-clamp-4"
-                  style="color: {summaryColor}; font-size: {summaryFontSize}px; font-family: 'Noto Sans Telugu', sans-serif;"
-                >
-                  {summary}
-                </div>
-
-                <!-- SMART QR CODE (Scan for Full News) -->
-                {#if showQrCode}
-                  <div class="flex-shrink-0 bg-white p-1.5 rounded-xl border border-slate-200 text-center shadow-md">
-                    <img
-                      src={qrImageUrl}
-                      alt="Scan QR"
-                      crossorigin="anonymous"
-                      class="w-16 h-16 object-contain block mx-auto"
-                    />
-                    <span class="text-[8px] font-black text-slate-900 block mt-0.5 tracking-tighter">
-                      స్కాన్ చేయండి
-                    </span>
-                  </div>
-                {/if}
+              <!-- Full Summary Paragraph (No Scanner Blocking) -->
+              <div
+                class="leading-relaxed font-semibold whitespace-pre-line"
+                style="
+                  color: {summaryColor};
+                  font-size: {summaryFontSize}px;
+                  font-family: {selectedFont};
+                  line-height: 1.45;
+                "
+              >
+                {summary}
               </div>
 
-              <!-- 4. BOTTOM BRANDING FOOTER -->
-              <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] font-bold text-slate-400">
+              <!-- 4. BOTTOM BRANDING FOOTER (Anchored at very bottom) -->
+              <div class="pt-2 mt-auto border-t border-slate-800/80 flex items-center justify-between text-[11px] font-bold text-slate-400 flex-shrink-0">
                 <span class="tracking-wide text-white font-mono">WWW.NEXLIFYNUCLEUS.IN</span>
-                <span class="bg-red-600/30 text-red-300 border border-red-500/40 px-2 py-0.5 rounded text-[9px]">
+                <span class="bg-red-600/30 text-red-300 border border-red-500/40 px-2.5 py-0.5 rounded text-[10px] font-semibold">
                   📍 {locationTag} • @nexlifynews
                 </span>
               </div>
