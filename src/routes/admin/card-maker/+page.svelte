@@ -5,26 +5,50 @@
 
   let authChecking = true;
 
-  // 1. Template & Ratio State
-  let selectedTemplate = 'jwala'; // 'jwala', 'ratna', 'darshini', 'vigyan', 'champion'
-  let selectedRatio = '1:1';     // '1:1' (Square - WhatsApp/FB/X), '9:16' (Story/Reels/Status)
+  // 1. Published News Articles (For 1-Click Linking)
+  let publishedArticles = [];
+  let selectedArticleId = '';
+  let loadingArticles = false;
 
-  // 2. Content Inputs
+  // 2. Aspect Ratios & Card Dimensions
+  let selectedRatio = '1:1'; // '1:1', '4:5', '9:16', '16:9'
+  const ratioConfigs = {
+    '1:1': { width: 480, height: 480, label: '1:1 Square (WhatsApp / FB / X)' },
+    '4:5': { width: 440, height: 550, label: '4:5 Portrait (Instagram Feed)' },
+    '9:16': { width: 380, height: 640, label: '9:16 Vertical (Status / Reels)' },
+    '16:9': { width: 560, height: 315, label: '16:9 Wide (YouTube / Web)' }
+  };
+
+  // 3. Brand Templates
+  let selectedTemplate = 'jwala'; // 'jwala', 'ratna', 'darshini', 'vigyan', 'champion'
+
+  // 4. Content State
   let badgeText = 'తాజా వార్త';
   let locationTag = 'ముత్తారం';
   let headline = 'కొత్త పింఛన్లపై మరో గుడ్‌న్యూస్.. మళ్లీ గడువు పెంచిన ప్రభుత్వం!';
   let summary = `• అర్హులైన లబ్ధిదారులకు దరఖాస్తు చేసుకోవడానికి ప్రభుత్వం మరో అవకాశం కల్పించింది.
 • గ్రామ పంచాయతీ మరియు మున్సిపల్ కార్యాలయాల్లో ప్రత్యేక హెల్ప్‌డెస్క్‌లు ఏర్పాటు.
 • దరఖాస్తుదారులు ఆధార్, రేషన్ కార్డు మరియు బ్యాంక్ వివరాలతో సంప్రదించాలి.`;
-  let highlightNumber = '₹50,000';
-  let highlightLabel = 'ఫిక్స్‌డ్ డిపాజిట్ సహాయం';
-  let websiteUrl = 'www.nexlifynucleus.in';
+  let targetNewsUrl = 'https://www.nexlifynucleus.in';
+  let showQrCode = true;
 
-  // 3. Photo Uploads
+  // 5. Typography & Color Controls
+  let selectedFont = "'Ramabhadra', sans-serif";
+  let headlineFontSize = 18; // in px
+  let summaryFontSize = 12;  // in px
+  let headlineColor = '#facc15';      // Bright Yellow
+  let headlineBgColor = '#000000';    // Black
+  let summaryColor = '#f1f5f9';       // Slate Light
+  let cardBgColor = '#090d16';        // Pitch Dark
+
+  // 6. Photo Uploads
   let mainPhotoPreview = 'https://images.unsplash.com/photo-1577495508048-b635879837f1?w=800&auto=format&fit=crop&q=80';
   let insetPhotoPreview = null;
   let showInsetCircle = false;
   let isGenerating = false;
+
+  // Computed QR Code Image URL (Using high-reliability dynamic QR API)
+  $: qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&margin=4&data=${encodeURIComponent(targetNewsUrl)}`;
 
   onMount(async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -33,9 +57,61 @@
       return;
     }
     authChecking = false;
+    await fetchPublishedArticles();
   });
 
-  // Handle Main Photo Pick
+  // Fetch News from Supabase for 1-Click Linking
+  async function fetchPublishedArticles() {
+    loadingArticles = true;
+    try {
+      let { data } = await supabase
+        .from('news_articles')
+        .select('id, headline, title, content, location_town, image_url')
+        .order('id', { ascending: false })
+        .limit(25);
+
+      if (!data || data.length === 0) {
+        const res = await supabase.from('news').select('id, title, headline, content, location_town, image_url').order('id', { ascending: false }).limit(25);
+        data = res.data;
+      }
+      publishedArticles = data || [];
+    } catch (e) {
+      console.error('Fetch articles error:', e);
+    } finally {
+      loadingArticles = false;
+    }
+  }
+
+  // 1-Click Auto Fill from Main News Article
+  function applyArticleToCard() {
+    const art = publishedArticles.find(a => String(a.id) === String(selectedArticleId));
+    if (!art) return;
+
+    headline = art.headline || art.title || headline;
+    locationTag = art.location_town || locationTag;
+    if (art.image_url) {
+      mainPhotoPreview = art.image_url;
+    }
+
+    // Auto extract first 3 concise lines from content
+    if (art.content) {
+      const cleanLines = art.content
+        .split('\n')
+        .map(l => l.trim())
+        .filter(l => l.length > 15)
+        .slice(0, 3)
+        .map(l => l.startsWith('•') ? l : `• ${l}`);
+      
+      if (cleanLines.length > 0) {
+        summary = cleanLines.join('\n');
+      }
+    }
+
+    // Connect Smart QR code directly to this published news
+    targetNewsUrl = `https://www.nexlifynucleus.in/news/${art.id}`;
+    showQrCode = true;
+  }
+
   function handleMainPhoto(e) {
     const input = e.target;
     if (input.files && input.files[0]) {
@@ -43,7 +119,6 @@
     }
   }
 
-  // Handle Inset Circle Photo Pick (Leader Face)
   function handleInsetPhoto(e) {
     const input = e.target;
     if (input.files && input.files[0]) {
@@ -52,7 +127,7 @@
     }
   }
 
-  // Load html-to-image library dynamically
+  // Load html-to-image library
   async function loadHtmlToImage() {
     if (typeof window === 'undefined') return null;
     if (window.htmlToImage) return window.htmlToImage;
@@ -60,69 +135,114 @@
       const script = document.createElement('script');
       script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js';
       script.onload = () => resolve(window.htmlToImage);
-      script.onerror = () => reject(new Error('html-to-image library load avaledu'));
+      script.onerror = () => reject(new Error('html-to-image లోడ్ కాలేదు'));
       document.head.appendChild(script);
     });
   }
 
-  // 1-Click HD PNG Download
-  async function downloadCardAsPng() {
+  // Mobile-Optimized High Quality JPEG Download Engine with Web Share API
+  async function downloadCardAsJpeg() {
     if (isGenerating) return;
     isGenerating = true;
 
     try {
       const node = document.getElementById('card-render-stage');
-      if (!node) throw new Error('Card element kanipinchaledu');
+      if (!node) throw new Error('కార్డ్ ఎలిమెంట్ కనుగొనబడలేదు');
 
       const hti = await loadHtmlToImage();
-      const dataUrl = await hti.toPng(node, {
-        quality: 1.0,
-        pixelRatio: 3.0, // High Definition (HD) Ultra Clarity
-        backgroundColor: '#000000'
+      
+      // Generate clean, mobile-compatible JPEG with 95% quality and 2.5x pixel ratio
+      const dataUrl = await hti.toJpeg(node, {
+        quality: 0.95,
+        pixelRatio: 2.5,
+        backgroundColor: cardBgColor || '#000000'
       });
 
-      const link = document.createElement('a');
-      const cleanTitle = headline.substring(0, 15).replace(/[^a-zA-Z0-9\u0C00-\u0C7F]/g, '_');
-      link.download = `NS_News_Card_${cleanTitle}_${Date.now()}.png`;
-      link.href = dataUrl;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      // Convert dataUrl to Blob for robust mobile compatibility
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const fileName = `NS_News_Card_${Date.now()}.jpg`;
+      const file = new File([blob], fileName, { type: 'image/jpeg' });
+
+      // If mobile supports native Web Share API with files, trigger native system sheet
+      if (typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: headline,
+          text: `${headline}\n\nపూర్తి కథనం: ${targetNewsUrl}`
+        });
+      } else {
+        // Fallback: standard browser download
+        const link = document.createElement('a');
+        link.download = fileName;
+        link.href = URL.createObjectURL(blob);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
     } catch (err) {
-      alert('Card download error: ' + err.message);
+      alert('కార్డ్ డౌన్‌లోడ్ లోపం: ' + err.message);
     } finally {
       isGenerating = false;
     }
   }
 
-  // 1-Click WhatsApp Share
-  function shareOnWhatsApp() {
-    const text = `*${headline}*\n\n📍 ${locationTag} | NS News Network\n\nతాజా పూర్తి వివరాలు చదవండి:\n👉 https://${websiteUrl}\n\n_NS News & A.S.V. Digital Express_`;
+  function shareDirectWhatsApp() {
+    const text = `*${headline}*\n\n📍 ${locationTag} | NS News Network\n\nపూర్తి వివరాలు చదవండి:\n👉 ${targetNewsUrl}\n\n_A.S.V. Enterprises & NS Media_`;
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+  }
+
+  // Preset Template Styles Auto-Setter
+  function applyPresetStyle(style) {
+    selectedTemplate = style;
+    if (style === 'jwala') {
+      headlineColor = '#facc15';
+      headlineBgColor = '#000000';
+      summaryColor = '#f1f5f9';
+      cardBgColor = '#090d16';
+    } else if (style === 'ratna') {
+      headlineColor = '#ffffff';
+      headlineBgColor = '#dc2626';
+      summaryColor = '#ffffff';
+      cardBgColor = '#0f172a';
+    } else if (style === 'darshini') {
+      headlineColor = '#0f172a';
+      headlineBgColor = '#facc15';
+      summaryColor = '#ffffff';
+      cardBgColor = '#1e3a8a';
+    } else if (style === 'vigyan') {
+      headlineColor = '#0f172a';
+      headlineBgColor = '#f1f5f9';
+      summaryColor = '#1e293b';
+      cardBgColor = '#ffffff';
+    }
   }
 </script>
 
 <svelte:head>
-  <title>NS News Picture Card Studio | Viral Social Media Creator</title>
+  <title>NS News Picture Card Studio | Advanced Pro Creator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Gidugu&family=Noto+Sans+Telugu:wght@400;600;700;800;900&family=Ramabhadra&family=Suranna&family=Tenali+Ramakrishna&display=swap" rel="stylesheet">
 </svelte:head>
 
 {#if authChecking}
-  <div class="min-h-screen bg-slate-950 flex items-center justify-center text-white font-sans">
+  <div class="min-h-screen bg-slate-950 flex items-center justify-center text-white">
     <div class="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
   </div>
 {:else}
-  <div class="min-h-screen bg-[#0f172a] font-sans pb-24 text-slate-100">
+  <div class="min-h-screen bg-[#090d16] font-sans pb-28 text-slate-100">
     
     <!-- Top Header -->
-    <header class="bg-[#090d16] text-white px-4 py-3 sticky top-0 z-40 border-b-2 border-red-600 shadow-xl">
+    <header class="bg-[#050811] text-white px-4 py-3 sticky top-0 z-40 border-b-2 border-red-600 shadow-2xl">
       <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-2.5">
           <span class="bg-red-600 text-white font-black text-xs px-2.5 py-1 rounded-lg shadow">NS</span>
           <div>
             <h1 class="text-sm sm:text-base font-black tracking-wide text-white font-['Ramabhadra']">
-              PICTURE NEWS CARD STUDIO
+              PICTURE NEWS CARD STUDIO PRO
             </h1>
-            <p class="text-[10px] text-slate-400">వైరల్ సోషల్ మీడియా న్యూస్ కార్డ్స్ మేకర్ • NS News Network</p>
+            <p class="text-[10px] text-slate-400">స్మార్ట్ QR కోడ్ & అడ్వాన్స్‌డ్ టైపోగ్రఫీ ఎడిటర్ • JPEG మొబైల్ డౌన్‌లోడ్</p>
           </div>
         </div>
 
@@ -139,113 +259,191 @@
 
     <main class="max-w-7xl mx-auto p-3 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
-      <!-- LEFT SIDE: INPUT CONTROLS PANEL (5 Columns) -->
-      <section class="lg:col-span-5 bg-[#1e293b] border border-slate-700 rounded-3xl p-5 sm:p-6 shadow-xl space-y-5">
+      <!-- LEFT SIDE: CONTROLS & STUDIO PANEL (5 Columns) -->
+      <section class="lg:col-span-5 bg-[#131b2e] border border-slate-800 rounded-3xl p-5 shadow-2xl space-y-5">
         
-        <!-- 1. Template Selector (5 Brand Styles) -->
-        <div>
-          <label class="block text-xs font-black text-amber-400 uppercase tracking-wider mb-2">
-            1. టెంప్లేట్ ఎంపిక (Brand Style)
-          </label>
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs font-bold">
-            <button
-              type="button"
-              on:click={() => selectedTemplate = 'jwala'}
-              class="p-2.5 rounded-xl border text-left transition {selectedTemplate === 'jwala' ? 'bg-amber-500 text-black border-amber-400 font-black shadow-lg scale-102' : 'bg-slate-800 text-slate-300 border-slate-700'}"
+        <!-- 1. AUTO LINK FROM PUBLISHED MAIN NEWS -->
+        <div class="bg-slate-900/90 border border-amber-500/40 p-3.5 rounded-2xl space-y-2">
+          <div class="flex items-center justify-between">
+            <label class="block text-xs font-black text-amber-400 uppercase tracking-wide flex items-center gap-1.5">
+              <span>🔗</span> <span>మెయిన్ న్యూస్‌తో లింక్ చేయండి (1-Click Auto Fill)</span>
+            </label>
+            <span class="text-[10px] text-slate-400">{publishedArticles.length} వార్తలు</span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <select
+              bind:value={selectedArticleId}
+              class="w-full bg-slate-950 border border-slate-700 text-white text-xs font-bold p-2 rounded-xl focus:outline-none"
             >
-              <span class="block text-base">🔥</span>
-              <span>NS జ్వాల</span>
-              <p class="text-[9px] opacity-75 font-normal">TV9 డార్క్ & ఎల్లో</p>
-            </button>
+              <option value="">-- వెబ్‌సైట్ వార్తను ఎంచుకోండి --</option>
+              {#each publishedArticles as a}
+                <option value={a.id}>#{a.id} • {a.headline || a.title}</option>
+              {/each}
+            </select>
 
             <button
               type="button"
-              on:click={() => selectedTemplate = 'ratna'}
-              class="p-2.5 rounded-xl border text-left transition {selectedTemplate === 'ratna' ? 'bg-red-600 text-white border-red-500 font-black shadow-lg scale-102' : 'bg-slate-800 text-slate-300 border-slate-700'}"
+              on:click={applyArticleToCard}
+              disabled={!selectedArticleId}
+              class="bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-slate-950 text-xs font-black px-3.5 py-2 rounded-xl shadow shrink-0 cursor-pointer"
             >
-              <span class="block text-base">💎</span>
-              <span>NS రత్న</span>
-              <p class="text-[9px] opacity-75 font-normal">ఈనాడు రెడ్ & నేవీ</p>
-            </button>
-
-            <button
-              type="button"
-              on:click={() => selectedTemplate = 'darshini'}
-              class="p-2.5 rounded-xl border text-left transition {selectedTemplate === 'darshini' ? 'bg-blue-600 text-white border-blue-400 font-black shadow-lg scale-102' : 'bg-slate-800 text-slate-300 border-slate-700'}"
-            >
-              <span class="block text-base">🌟</span>
-              <span>NS దర్శిని</span>
-              <p class="text-[9px] opacity-75 font-normal">ETV ఎల్లో & రాయల్ బ్లూ</p>
-            </button>
-
-            <button
-              type="button"
-              on:click={() => selectedTemplate = 'vigyan'}
-              class="p-2.5 rounded-xl border text-left transition {selectedTemplate === 'vigyan' ? 'bg-emerald-600 text-white border-emerald-400 font-black shadow-lg scale-102' : 'bg-slate-800 text-slate-300 border-slate-700'}"
-            >
-              <span class="block text-base">🏛️</span>
-              <span>NS విజ్ఞాన్</span>
-              <p class="text-[9px] opacity-75 font-normal">Govt / ఇన్ఫోగ్రాఫిక్</p>
-            </button>
-
-            <button
-              type="button"
-              on:click={() => selectedTemplate = 'champion'}
-              class="p-2.5 rounded-xl border text-left transition {selectedTemplate === 'champion' ? 'bg-purple-600 text-white border-purple-400 font-black shadow-lg scale-102' : 'bg-slate-800 text-slate-300 border-slate-700'}"
-            >
-              <span class="block text-base">🏆</span>
-              <span>NS ఛాంపియన్</span>
-              <p class="text-[9px] opacity-75 font-normal">స్పోర్ట్స్ / బిగ్ నంబర్స్</p>
+              ఆటో-ఫిల్
             </button>
           </div>
         </div>
 
-        <!-- 2. Aspect Ratio Selector -->
+        <!-- 2. CARD RATIO / SIZE SELECTION -->
         <div>
-          <label class="block text-xs font-black text-amber-400 uppercase tracking-wider mb-2">
-            2. కార్డ్ సైజు / నిష్పత్తి (Aspect Ratio)
+          <label class="block text-xs font-black text-slate-300 uppercase tracking-wider mb-2">
+            కార్డ్ సైజు / నిష్పత్తి (Card Size)
           </label>
-          <div class="grid grid-cols-2 gap-2 text-xs font-bold">
-            <button
-              type="button"
-              on:click={() => selectedRatio = '1:1'}
-              class="p-2 rounded-xl border transition flex items-center justify-center gap-2 {selectedRatio === '1:1' ? 'bg-white text-black border-white shadow' : 'bg-slate-800 text-slate-300 border-slate-700'}"
-            >
-              <span>⬛ 1:1 స్క్వేర్ (WhatsApp / FB / X)</span>
-            </button>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-bold">
+            {#each Object.keys(ratioConfigs) as ratioKey}
+              <button
+                type="button"
+                on:click={() => selectedRatio = ratioKey}
+                class="p-2 rounded-xl border text-center transition {selectedRatio === ratioKey ? 'bg-red-600 text-white border-red-500 font-black shadow-lg' : 'bg-slate-900 text-slate-400 border-slate-700'}"
+              >
+                {ratioKey}
+              </button>
+            {/each}
+          </div>
+        </div>
 
+        <!-- 3. BRAND PRESET TEMPLATES -->
+        <div>
+          <label class="block text-xs font-black text-slate-300 uppercase tracking-wider mb-2">
+            టెంప్లేట్ స్టైల్ (Brand Preset)
+          </label>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-bold">
             <button
               type="button"
-              on:click={() => selectedRatio = '9:16'}
-              class="p-2 rounded-xl border transition flex items-center justify-center gap-2 {selectedRatio === '9:16' ? 'bg-white text-black border-white shadow' : 'bg-slate-800 text-slate-300 border-slate-700'}"
+              on:click={() => applyPresetStyle('jwala')}
+              class="p-2 rounded-xl border text-center transition {selectedTemplate === 'jwala' ? 'bg-amber-500 text-black border-amber-400 font-black shadow' : 'bg-slate-900 text-slate-300 border-slate-700'}"
             >
-              <span>📱 9:16 వర్టికల్ (Status / Reels)</span>
+              🔥 NS జ్వాల
+            </button>
+            <button
+              type="button"
+              on:click={() => applyPresetStyle('ratna')}
+              class="p-2 rounded-xl border text-center transition {selectedTemplate === 'ratna' ? 'bg-red-600 text-white border-red-500 font-black shadow' : 'bg-slate-900 text-slate-300 border-slate-700'}"
+            >
+              💎 NS రత్న
+            </button>
+            <button
+              type="button"
+              on:click={() => applyPresetStyle('darshini')}
+              class="p-2 rounded-xl border text-center transition {selectedTemplate === 'darshini' ? 'bg-blue-600 text-white border-blue-400 font-black shadow' : 'bg-slate-900 text-slate-300 border-slate-700'}"
+            >
+              🌟 NS దర్శిని
+            </button>
+            <button
+              type="button"
+              on:click={() => applyPresetStyle('vigyan')}
+              class="p-2 rounded-xl border text-center transition {selectedTemplate === 'vigyan' ? 'bg-emerald-600 text-white border-emerald-400 font-black shadow' : 'bg-slate-900 text-slate-300 border-slate-700'}"
+            >
+              🏛️ NS విజ్ఞాన్
             </button>
           </div>
         </div>
 
-        <!-- 3. Photo Uploads -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div class="border-2 border-dashed border-slate-700 bg-slate-900/60 p-3 rounded-2xl text-center space-y-1">
-            <input type="file" id="main-pic" accept="image/*" on:change={handleMainPhoto} class="hidden" />
-            <label for="main-pic" class="cursor-pointer block">
+        <!-- 4. ADVANCED TYPOGRAPHY & COLOR PICKER CONTROLS -->
+        <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 space-y-3.5 text-xs">
+          <span class="font-black text-amber-400 block border-b border-slate-800 pb-1.5">
+            🎨 ఫాంట్, సైజు & రంగుల కంట్రోల్స్ (Custom Typography)
+          </span>
+
+          <!-- Telugu Font Family Selector -->
+          <div>
+            <label class="block font-bold text-slate-400 mb-1">తెలుగు ఫాంట్ శైలి (Font Selection)</label>
+            <select
+              bind:value={selectedFont}
+              class="w-full bg-slate-950 border border-slate-700 text-white text-xs font-bold p-2 rounded-xl"
+            >
+              <option value="'Ramabhadra', sans-serif">రామభద్ర (Ramabhadra - ముదురు హెడ్‌లైన్లకు బెస్ట్)</option>
+              <option value="'Noto Sans Telugu', sans-serif">నోటో సాన్స్ తెలుగు (Noto Sans - క్లియర్ & మోడ్రన్)</option>
+              <option value="'Suranna', serif">సూరన్న (Suranna - క్లాసిక్ పత్రిక ఫాంట్)</option>
+              <option value="'Gidugu', sans-serif">గిడుగు (Gidugu - రౌండెడ్ స్టైలిష్)</option>
+              <option value="'Tenali Ramakrishna', sans-serif">తెనాలి రామకృష్ణ (Tenali Ramakrishna)</option>
+            </select>
+          </div>
+
+          <!-- Font Size Adjusters -->
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <div class="flex justify-between text-slate-400 font-bold mb-1">
+                <span>శీర్షిక సైజు</span>
+                <span class="text-white font-mono">{headlineFontSize}px</span>
+              </div>
+              <input type="range" min="14" max="28" bind:value={headlineFontSize} class="w-full accent-red-600 cursor-pointer" />
+            </div>
+
+            <div>
+              <div class="flex justify-between text-slate-400 font-bold mb-1">
+                <span>సారాంశం సైజు</span>
+                <span class="text-white font-mono">{summaryFontSize}px</span>
+              </div>
+              <input type="range" min="9" max="18" bind:value={summaryFontSize} class="w-full accent-blue-600 cursor-pointer" />
+            </div>
+          </div>
+
+          <!-- Color Pickers Grid -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 font-bold text-[11px]">
+            <div>
+              <label class="block text-slate-400 mb-1">హెడ్‌లైన్ రంగు</label>
+              <div class="flex items-center gap-1.5 bg-slate-950 p-1.5 rounded-xl border border-slate-700">
+                <input type="color" bind:value={headlineColor} class="w-6 h-6 border-0 rounded cursor-pointer bg-transparent" />
+                <span class="font-mono text-[10px] uppercase text-white truncate">{headlineColor}</span>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-slate-400 mb-1">హెడ్‌లైన్ Bg</label>
+              <div class="flex items-center gap-1.5 bg-slate-950 p-1.5 rounded-xl border border-slate-700">
+                <input type="color" bind:value={headlineBgColor} class="w-6 h-6 border-0 rounded cursor-pointer bg-transparent" />
+                <span class="font-mono text-[10px] uppercase text-white truncate">{headlineBgColor}</span>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-slate-400 mb-1">సారాంశం రంగు</label>
+              <div class="flex items-center gap-1.5 bg-slate-950 p-1.5 rounded-xl border border-slate-700">
+                <input type="color" bind:value={summaryColor} class="w-6 h-6 border-0 rounded cursor-pointer bg-transparent" />
+                <span class="font-mono text-[10px] uppercase text-white truncate">{summaryColor}</span>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-slate-400 mb-1">కార్డ్ బ్యాక్‌గ్రౌండ్</label>
+              <div class="flex items-center gap-1.5 bg-slate-950 p-1.5 rounded-xl border border-slate-700">
+                <input type="color" bind:value={cardBgColor} class="w-6 h-6 border-0 rounded cursor-pointer bg-transparent" />
+                <span class="font-mono text-[10px] uppercase text-white truncate">{cardBgColor}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. PHOTO UPLOADS -->
+        <div class="grid grid-cols-2 gap-3">
+          <div class="border-2 border-dashed border-slate-700 bg-slate-900/60 p-3 rounded-2xl text-center">
+            <input type="file" id="main-photo-in" accept="image/*" on:change={handleMainPhoto} class="hidden" />
+            <label for="main-photo-in" class="cursor-pointer block">
               <span class="text-xl block">📷</span>
               <span class="text-xs font-bold text-slate-200 block">ప్రధాన ఫోటో మార్చండి</span>
-              <span class="text-[9px] text-slate-400">క్లిక్ చేసి ఫోటో ఎంచుకోండి</span>
             </label>
           </div>
 
-          <div class="border-2 border-dashed border-slate-700 bg-slate-900/60 p-3 rounded-2xl text-center space-y-1">
-            <input type="file" id="inset-pic" accept="image/*" on:change={handleInsetPhoto} class="hidden" />
-            <label for="inset-pic" class="cursor-pointer block">
+          <div class="border-2 border-dashed border-slate-700 bg-slate-900/60 p-3 rounded-2xl text-center">
+            <input type="file" id="inset-photo-in" accept="image/*" on:change={handleInsetPhoto} class="hidden" />
+            <label for="inset-photo-in" class="cursor-pointer block">
               <span class="text-xl block">👤</span>
-              <span class="text-xs font-bold text-slate-200 block">సర్కిల్ ఫోటో (లీడర్ ఫేస్)</span>
-              <span class="text-[9px] text-slate-400">ఈనాడు మోడల్ ఇన్‌సెట్</span>
+              <span class="text-xs font-bold text-slate-200 block">సర్కిల్ లీడర్ ఫోటో</span>
             </label>
           </div>
         </div>
 
-        <!-- 4. Text Information Form -->
+        <!-- 6. TEXT INPUTS & SMART QR TOGGLE -->
         <div class="space-y-3 text-xs">
           <div class="grid grid-cols-2 gap-2">
             <div>
@@ -253,59 +451,68 @@
               <input type="text" bind:value={badgeText} class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold" />
             </div>
             <div>
-              <label class="block font-bold text-slate-400 mb-1">లొకేషన్ / ఊరు</label>
+              <label class="block font-bold text-slate-400 mb-1">ఊరు / లొకేషన్</label>
               <input type="text" bind:value={locationTag} class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold" />
             </div>
           </div>
 
           <div>
-            <label class="block font-bold text-slate-400 mb-1">ప్రధాన బోల్డ్ హెడ్‌లైన్ (Catchy Punch Title) *</label>
+            <label class="block font-bold text-slate-400 mb-1">బోల్డ్ శీర్షిక (Headline) *</label>
             <textarea
               bind:value={headline}
               rows="2"
-              class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white font-black text-sm font-['Ramabhadra']"
+              class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white font-black text-sm"
+              style="font-family: {selectedFont};"
             ></textarea>
           </div>
 
           <div>
-            <label class="block font-bold text-slate-400 mb-1">సారాంశం (3-4 ముఖ్యమైన లైన్లు) *</label>
+            <label class="block font-bold text-slate-400 mb-1">సారాంశం (Summary Points) *</label>
             <textarea
               bind:value={summary}
-              rows="4"
+              rows="3"
               class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white text-xs leading-relaxed"
             ></textarea>
           </div>
 
-          {#if selectedTemplate === 'champion'}
-            <div class="grid grid-cols-2 gap-2 bg-slate-900 p-3 rounded-xl border border-slate-700">
-              <div>
-                <label class="block font-bold text-amber-400 mb-1">బిగ్ నంబర్ (అంకెలు)</label>
-                <input type="text" bind:value={highlightNumber} class="w-full bg-slate-800 border border-slate-600 rounded-lg p-1.5 text-amber-300 font-mono font-black" />
-              </div>
-              <div>
-                <label class="block font-bold text-slate-400 mb-1">నంబర్ వివరణ</label>
-                <input type="text" bind:value={highlightLabel} class="w-full bg-slate-800 border border-slate-600 rounded-lg p-1.5 text-white" />
-              </div>
+          <!-- Smart QR Code Config -->
+          <div class="bg-slate-900 p-3 rounded-2xl border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between">
+              <label class="flex items-center gap-2 cursor-pointer font-bold text-slate-300">
+                <input type="checkbox" bind:checked={showQrCode} class="w-4 h-4 text-red-600 rounded" />
+                <span>🏁 స్మార్ట్ QR కోడ్ ఆన్ చేయండి (Scan for Full News)</span>
+              </label>
             </div>
-          {/if}
+            {#if showQrCode}
+              <div>
+                <label class="block text-[10px] text-slate-400 mb-1">QR కోడ్ స్కాన్ చేయగానే ఓపెన్ అయ్యే వెబ్‌సైట్ లింక్:</label>
+                <input
+                  type="text"
+                  bind:value={targetNewsUrl}
+                  placeholder="https://www.nexlifynucleus.in/news/..."
+                  class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-white text-xs font-mono"
+                />
+              </div>
+            {/if}
+          </div>
         </div>
 
-        <!-- Action Export Buttons -->
+        <!-- 7. MOBILE OPTIMIZED JPEG DOWNLOAD & SHARE BUTTONS -->
         <div class="grid grid-cols-2 gap-3 pt-2">
           <button
             type="button"
-            on:click={downloadCardAsPng}
+            on:click={downloadCardAsJpeg}
             disabled={isGenerating}
-            class="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 disabled:opacity-50 text-white font-black py-3 rounded-2xl shadow-xl transition flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+            class="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 disabled:opacity-50 text-white font-black py-3.5 rounded-2xl shadow-xl transition flex items-center justify-center gap-2 cursor-pointer active:scale-95"
           >
-            <span>📸</span>
-            <span>{isGenerating ? 'సిద్ధమవుతోంది...' : 'HD PNG డౌన్‌లోడ్'}</span>
+            <span>🖼️</span>
+            <span>{isGenerating ? 'సిద్ధమవుతోంది...' : 'HD JPEG డౌన్‌లోడ్'}</span>
           </button>
 
           <button
             type="button"
-            on:click={shareOnWhatsApp}
-            class="bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3 rounded-2xl shadow-xl transition flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+            on:click={shareDirectWhatsApp}
+            class="bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3.5 rounded-2xl shadow-xl transition flex items-center justify-center gap-2 cursor-pointer active:scale-95"
           >
             <span>📲 WhatsApp షేర్</span>
           </button>
@@ -313,263 +520,112 @@
 
       </section>
 
-      <!-- RIGHT SIDE: LIVE INTERACTIVE PREVIEW CANVAS (7 Columns) -->
+      <!-- RIGHT SIDE: LIVE INTERACTIVE PREVIEW STAGE (7 Columns) -->
       <section class="lg:col-span-7 flex flex-col items-center justify-center">
-        <div class="w-full mb-2 flex items-center justify-between text-xs text-slate-400 px-2 font-bold">
-          <span>🔍 లైవ్ కార్డు ప్రివ్యూ ({selectedRatio})</span>
-          <span class="text-amber-400">స్టైల్: {selectedTemplate.toUpperCase()}</span>
+        
+        <div class="w-full mb-3 flex items-center justify-between text-xs text-slate-400 px-2 font-bold">
+          <span>🔍 లైవ్ కార్డు ప్రివ్యూ ({ratioConfigs[selectedRatio].label})</span>
+          <span class="text-amber-400">JPEG మోడ్ • 100% ఆటో-ఫిట్</span>
         </div>
 
-        <!-- RENDER STAGE (Captured by html-to-image) -->
-        <div class="overflow-hidden p-2 flex items-center justify-center">
+        <!-- CARD RENDER CONTAINER -->
+        <div class="overflow-hidden p-2 flex items-center justify-center w-full">
           
           <div
             id="card-render-stage"
-            class="relative overflow-hidden shadow-2xl flex flex-col justify-between font-sans select-none"
-            style="width: {selectedRatio === '1:1' ? '460px' : '380px'}; height: {selectedRatio === '1:1' ? '460px' : '620px'}; font-family: 'Noto Sans Telugu', sans-serif;"
+            class="relative overflow-hidden shadow-2xl flex flex-col justify-between select-none"
+            style="
+              width: {ratioConfigs[selectedRatio].width}px;
+              height: {ratioConfigs[selectedRatio].height}px;
+              background-color: {cardBgColor};
+              font-family: {selectedFont};
+            "
           >
 
-            <!-- ========================================================= -->
-            <!-- STYLE 1: NS JWALA (TV9 DARK, FIRE YELLOW & RED FOOTER) -->
-            <!-- ========================================================= -->
-            {#if selectedTemplate === 'jwala'}
-              <div class="w-full h-full bg-[#0a0a0c] flex flex-col justify-between text-white border border-slate-800">
-                
-                <!-- Top Image Half -->
-                <div class="relative w-full {selectedRatio === '1:1' ? 'h-[50%]' : 'h-[52%]'} overflow-hidden bg-black">
-                  <img src={mainPhotoPreview} alt="News" class="w-full h-full object-cover" />
-                  
-                  <!-- Top Bar: Logo & Badge -->
-                  <div class="absolute top-2 left-2 right-2 flex items-center justify-between">
-                    <div class="flex items-center gap-1.5 bg-black/80 backdrop-blur-sm px-2.5 py-1 rounded-md border border-red-600">
-                      <span class="bg-red-600 text-white font-black text-[10px] px-1.5 py-0.2 rounded shadow">NS</span>
-                      <span class="font-black text-xs text-white font-['Ramabhadra'] tracking-wide">NS NEWS</span>
-                    </div>
-                    <span class="bg-amber-500 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded shadow uppercase">
-                      {badgeText}
-                    </span>
-                  </div>
+            <!-- 1. TOP PHOTO CONTAINER -->
+            <div class="relative w-full overflow-hidden bg-black flex-shrink-0" style="height: {selectedRatio === '1:1' ? '50%' : selectedRatio === '4:5' ? '46%' : selectedRatio === '9:16' ? '42%' : '52%'};">
+              <img
+                src={mainPhotoPreview}
+                alt="News Feature"
+                crossorigin="anonymous"
+                class="w-full h-full object-cover"
+              />
 
-                  {#if showInsetCircle && insetPhotoPreview}
-                    <div class="absolute bottom-2 right-2 w-16 h-16 rounded-full border-2 border-amber-400 overflow-hidden shadow-2xl bg-black">
-                      <img src={insetPhotoPreview} alt="Leader" class="w-full h-full object-cover" />
-                    </div>
-                  {/if}
+              <!-- Top Branding Strip -->
+              <div class="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between z-10">
+                <div class="flex items-center gap-1.5 bg-black/85 backdrop-blur-sm px-2.5 py-1 rounded-lg border border-red-600/80 shadow-lg">
+                  <span class="bg-red-600 text-white font-black text-[10px] px-1.5 py-0.5 rounded shadow">NS</span>
+                  <span class="font-black text-xs text-white font-['Ramabhadra'] tracking-wide">NS NEWS</span>
                 </div>
 
-                <!-- Bottom Content: Black with Yellow Headline & White Text -->
-                <div class="flex-1 p-3.5 flex flex-col justify-between bg-gradient-to-b from-[#0e0e11] to-[#050507]">
-                  <div>
-                    <h2 class="text-amber-400 font-black text-base sm:text-[17px] leading-snug font-['Ramabhadra'] tracking-tight mb-2">
-                      {headline}
-                    </h2>
-                    <div class="text-slate-200 text-[11.5px] leading-relaxed line-clamp-4 font-medium whitespace-pre-line">
-                      {summary}
-                    </div>
-                  </div>
-
-                  <!-- TV9 Style Bottom Red Bar -->
-                  <div class="bg-red-600 text-white py-1.5 px-3 -mx-3.5 -mb-3.5 flex items-center justify-between font-black text-[10.5px]">
-                    <span class="tracking-wide">WWW.NEXLIFYNUCLEUS.IN</span>
-                    <span class="bg-black/30 px-2 py-0.5 rounded text-[9.5px]">📍 {locationTag}</span>
-                  </div>
-                </div>
-
+                <span class="bg-amber-500 text-slate-950 font-black text-[10px] px-2.5 py-0.5 rounded-full shadow-md uppercase tracking-wider">
+                  {badgeText}
+                </span>
               </div>
 
-            <!-- ========================================================= -->
-            <!-- STYLE 2: NS RATNA (EENADU RED TITLE BAND & NAVY BLUE BODY) -->
-            <!-- ========================================================= -->
-            {:else if selectedTemplate === 'ratna'}
-              <div class="w-full h-full bg-[#1e293b] flex flex-col justify-between text-white border border-slate-700">
-                
-                <!-- Top Image -->
-                <div class="relative w-full {selectedRatio === '1:1' ? 'h-[48%]' : 'h-[50%]'} overflow-hidden bg-black">
-                  <img src={mainPhotoPreview} alt="News" class="w-full h-full object-cover" />
-                  
-                  <!-- Top Logo -->
-                  <div class="absolute top-2 left-2 flex items-center gap-1.5 bg-black/80 px-2.5 py-1 rounded-md border border-red-500">
-                    <span class="bg-red-600 text-white font-black text-[10px] px-1.5 rounded">NS</span>
-                    <span class="font-black text-xs text-white font-['Ramabhadra']">NS NEWS</span>
-                  </div>
-
-                  {#if showInsetCircle && insetPhotoPreview}
-                    <div class="absolute bottom-2 right-2 w-16 h-16 rounded-full border-2 border-white overflow-hidden shadow-2xl bg-white">
-                      <img src={insetPhotoPreview} alt="Leader" class="w-full h-full object-cover" />
-                    </div>
-                  {/if}
+              <!-- Leader Face Inset Circle -->
+              {#if showInsetCircle && insetPhotoPreview}
+                <div class="absolute bottom-2.5 right-2.5 w-16 h-16 rounded-full border-2 border-white overflow-hidden shadow-2xl bg-white z-10">
+                  <img src={insetPhotoPreview} alt="Leader" class="w-full h-full object-cover" />
                 </div>
+              {/if}
+            </div>
 
-                <!-- Red Title Band (Eenadu Signature) -->
-                <div class="bg-[#dc2626] text-white px-3 py-2 text-center shadow-md">
-                  <h2 class="font-black text-sm sm:text-base leading-tight font-['Ramabhadra']">
-                    {headline}
-                  </h2>
-                </div>
+            <!-- 2. HEADLINE TITLE BAND -->
+            <div
+              class="px-3.5 py-2.5 shadow-md flex-shrink-0"
+              style="background-color: {headlineBgColor};"
+            >
+              <h2
+                class="font-black leading-snug tracking-tight m-0 text-center"
+                style="color: {headlineColor}; font-size: {headlineFontSize}px; font-family: {selectedFont};"
+              >
+                {headline}
+              </h2>
+            </div>
 
-                <!-- Navy Blue Content Area -->
-                <div class="flex-1 bg-[#0f172a] p-3 text-slate-100 text-xs leading-relaxed flex flex-col justify-between">
-                  <div class="whitespace-pre-line text-[11px] leading-relaxed line-clamp-4">
-                    {summary}
-                  </div>
-
-                  <!-- Footer -->
-                  <div class="border-t border-slate-800 pt-1.5 flex items-center justify-between text-[10px] text-slate-400 font-bold">
-                    <span>{websiteUrl}</span>
-                    <span>📍 {locationTag} • Follow: @nexlifynews</span>
-                  </div>
-                </div>
-
-              </div>
-
-            <!-- ========================================================= -->
-            <!-- STYLE 3: NS DARSHINI (ETV YELLOW BANNER & ROYAL BLUE BODY) -->
-            <!-- ========================================================= -->
-            {:else if selectedTemplate === 'darshini'}
-              <div class="w-full h-full bg-[#172554] flex flex-col justify-between text-white border border-slate-700">
-                
-                <!-- Top Image Area -->
-                <div class="relative w-full {selectedRatio === '1:1' ? 'h-[46%]' : 'h-[48%]'} overflow-hidden bg-black">
-                  <img src={mainPhotoPreview} alt="News" class="w-full h-full object-cover" />
-                  
-                  <div class="absolute top-2 right-2 bg-black/80 px-2 py-1 rounded-md border border-amber-400 flex items-center gap-1">
-                    <span class="bg-amber-400 text-black font-black text-[10px] px-1 rounded">ETV</span>
-                    <span class="text-white font-black text-[10px]">NS TELANGANA</span>
-                  </div>
-                </div>
-
-                <!-- Middle Bright Yellow Band (ETV Signature) -->
-                <div class="bg-[#facc15] text-slate-950 px-3 py-2 text-center shadow">
-                  <h2 class="font-black text-sm sm:text-base leading-tight font-['Ramabhadra']">
-                    {headline}
-                  </h2>
-                </div>
-
-                <!-- Deep Royal Blue Body -->
-                <div class="flex-1 bg-[#1e40af] p-3 text-white text-xs leading-relaxed flex flex-col justify-between">
-                  <div class="whitespace-pre-line text-[11px] leading-relaxed line-clamp-4 font-medium">
-                    {summary}
-                  </div>
-
-                  <div class="bg-[#172554] py-1 px-3 -mx-3 -mb-3 flex items-center justify-between text-[9.5px] font-bold text-slate-300">
-                    <span>Follow Us: YouTube • FB • Insta</span>
-                    <span>@nexlifynews</span>
-                  </div>
-                </div>
-
-              </div>
-
-            <!-- ========================================================= -->
-            <!-- STYLE 4: NS VIGYAN (GOVT / INFOGRAPHIC PASTEL STYLE) -->
-            <!-- ========================================================= -->
-            {:else if selectedTemplate === 'vigyan'}
-              <div class="w-full h-full bg-[#f8fafc] text-slate-900 flex flex-col justify-between border-2 border-slate-300 p-3">
-                
-                <!-- Top Official Bar -->
-                <div class="flex items-center justify-between border-b pb-2 border-slate-300">
-                  <div class="flex items-center gap-2">
-                    <span class="text-xl">🏛️</span>
-                    <div>
-                      <span class="text-[10px] font-bold text-slate-500 block">TELANGANA SPOTLIGHT</span>
-                      <span class="text-xs font-black text-slate-900 font-['Ramabhadra']">NS NEWS BULLETIN</span>
-                    </div>
-                  </div>
-                  <span class="bg-emerald-100 text-emerald-900 font-black text-[9px] px-2 py-0.5 rounded-full border border-emerald-300">
-                    {locationTag}
-                  </span>
-                </div>
-
-                <!-- Headline -->
-                <div class="py-1">
-                  <h2 class="text-slate-950 font-black text-sm sm:text-base font-['Ramabhadra'] leading-tight">
-                    {headline}
-                  </h2>
-                </div>
-
-                <!-- 3 Highlights Cards -->
-                <div class="grid grid-cols-3 gap-1.5 my-1 text-[10px]">
-                  <div class="bg-blue-50 border border-blue-200 p-1.5 rounded-xl text-center">
-                    <span class="block text-blue-900 font-bold">స్థానం</span>
-                    <span class="font-black text-blue-950 truncate block">{locationTag}</span>
-                  </div>
-                  <div class="bg-emerald-50 border border-emerald-200 p-1.5 rounded-xl text-center">
-                    <span class="block text-emerald-900 font-bold">కేటగిరీ</span>
-                    <span class="font-black text-emerald-950 truncate block">{badgeText}</span>
-                  </div>
-                  <div class="bg-amber-50 border border-amber-200 p-1.5 rounded-xl text-center">
-                    <span class="block text-amber-900 font-bold">పరిశీలన</span>
-                    <span class="font-black text-amber-950 block">వెరిఫైడ్ ✓</span>
-                  </div>
-                </div>
-
-                <!-- Photo Half -->
-                <div class="relative w-full h-[36%] rounded-xl overflow-hidden border border-slate-300">
-                  <img src={mainPhotoPreview} alt="News" class="w-full h-full object-cover" />
-                </div>
-
-                <!-- Summary Bullets -->
-                <div class="bg-white p-2 rounded-xl border border-slate-200 text-[10.5px] leading-tight text-slate-800 line-clamp-3 font-medium">
+            <!-- 3. SUMMARY BODY & SMART QR SECTION -->
+            <div class="flex-1 p-3.5 flex flex-col justify-between overflow-hidden" style="background-color: {cardBgColor};">
+              
+              <div class="flex items-start gap-3">
+                <!-- Summary Text -->
+                <div
+                  class="flex-1 leading-relaxed font-medium whitespace-pre-line line-clamp-4"
+                  style="color: {summaryColor}; font-size: {summaryFontSize}px; font-family: 'Noto Sans Telugu', sans-serif;"
+                >
                   {summary}
                 </div>
 
-                <!-- Footer -->
-                <div class="border-t border-slate-200 pt-1 flex justify-between text-[9px] text-slate-500 font-bold">
-                  <span>A.S.V. Enterprises & NS Media</span>
-                  <span>{websiteUrl}</span>
-                </div>
-
-              </div>
-
-            <!-- ========================================================= -->
-            <!-- STYLE 5: NS CHAMPION (SPORTS & BIG NUMBERS GRADIENT) -->
-            <!-- ========================================================= -->
-            {:else if selectedTemplate === 'champion'}
-              <div class="w-full h-full relative overflow-hidden bg-slate-950 flex flex-col justify-between text-white border border-slate-800">
-                
-                <!-- Background Full Cover Image -->
-                <img src={mainPhotoPreview} alt="News" class="absolute inset-0 w-full h-full object-cover" />
-                
-                <!-- Dark Gradient Overlay -->
-                <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/70 to-black/40"></div>
-
-                <!-- Top Bar -->
-                <div class="relative z-10 p-3 flex justify-between items-center">
-                  <span class="bg-red-600 text-white font-black text-xs px-2.5 py-0.5 rounded shadow">NS CHAMPION</span>
-                  <span class="bg-black/60 backdrop-blur text-amber-300 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-400">
-                    #{locationTag}
-                  </span>
-                </div>
-
-                <!-- Center Big Highlight Number -->
-                <div class="relative z-10 p-4 text-center my-auto">
-                  <h2 class="text-amber-300 font-black text-4xl sm:text-5xl font-mono tracking-tight drop-shadow-md">
-                    {highlightNumber}
-                  </h2>
-                  <p class="text-xs font-bold text-slate-200 tracking-wider uppercase mt-1">
-                    {highlightLabel}
-                  </p>
-                </div>
-
-                <!-- Bottom Headline & Summary -->
-                <div class="relative z-10 p-3.5 bg-black/70 backdrop-blur-sm border-t border-slate-800 space-y-1">
-                  <h3 class="font-black text-sm text-white font-['Ramabhadra'] leading-tight">
-                    {headline}
-                  </h3>
-                  <p class="text-[10.5px] text-slate-300 line-clamp-2 leading-relaxed">
-                    {summary}
-                  </p>
-                  <div class="pt-1 flex justify-between text-[9.5px] text-slate-400 font-bold border-t border-slate-700/60">
-                    <span>{websiteUrl}</span>
-                    <span>@nexlifynews</span>
+                <!-- SMART QR CODE (Scan for Full News) -->
+                {#if showQrCode}
+                  <div class="flex-shrink-0 bg-white p-1.5 rounded-xl border border-slate-200 text-center shadow-md">
+                    <img
+                      src={qrImageUrl}
+                      alt="Scan QR"
+                      crossorigin="anonymous"
+                      class="w-16 h-16 object-contain block mx-auto"
+                    />
+                    <span class="text-[8px] font-black text-slate-900 block mt-0.5 tracking-tighter">
+                      స్కాన్ చేయండి
+                    </span>
                   </div>
-                </div>
-
+                {/if}
               </div>
-            {/if}
+
+              <!-- 4. BOTTOM BRANDING FOOTER -->
+              <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] font-bold text-slate-400">
+                <span class="tracking-wide text-white font-mono">WWW.NEXLIFYNUCLEUS.IN</span>
+                <span class="bg-red-600/30 text-red-300 border border-red-500/40 px-2 py-0.5 rounded text-[9px]">
+                  📍 {locationTag} • @nexlifynews
+                </span>
+              </div>
+
+            </div>
 
           </div>
 
         </div>
+
       </section>
 
     </main>
