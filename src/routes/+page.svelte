@@ -117,35 +117,38 @@
     currentDate = now.toLocaleDateString('te-IN', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' });
   }
 
+  // Bulletproof News Fetching using select('*')
   async function loadHomeData() {
     loadingNews = true;
     try {
-      // Fetch Latest News with location for Ticker & Cards
-      let { data: newsData } = await supabase
-        .from('news_articles')
-        .select('id, headline, title, category, location_town, image_url, created_at')
+      // 1. Try 'news' table first (used by /news)
+      let { data: rawNews, error } = await supabase
+        .from('news')
+        .select('*')
         .order('id', { ascending: false })
         .limit(10);
 
-      if (!newsData || newsData.length === 0) {
+      // 2. If 'news' is empty or error, try 'news_articles'
+      if (error || !rawNews || rawNews.length === 0) {
         const res = await supabase
-          .from('news')
-          .select('id, title, headline, category, location_town, image_url, created_at')
+          .from('news_articles')
+          .select('*')
           .order('id', { ascending: false })
           .limit(10);
-        newsData = res.data;
+        rawNews = res.data;
       }
-      latestNews = newsData || [];
 
-      // Fetch Latest Press Clips
-      const { data: clipsData } = await supabase
-        .from('news_articles')
-        .select('id, headline, title, image_url, created_at')
-        .not('image_url', 'is', null)
-        .order('id', { ascending: false })
-        .limit(4);
+      // Safe normalization so no field throws undefined
+      latestNews = (rawNews || []).map(item => ({
+        id: item.id,
+        headline: item.headline || item.title || 'తాజా వార్త',
+        location: item.location_town || item.location || item.place || item.district || 'ముత్తారం',
+        image_url: item.image_url || null,
+        created_at: item.created_at || null
+      }));
 
-      paperClips = clipsData || [];
+      // Press clips
+      paperClips = latestNews.filter(n => n.image_url).slice(0, 4);
     } catch (e) {
       console.error('Home data load error:', e);
     } finally {
@@ -169,11 +172,10 @@
 
 <div class="min-h-screen bg-[#f8fafc] text-slate-900 font-sans pb-24">
   
-  <!-- 1. STATUTORY TOP HEADER STRIP (CLEAN SLATE BAR) -->
+  <!-- 1. STATUTORY TOP HEADER STRIP -->
   <div class="bg-slate-900 text-slate-200 border-b border-slate-800 text-[11px] py-1.5 px-3">
     <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
       
-      <!-- Date & Clock -->
       <div class="flex items-center gap-2 font-mono">
         <span class="flex items-center gap-1.5 text-amber-400 font-bold">
           <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -183,7 +185,6 @@
         <span class="hidden md:inline text-slate-300">📍 ముత్తారం, పెద్దపల్లి జిల్లా, తెలంగాణ</span>
       </div>
 
-      <!-- Statutory Identifiers -->
       <div class="flex items-center gap-3 font-mono text-[10.5px]">
         <span>GSTIN: <strong class="text-amber-400 font-bold">36AMXPA2915K1ZR</strong></span>
         <span class="hidden sm:inline">CSC ID: <strong class="text-emerald-400 font-bold">514542450010</strong></span>
@@ -199,7 +200,6 @@
   <header class="bg-white text-slate-900 sticky top-0 z-40 shadow-sm border-b-2 border-red-600">
     <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
       
-      <!-- Brand Logo -->
       <a href="/" class="flex items-center gap-2.5">
         <div class="w-10 h-10 bg-gradient-to-br from-red-600 to-rose-700 text-white rounded-xl flex items-center justify-center font-black text-lg shadow-md">
           ASV
@@ -250,8 +250,8 @@
       {#if latestNews.length > 0}
         {#each latestNews as item}
           <a href="/news/{item.id}" class="hover:underline mx-4 text-white inline-flex items-center gap-1.5">
-            <span class="text-yellow-300 font-black">[{item.location_town || 'తాజా వార్త'}]</span>
-            <span class="text-white font-medium">{item.headline || item.title}</span>
+            <span class="text-yellow-300 font-black">[{item.location}]</span>
+            <span class="text-white font-medium">{item.headline}</span>
           </a>
           <span class="text-yellow-400 font-bold mx-2">•</span>
         {/each}
@@ -267,10 +267,9 @@
 
   <main class="max-w-7xl mx-auto px-3 sm:px-6 py-6 space-y-8">
 
-    <!-- 4. ALL-IN-ONE GRAND HERO BANNER (CLEAN LIGHT THEME) -->
+    <!-- 4. ALL-IN-ONE GRAND HERO BANNER -->
     <section class="relative bg-gradient-to-br from-white via-slate-50 to-blue-50/40 rounded-3xl p-6 sm:p-10 shadow-sm border border-slate-200/80 overflow-hidden">
       
-      <!-- Ambient Backdrops -->
       <div class="absolute -right-20 -top-20 w-72 h-72 bg-red-100/50 rounded-full blur-2xl pointer-events-none"></div>
       <div class="absolute -left-20 -bottom-20 w-72 h-72 bg-blue-100/50 rounded-full blur-2xl pointer-events-none"></div>
 
@@ -343,7 +342,7 @@
       </div>
     </section>
 
-    <!-- 5. CITIZEN & DIGITAL UTILITIES (8 ALL-IN-ONE CARDS ON WHITE) -->
+    <!-- 5. CITIZEN & DIGITAL UTILITIES (8 ALL-IN-ONE CARDS) -->
     <section class="space-y-4">
       
       <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
@@ -392,7 +391,7 @@
 
     </section>
 
-    <!-- 6. NS NEWS PORTAL PULSE (TAZA VARTALU) -->
+    <!-- 6. NS NEWS PORTAL PULSE -->
     <section class="space-y-4">
       
       <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
@@ -425,7 +424,7 @@
                   <div class="h-44 w-full bg-slate-100 overflow-hidden relative">
                     <img src={art.image_url} alt={art.headline || 'News'} class="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
                     <span class="absolute top-2 left-2 bg-red-600 text-white font-black text-[10px] px-2 py-0.5 rounded shadow">
-                      {art.location_town || 'ముత్తారం'}
+                      {art.location}
                     </span>
                   </div>
                 {/if}
@@ -435,7 +434,7 @@
                     {art.created_at ? new Date(art.created_at).toLocaleDateString('te-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'తాజా వార్త'}
                   </span>
                   <h3 class="font-black text-sm text-slate-900 leading-snug line-clamp-2 font-['Ramabhadra'] group-hover:text-red-600 transition">
-                    {art.headline || art.title}
+                    {art.headline}
                   </h3>
                 </div>
               </div>
@@ -480,7 +479,7 @@
                 <img src={clip.image_url} alt="Clip" class="w-full h-full object-cover group-hover:scale-105 transition" />
               </div>
               <p class="text-[11px] font-bold text-slate-800 line-clamp-2">
-                {clip.headline || clip.title || 'పేపర్ క్లిప్'}
+                {clip.headline || 'పేపర్ క్లిప్'}
               </p>
             </button>
           {/each}
@@ -512,7 +511,7 @@
       </div>
     </section>
 
-    <!-- 9. CONTACT & CENTER FOOTER (WHITE CARD) -->
+    <!-- 9. CONTACT & CENTER FOOTER (WHITE PROFESSIONAL CARD) -->
     <footer class="bg-white border border-slate-200 rounded-3xl p-6 sm:p-9 shadow-sm space-y-6">
       <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
         
@@ -566,7 +565,7 @@
 
   </main>
 
-  <!-- 10. MOBILE FLOATING ACTION BAR (CLEAN WHITE) -->
+  <!-- 10. MOBILE FLOATING ACTION BAR -->
   <div class="sm:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-2 z-50 flex items-center justify-around gap-2 shadow-2xl">
     <a
       href="tel:9949122402"
