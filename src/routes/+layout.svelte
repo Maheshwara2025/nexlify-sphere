@@ -7,19 +7,24 @@
 
   let { children } = $props();
 
-  // Ticker News State (Svelte 5 Runes)
   let globalTickerNews = $state([]);
+  let isAdmin = $state(false);
+
+  // Safely track URL path in client-side
+  $effect(() => {
+    if ($page && $page.url) {
+      isAdmin = $page.url.pathname.startsWith('/admin');
+    }
+  });
 
   onMount(async () => {
     try {
-      // 1. Fetch from 'news' table
       let { data } = await supabase
         .from('news')
         .select('*')
         .order('id', { ascending: false })
         .limit(10);
 
-      // 2. Fallback to 'news_articles'
       if (!data || data.length === 0) {
         const res = await supabase
           .from('news_articles')
@@ -38,26 +43,20 @@
       console.error('Ticker fetch error:', e);
     }
   });
-
-  // Admin pages lo ticker raakunda hide cheyadam
-  let isAdminPage = $derived($page.url.pathname.startsWith('/admin'));
 </script>
 
 <svelte:head>
   <link rel="icon" href={favicon} />
 </svelte:head>
 
-<!-- ALL PUBLIC PAGES GLOBAL TICKER (100% SMOOTH SCROLLING) -->
-{#if !isAdminPage && globalTickerNews.length > 0}
+<!-- All Public Pages Global Breaking News Ticker -->
+{#if !isAdmin && globalTickerNews.length > 0}
   <div class="bg-[#b91c1c] text-white flex items-center overflow-hidden py-1.5 px-3 shadow-md border-b border-red-800 z-50 sticky top-0">
-    
-    <!-- Left Black Badge -->
     <div class="bg-black text-white font-black text-xs px-2.5 py-1 rounded shrink-0 flex items-center gap-1.5 shadow mr-2 z-10">
       <span class="text-red-500 font-black text-sm leading-none">+</span>
       <span class="tracking-wide">లైవ్ న్యూస్</span>
     </div>
 
-    <!-- Smooth Native Marquee -->
     <marquee 
       behavior="scroll" 
       direction="left" 
@@ -72,9 +71,7 @@
         <span class="text-yellow-400 font-bold mx-2">•</span>
       {/each}
     </marquee>
-
   </div>
 {/if}
 
-<!-- Render All Pages Content -->
 {@render children()}
