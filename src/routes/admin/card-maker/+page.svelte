@@ -19,7 +19,6 @@
   };
 
   // 3. Layout Arrangements
-  // 'top_img_bottom_text' | 'top_text_bottom_img' | 'text_middle_dual_img' | 'full_overlay'
   let layoutArrangement = 'top_img_bottom_text';
 
   // 4. Trending Brand Presets
@@ -224,29 +223,38 @@
     }
   }
 
-  // Load html2canvas Library (Mobile Friendly & Safe)
-  async function loadHtml2Canvas() {
+  // Load html2canvas-pro with OKLCH Color Parser Support
+  async function loadHtml2CanvasPro() {
     if (typeof window === 'undefined') return null;
-    if (window.html2canvas) return window.html2canvas;
+    if (window.__html2canvas_pro_ready && window.html2canvas) {
+      return window.html2canvas;
+    }
     return new Promise((resolve, reject) => {
+      // Remove any previously loaded standard html2canvas scripts
+      const oldScripts = document.querySelectorAll('script[src*="html2canvas"]');
+      oldScripts.forEach(s => s.remove());
+
       const script = document.createElement('script');
-      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-      script.onload = () => resolve(window.html2canvas);
-      script.onerror = () => reject(new Error('html2canvas library load kaaledu'));
+      script.src = 'https://cdn.jsdelivr.net/npm/html2canvas-pro@2.0.2/dist/html2canvas-pro.min.js';
+      script.onload = () => {
+        window.__html2canvas_pro_ready = true;
+        resolve(window.html2canvas);
+      };
+      script.onerror = () => reject(new Error('html2canvas-pro లైబ్రరీ లోడ్ కాలేదు'));
       document.head.appendChild(script);
     });
   }
 
-  // Mobile Bulletproof High-Quality JPEG Engine using html2canvas
+  // Mobile Bulletproof High-Quality JPEG Engine
   async function downloadCardAsJpeg() {
     if (isGenerating) return;
     isGenerating = true;
 
     try {
       const node = document.getElementById('card-render-stage');
-      if (!node) throw new Error('Card element dorakaledu');
+      if (!node) throw new Error('కార్డ్ ఎలిమెంట్ కనుగొనబడలేదు');
 
-      const h2c = await loadHtml2Canvas();
+      const h2c = await loadHtml2CanvasPro();
       
       const canvas = await h2c(node, {
         scale: 2.2,
@@ -254,13 +262,13 @@
         allowTaint: true,
         backgroundColor: cardBgColor || '#000000',
         logging: false,
-        imageTimeout: 10000
+        imageTimeout: 15000
       });
 
       const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
       generatedCardImage = dataUrl;
 
-      // 1. Direct browser download trigger
+      // 1. Trigger browser direct download
       const fileName = `NS_News_Card_${Date.now()}.jpg`;
       const link = document.createElement('a');
       link.download = fileName;
@@ -269,12 +277,12 @@
       link.click();
       document.body.removeChild(link);
 
-      // 2. Open Mobile Save Modal (100% Reliable for Mobile)
+      // 2. Open Mobile Save Modal
       showImageModal = true;
 
     } catch (err) {
       console.error('Download error:', err);
-      const errMsg = err?.message || (typeof err === 'string' ? err : 'Mobile browser security block');
+      const errMsg = err?.message || (typeof err === 'string' ? err : 'మొబైల్ బ్రౌజర్ ఎర్రర్');
       alert('కార్డ్ ప్రాసెస్ లోపం: ' + errMsg);
     } finally {
       isGenerating = false;
@@ -322,7 +330,7 @@
     <div class="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
   </div>
 {:else}
-  <!-- CLEAN WHITE CONTAINER -->
+  <!-- CLEAN WHITE THEME -->
   <div class="min-h-screen bg-[#f8fafc] font-sans pb-28 text-slate-900">
     
     <!-- NAVBAR WITH HOME & DESK LINKS -->
@@ -359,7 +367,7 @@
 
     <main class="max-w-7xl mx-auto p-3 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
-      <!-- LEFT SIDE: CONTROLS PANEL -->
+      <!-- LEFT SIDE: CONTROLS PANEL (WHITE THEME) -->
       <section class="lg:col-span-5 bg-white border border-slate-200 rounded-3xl p-4 sm:p-5 shadow-sm space-y-4">
         
         <!-- 1. AUTO LINK FROM MAIN NEWS -->
@@ -699,7 +707,7 @@
 
       </section>
 
-      <!-- RIGHT SIDE: LIVE PREVIEW STAGE -->
+      <!-- RIGHT SIDE: LIVE PREVIEW STAGE (IMMUNE TO OKLCH CRASH) -->
       <section class="lg:col-span-7 flex flex-col items-center justify-center">
         
         <div class="w-full mb-2.5 flex items-center justify-between text-xs text-slate-500 px-2 font-bold">
@@ -707,7 +715,7 @@
           <span class="text-red-600">లేఅవుట్: {layoutArrangement.toUpperCase()}</span>
         </div>
 
-        <!-- CARD RENDER CONTAINER -->
+        <!-- CARD RENDER CONTAINER (ALL EXPLICIT INLINE COLORS, ZERO OKLCH) -->
         <div class="overflow-hidden p-2 flex items-center justify-center w-full">
           
           <div
@@ -724,30 +732,33 @@
             <!-- LAYOUT 1: TOP IMAGE - BOTTOM TEXT -->
             {#if layoutArrangement === 'top_img_bottom_text'}
               
-              <div class="relative w-full overflow-hidden bg-black flex-shrink-0" style="height: {photoHeightPercent}%;">
-                <img src={mainPhotoPreview} alt="News" crossorigin="anonymous" class="w-full h-full object-cover" style="object-position: {imagePosition};" />
+              <div style="position: relative; width: 100%; height: {photoHeightPercent}%; overflow: hidden; background-color: #000000; flex-shrink: 0;">
+                <img src={mainPhotoPreview} alt="News" crossorigin="anonymous" style="width: 100%; height: 100%; object-fit: cover; object-position: {imagePosition};" />
 
-                <div class="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between z-10">
-                  <div class="flex items-center gap-1.5 bg-black/85 px-2.5 py-1 rounded-lg border border-red-600 shadow">
-                    <span class="bg-red-600 text-white font-black text-[10px] px-1.5 py-0.5 rounded">NS</span>
-                    <span class="font-black text-xs text-white font-['Ramabhadra']">NS NEWS</span>
+                <!-- Badges -->
+                <div style="position: absolute; top: 10px; left: 10px; right: 10px; display: flex; align-items: center; justify-content: space-between; z-index: 10;">
+                  <div style="display: flex; align-items: center; gap: 6px; background-color: rgba(0,0,0,0.85); padding: 4px 10px; border-radius: 8px; border: 1px solid #dc2626; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                    <span style="background-color: #dc2626; color: #ffffff; font-weight: 900; font-size: 10px; padding: 2px 6px; border-radius: 4px;">NS</span>
+                    <span style="font-weight: 900; font-size: 12px; color: #ffffff; font-family: 'Ramabhadra', sans-serif;">NS NEWS</span>
                   </div>
-                  <span class="bg-amber-500 text-slate-950 font-black text-[10px] px-2.5 py-0.5 rounded-full shadow uppercase">
+                  <span style="background-color: #f59e0b; color: #020617; font-weight: 900; font-size: 10px; padding: 2px 10px; border-radius: 9999px; text-transform: uppercase;">
                     {badgeText}
                   </span>
                 </div>
 
                 {#if showInsetCircle && insetPhotoPreview}
-                  <div class="absolute bottom-2.5 right-2.5 w-16 h-16 rounded-full border-2 border-white overflow-hidden shadow-2xl bg-white z-10">
-                    <img src={insetPhotoPreview} alt="Leader" class="w-full h-full object-cover" />
+                  <div style="position: absolute; bottom: 10px; right: 10px; width: 64px; height: 64px; border-radius: 9999px; border: 2px solid #ffffff; overflow: hidden; background-color: #ffffff; z-index: 10; box-shadow: 0 8px 16px rgba(0,0,0,0.4);">
+                    <img src={insetPhotoPreview} alt="Leader" style="width: 100%; height: 100%; object-fit: cover;" />
                   </div>
                 {/if}
               </div>
 
-              <div class="px-4 py-2.5 shadow-md flex-shrink-0" style="background-color: {headlineBgColor};">
+              <div style="padding: 10px 16px; background-color: {headlineBgColor}; flex-shrink: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
                 <h2
-                  class="leading-snug tracking-tight m-0"
                   style="
+                    margin: 0;
+                    line-height: 1.35;
+                    letter-spacing: -0.01em;
                     color: {headlineColor};
                     font-size: {headlineFontSize}px;
                     font-weight: {isBold ? '900' : '400'};
@@ -760,24 +771,24 @@
                 </h2>
               </div>
 
-              <div class="flex-1 px-4 py-3 flex flex-col justify-between overflow-hidden" style="background-color: {cardBgColor};">
+              <div style="flex: 1; padding: 12px 16px; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; background-color: {cardBgColor};">
                 <div
-                  class="leading-relaxed whitespace-pre-line"
                   style="
+                    white-space: pre-line;
+                    line-height: 1.45;
                     color: {summaryColor};
                     font-size: {summaryFontSize}px;
                     font-weight: {isBold ? '600' : '400'};
                     font-style: {isItalic ? 'italic' : 'normal'};
                     text-align: {textAlign};
-                    line-height: 1.45;
                   "
                 >
                   {summary}
                 </div>
 
-                <div class="pt-2 mt-auto border-t border-slate-800/80 flex items-center justify-between text-[11px] font-bold text-slate-400">
-                  <span class="tracking-wide text-white font-mono">WWW.NEXLIFYNUCLEUS.IN</span>
-                  <span class="bg-red-600/30 text-red-300 border border-red-500/40 px-2 py-0.5 rounded text-[10px]">
+                <div style="padding-top: 8px; margin-top: auto; border-top: 1px solid rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: space-between; font-size: 11px; font-weight: bold; color: #94a3b8;">
+                  <span style="color: #ffffff; font-family: monospace;">WWW.NEXLIFYNUCLEUS.IN</span>
+                  <span style="background-color: rgba(220, 38, 38, 0.3); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); padding: 2px 8px; border-radius: 4px; font-size: 10px;">
                     📍 {locationTag} • @nexlifynews
                   </span>
                 </div>
@@ -786,20 +797,21 @@
             <!-- LAYOUT 2: TOP TEXT - BOTTOM IMAGE -->
             {:else if layoutArrangement === 'top_text_bottom_img'}
 
-              <div class="p-3 pb-1 flex items-center justify-between border-b border-slate-800/60" style="background-color: {cardBgColor};">
-                <div class="flex items-center gap-1.5 bg-black/85 px-2.5 py-1 rounded-lg border border-red-600 shadow">
-                  <span class="bg-red-600 text-white font-black text-[10px] px-1.5 py-0.5 rounded">NS</span>
-                  <span class="font-black text-xs text-white font-['Ramabhadra']">NS NEWS</span>
+              <div style="padding: 12px 12px 6px 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1); background-color: {cardBgColor};">
+                <div style="display: flex; align-items: center; gap: 6px; background-color: rgba(0,0,0,0.85); padding: 4px 10px; border-radius: 8px; border: 1px solid #dc2626;">
+                  <span style="background-color: #dc2626; color: #ffffff; font-weight: 900; font-size: 10px; padding: 2px 6px; border-radius: 4px;">NS</span>
+                  <span style="font-weight: 900; font-size: 12px; color: #ffffff; font-family: 'Ramabhadra', sans-serif;">NS NEWS</span>
                 </div>
-                <span class="bg-amber-500 text-slate-950 font-black text-[10px] px-2.5 py-0.5 rounded-full shadow uppercase">
+                <span style="background-color: #f59e0b; color: #020617; font-weight: 900; font-size: 10px; padding: 2px 10px; border-radius: 9999px; text-transform: uppercase;">
                   {badgeText}
                 </span>
               </div>
 
-              <div class="px-4 py-2.5 shadow-md flex-shrink-0" style="background-color: {headlineBgColor};">
+              <div style="padding: 10px 16px; background-color: {headlineBgColor}; flex-shrink: 0;">
                 <h2
-                  class="leading-snug tracking-tight m-0"
                   style="
+                    margin: 0;
+                    line-height: 1.35;
                     color: {headlineColor};
                     font-size: {headlineFontSize}px;
                     font-weight: {isBold ? '900' : '400'};
@@ -812,49 +824,50 @@
                 </h2>
               </div>
 
-              <div class="px-4 py-2.5 overflow-hidden flex-shrink-0" style="background-color: {cardBgColor};">
+              <div style="padding: 10px 16px; overflow: hidden; flex-shrink: 0; background-color: {cardBgColor};">
                 <div
-                  class="leading-relaxed whitespace-pre-line line-clamp-3"
                   style="
+                    white-space: pre-line;
+                    line-height: 1.4;
                     color: {summaryColor};
                     font-size: {summaryFontSize}px;
                     font-weight: {isBold ? '600' : '400'};
                     font-style: {isItalic ? 'italic' : 'normal'};
                     text-align: {textAlign};
-                    line-height: 1.4;
                   "
                 >
                   {summary}
                 </div>
               </div>
 
-              <div class="relative w-full flex-1 overflow-hidden bg-black">
-                <img src={mainPhotoPreview} alt="News" crossorigin="anonymous" class="w-full h-full object-cover" style="object-position: {imagePosition};" />
+              <div style="position: relative; width: 100%; flex: 1; overflow: hidden; background-color: #000000;">
+                <img src={mainPhotoPreview} alt="News" crossorigin="anonymous" style="width: 100%; height: 100%; object-fit: cover; object-position: {imagePosition};" />
                 
-                <div class="absolute bottom-2 left-2 right-2 flex items-center justify-between text-[10px] font-bold text-white bg-black/75 backdrop-blur-sm px-2.5 py-1 rounded-lg border border-white/20">
-                  <span class="font-mono text-amber-300">WWW.NEXLIFYNUCLEUS.IN</span>
-                  <span class="bg-red-600 px-2 py-0.5 rounded text-[9px]">📍 {locationTag}</span>
+                <div style="position: absolute; bottom: 8px; left: 8px; right: 8px; display: flex; align-items: center; justify-content: space-between; font-size: 10px; font-weight: bold; color: #ffffff; background-color: rgba(0,0,0,0.75); padding: 4px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2);">
+                  <span style="font-family: monospace; color: #fde047;">WWW.NEXLIFYNUCLEUS.IN</span>
+                  <span style="background-color: #dc2626; padding: 2px 8px; border-radius: 4px; font-size: 9px;">📍 {locationTag}</span>
                 </div>
               </div>
 
             <!-- LAYOUT 3: TEXT MIDDLE - DUAL IMAGE -->
             {:else if layoutArrangement === 'text_middle_dual_img'}
 
-              <div class="relative w-full h-[32%] overflow-hidden bg-black flex-shrink-0">
-                <img src={mainPhotoPreview} alt="Top" crossorigin="anonymous" class="w-full h-full object-cover" style="object-position: {imagePosition};" />
-                <div class="absolute top-2 left-2 flex items-center gap-1.5 bg-black/85 px-2 py-0.5 rounded border border-red-600">
-                  <span class="bg-red-600 text-white font-black text-[9px] px-1 rounded">NS</span>
-                  <span class="font-black text-[11px] text-white">NS NEWS</span>
+              <div style="position: relative; width: 100%; height: 32%; overflow: hidden; background-color: #000000; flex-shrink: 0;">
+                <img src={mainPhotoPreview} alt="Top" crossorigin="anonymous" style="width: 100%; height: 100%; object-fit: cover; object-position: {imagePosition};" />
+                <div style="position: absolute; top: 8px; left: 8px; display: flex; align-items: center; gap: 4px; background-color: rgba(0,0,0,0.85); padding: 2px 8px; border-radius: 4px; border: 1px solid #dc2626;">
+                  <span style="background-color: #dc2626; color: #ffffff; font-weight: 900; font-size: 9px; padding: 1px 4px; border-radius: 2px;">NS</span>
+                  <span style="font-weight: 900; font-size: 11px; color: #ffffff;">NS NEWS</span>
                 </div>
-                <span class="absolute top-2 right-2 bg-amber-500 text-slate-950 font-black text-[9px] px-2 py-0.5 rounded-full uppercase">
+                <span style="position: absolute; top: 8px; right: 8px; background-color: #f59e0b; color: #020617; font-weight: 900; font-size: 9px; padding: 2px 8px; border-radius: 9999px; text-transform: uppercase;">
                   {badgeText}
                 </span>
               </div>
 
-              <div class="flex-1 px-3 py-2 flex flex-col justify-center shadow-inner" style="background-color: {headlineBgColor};">
+              <div style="flex: 1; padding: 8px 14px; display: flex; flex-direction: column; justify-content: center; background-color: {headlineBgColor};">
                 <h2
-                  class="leading-tight m-0"
                   style="
+                    margin: 0;
+                    line-height: 1.3;
                     color: {headlineColor};
                     font-size: {headlineFontSize - 2}px;
                     font-weight: {isBold ? '900' : '400'};
@@ -867,8 +880,9 @@
                 </h2>
                 
                 <p
-                  class="mt-1 line-clamp-2 leading-relaxed"
                   style="
+                    margin-top: 4px;
+                    line-height: 1.35;
                     color: {summaryColor};
                     font-size: {summaryFontSize - 2}px;
                     text-align: {textAlign};
@@ -878,12 +892,12 @@
                 </p>
               </div>
 
-              <div class="relative w-full h-[32%] overflow-hidden bg-black flex-shrink-0">
-                <img src={secondaryPhotoPreview} alt="Bottom" crossorigin="anonymous" class="w-full h-full object-cover" />
+              <div style="position: relative; width: 100%; height: 32%; overflow: hidden; background-color: #000000; flex-shrink: 0;">
+                <img src={secondaryPhotoPreview} alt="Bottom" crossorigin="anonymous" style="width: 100%; height: 100%; object-fit: cover;" />
                 
-                <div class="absolute bottom-2 left-2 right-2 flex items-center justify-between text-[10px] font-bold text-white bg-black/80 px-2 py-0.5 rounded">
-                  <span class="font-mono text-amber-300">WWW.NEXLIFYNUCLEUS.IN</span>
-                  <span class="bg-red-600 px-1.5 py-0.5 rounded text-[9px]">📍 {locationTag}</span>
+                <div style="position: absolute; bottom: 8px; left: 8px; right: 8px; display: flex; align-items: center; justify-content: space-between; font-size: 10px; font-weight: bold; color: #ffffff; background-color: rgba(0,0,0,0.8); padding: 3px 8px; border-radius: 6px;">
+                  <span style="font-family: monospace; color: #fde047;">WWW.NEXLIFYNUCLEUS.IN</span>
+                  <span style="background-color: #dc2626; padding: 1px 6px; border-radius: 3px; font-size: 9px;">📍 {locationTag}</span>
                 </div>
               </div>
 
@@ -894,41 +908,42 @@
                 src={mainPhotoPreview}
                 alt="News Background"
                 crossorigin="anonymous"
-                class="absolute inset-0 w-full h-full object-cover"
-                style="object-position: {imagePosition};"
+                style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: {imagePosition};"
               />
 
-              <div class="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent"></div>
+              <div style="position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.6) 60%, rgba(0,0,0,0.1) 100%);"></div>
 
-              <div class="relative z-10 p-3 flex items-center justify-between">
-                <div class="flex items-center gap-1.5 bg-black/80 backdrop-blur-md px-2.5 py-1 rounded-lg border border-red-600 shadow">
-                  <span class="bg-red-600 text-white font-black text-[10px] px-1.5 py-0.5 rounded">NS</span>
-                  <span class="font-black text-xs text-white font-['Ramabhadra']">NS NEWS</span>
+              <div style="position: relative; z-index: 10; padding: 12px; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 6px; background-color: rgba(0,0,0,0.8); padding: 4px 10px; border-radius: 8px; border: 1px solid #dc2626;">
+                  <span style="background-color: #dc2626; color: #ffffff; font-weight: 900; font-size: 10px; padding: 2px 6px; border-radius: 4px;">NS</span>
+                  <span style="font-weight: 900; font-size: 12px; color: #ffffff; font-family: 'Ramabhadra', sans-serif;">NS NEWS</span>
                 </div>
-                <span class="bg-amber-500 text-slate-950 font-black text-[10px] px-2.5 py-0.5 rounded-full shadow uppercase">
+                <span style="background-color: #f59e0b; color: #020617; font-weight: 900; font-size: 10px; padding: 2px 10px; border-radius: 9999px; text-transform: uppercase;">
                   {badgeText}
                 </span>
               </div>
 
-              <div class="relative z-10 p-4 mt-auto space-y-2">
+              <div style="position: relative; z-index: 10; padding: 16px; margin-top: auto;">
                 <h2
-                  class="leading-snug tracking-tight m-0"
                   style="
+                    margin: 0;
+                    line-height: 1.35;
                     color: {headlineColor};
                     font-size: {headlineFontSize}px;
                     font-weight: {isBold ? '900' : '400'};
                     font-style: {isItalic ? 'italic' : 'normal'};
                     text-transform: {isUppercase ? 'uppercase' : 'none'};
                     text-align: {textAlign};
-                    text-shadow: 0 2px 10px rgba(0,0,0,0.9);
+                    text-shadow: 0 2px 8px rgba(0,0,0,0.9);
                   "
                 >
                   {headline}
                 </h2>
 
                 <p
-                  class="leading-relaxed font-semibold whitespace-pre-line line-clamp-3"
                   style="
+                    margin-top: 6px;
+                    line-height: 1.4;
                     color: {summaryColor};
                     font-size: {summaryFontSize}px;
                     text-align: {textAlign};
@@ -938,9 +953,9 @@
                   {summary}
                 </p>
 
-                <div class="pt-2 border-t border-white/20 flex items-center justify-between text-[11px] font-bold text-slate-300">
-                  <span class="tracking-wider text-amber-300 font-mono">WWW.NEXLIFYNUCLEUS.IN</span>
-                  <span class="bg-red-600/60 text-white px-2 py-0.5 rounded text-[10px]">
+                <div style="padding-top: 8px; margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: space-between; font-size: 11px; font-weight: bold; color: #e2e8f0;">
+                  <span style="color: #fde047; font-family: monospace;">WWW.NEXLIFYNUCLEUS.IN</span>
+                  <span style="background-color: rgba(220,38,38,0.7); color: #ffffff; padding: 2px 8px; border-radius: 4px; font-size: 10px;">
                     📍 {locationTag} • @nexlifynews
                   </span>
                 </div>
