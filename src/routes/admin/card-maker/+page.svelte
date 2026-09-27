@@ -18,14 +18,14 @@
     '16:9': { width: 580, height: 326, label: '16:9 Wide (YouTube / Web)' }
   };
 
-  // 3. Smart Layout Arrangements
+  // 3. Layout Arrangements
   // 'top_img_bottom_text' | 'top_text_bottom_img' | 'text_middle_dual_img' | 'full_overlay'
   let layoutArrangement = 'top_img_bottom_text';
 
   // 4. Trending Brand Presets
-  let selectedTemplate = 'jwala'; // 'jwala', 'ratna', 'darshini', 'vigyan', 'neon', 'patrika'
+  let selectedTemplate = 'jwala';
 
-  // 5. Inbuilt Category Combo Box
+  // 5. Inbuilt Category Options
   const categoryOptions = [
     'తాజా వార్త',
     'బ్రేకింగ్ న్యూస్',
@@ -43,7 +43,7 @@
   let customCategoryText = '';
   $: badgeText = selectedCategoryChoice === 'కస్టమ్ (Custom)' ? (customCategoryText || 'వార్త') : selectedCategoryChoice;
 
-  // 6. Inbuilt Location Options (Default: న్యూస్ డెస్క్)
+  // 6. Inbuilt Location Options
   const locationOptions = [
     'న్యూస్ డెస్క్',
     'ముత్తారం',
@@ -58,13 +58,12 @@
   let customLocationText = '';
   $: locationTag = selectedLocationChoice === 'కస్టమ్ (Custom)' ? (customLocationText || 'న్యూస్ డెస్క్') : selectedLocationChoice;
 
-  // 7. SINGLE UNIFIED NEWS INPUT BOX (Smart Text Parser)
+  // 7. Single Unified News Box (Smart Parser)
   let rawNewsInput = `కొత్త పింఛన్లపై మరో గుడ్‌న్యూస్.. మళ్లీ గడువు పెంచిన ప్రభుత్వం!
 • అర్హులైన లబ్ధిదారులకు దరఖాస్తు చేసుకోవడానికి ప్రభుత్వం మరో అవకాశం కల్పించింది.
 • గ్రామ పంచాయతీ మరియు మున్సిపల్ కార్యాలయాల్లో ప్రత్యేక హెల్ప్‌డెస్క్‌లు ఏర్పాటు.
 • దరఖాస్తుదారులు అవసరమైన ధ్రువీకరణ పత్రాలతో సంప్రదించాలి.`;
 
-  // Parsed Headline & Summary from Single Box
   let headline = '';
   let summary = '';
 
@@ -75,7 +74,7 @@
         headline = lines[0];
         summary = lines.slice(1).join('\n');
       } else {
-        headline = 'తాజా వార్త శీర్షిక ఇక్కడ వస్తుంది...';
+        headline = 'తాజా వార్త శీర్షిక...';
         summary = '';
       }
     } else {
@@ -84,30 +83,29 @@
     }
   }
 
-  // 8. Typography, Font & Styling Controls
+  // 8. Typography & Styles
   let selectedFont = "'Ramabhadra', sans-serif";
-  let headlineFontSize = 26; // in px
-  let summaryFontSize = 16;  // in px
+  let headlineFontSize = 26;
+  let summaryFontSize = 16;
   let headlineColor = '#facc15';
   let headlineBgColor = '#000000';
   let summaryColor = '#f8fafc';
   let cardBgColor = '#090d16';
 
-  // Text Style Toggles
   let isBold = true;
   let isItalic = false;
   let isUppercase = false;
-  let textAlign = 'center'; // 'left', 'center', 'right'
+  let textAlign = 'center';
 
-  // 9. Photo Uploads (Main Top Photo & Optional Secondary Bottom Photo)
+  // 9. Photos
   let mainPhotoPreview = 'https://images.unsplash.com/photo-1577495508048-b635879837f1?w=800&auto=format&fit=crop&q=80';
   let secondaryPhotoPreview = 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=800&auto=format&fit=crop&q=80';
   let insetPhotoPreview = null;
   let showInsetCircle = false;
-  let imagePosition = 'center'; // 'center', 'top', 'bottom'
-  let photoHeightPercent = 46;  // in percentage
+  let imagePosition = 'center';
+  let photoHeightPercent = 46;
 
-  // 10. Mobile Download & Modal State
+  // 10. Mobile Modal & Download
   let isGenerating = false;
   let generatedCardImage = null;
   let showImageModal = false;
@@ -122,7 +120,6 @@
     await fetchPublishedArticles();
   });
 
-  // Fetch Published News from Supabase for 1-Click Fill
   async function fetchPublishedArticles() {
     try {
       let { data } = await supabase
@@ -141,7 +138,6 @@
     }
   }
 
-  // 1-Click Auto Fill into the Single News Input Box
   function applyArticleToCard() {
     const art = publishedArticles.find(a => String(a.id) === String(selectedArticleId));
     if (!art) return;
@@ -193,7 +189,6 @@
     }
   }
 
-  // Preset Template Styles Auto-Setter
   function applyPresetStyle(style) {
     selectedTemplate = style;
     if (style === 'jwala') {
@@ -229,37 +224,40 @@
     }
   }
 
-  // Load html-to-image library
-  async function loadHtmlToImage() {
+  // Load html2canvas Library (Mobile Friendly & Safe)
+  async function loadHtml2Canvas() {
     if (typeof window === 'undefined') return null;
-    if (window.htmlToImage) return window.htmlToImage;
+    if (window.html2canvas) return window.html2canvas;
     return new Promise((resolve, reject) => {
       const script = document.createElement('script');
-      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js';
-      script.onload = () => resolve(window.htmlToImage);
-      script.onerror = () => reject(new Error('html-to-image లోడ్ కాలేదు'));
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+      script.onload = () => resolve(window.html2canvas);
+      script.onerror = () => reject(new Error('html2canvas library load kaaledu'));
       document.head.appendChild(script);
     });
   }
 
-  // Mobile Bulletproof High-Quality JPEG Engine
+  // Mobile Bulletproof High-Quality JPEG Engine using html2canvas
   async function downloadCardAsJpeg() {
     if (isGenerating) return;
     isGenerating = true;
 
     try {
       const node = document.getElementById('card-render-stage');
-      if (!node) throw new Error('కార్డ్ ఎలిమెంట్ కనుగొనబడలేదు');
+      if (!node) throw new Error('Card element dorakaledu');
 
-      const hti = await loadHtmlToImage();
+      const h2c = await loadHtml2Canvas();
       
-      const dataUrl = await hti.toJpeg(node, {
-        quality: 0.96,
-        pixelRatio: 2.2,
+      const canvas = await h2c(node, {
+        scale: 2.2,
+        useCORS: true,
+        allowTaint: true,
         backgroundColor: cardBgColor || '#000000',
-        cacheBust: true
+        logging: false,
+        imageTimeout: 10000
       });
 
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
       generatedCardImage = dataUrl;
 
       // 1. Direct browser download trigger
@@ -271,17 +269,18 @@
       link.click();
       document.body.removeChild(link);
 
-      // 2. Open Mobile Save Modal
+      // 2. Open Mobile Save Modal (100% Reliable for Mobile)
       showImageModal = true;
 
     } catch (err) {
-      alert('కార్డ్ డౌన్‌లోడ్ లోపం: ' + err.message);
+      console.error('Download error:', err);
+      const errMsg = err?.message || (typeof err === 'string' ? err : 'Mobile browser security block');
+      alert('కార్డ్ ప్రాసెస్ లోపం: ' + errMsg);
     } finally {
       isGenerating = false;
     }
   }
 
-  // Web Share API
   async function shareMobileNative() {
     if (!generatedCardImage) {
       await downloadCardAsJpeg();
@@ -323,10 +322,10 @@
     <div class="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
   </div>
 {:else}
-  <!-- PURE CLEAN WHITE / LIGHT THEME CONTAINER -->
+  <!-- CLEAN WHITE CONTAINER -->
   <div class="min-h-screen bg-[#f8fafc] font-sans pb-28 text-slate-900">
     
-    <!-- TOP CLEAN WHITE NAVBAR WITH HOME PAGE & DESK BUTTONS -->
+    <!-- NAVBAR WITH HOME & DESK LINKS -->
     <header class="bg-white text-slate-900 px-3 sm:px-6 py-3 sticky top-0 z-40 border-b-2 border-red-600 shadow-sm">
       <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
         
@@ -340,7 +339,6 @@
           </div>
         </div>
 
-        <!-- Navigation Buttons -->
         <div class="flex flex-wrap items-center gap-2">
           <a href="/" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-xl font-bold transition shadow flex items-center gap-1">
             <span>🏠</span> <span>హోమ్ పేజీ</span>
@@ -361,7 +359,7 @@
 
     <main class="max-w-7xl mx-auto p-3 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
-      <!-- LEFT SIDE: CONTROLS PANEL (WHITE THEME, 5 Columns) -->
+      <!-- LEFT SIDE: CONTROLS PANEL -->
       <section class="lg:col-span-5 bg-white border border-slate-200 rounded-3xl p-4 sm:p-5 shadow-sm space-y-4">
         
         <!-- 1. AUTO LINK FROM MAIN NEWS -->
@@ -395,7 +393,7 @@
           </div>
         </div>
 
-        <!-- 2. LAYOUT ARRANGEMENTS (Top/Bottom, Middle Text, Overlay) -->
+        <!-- 2. LAYOUT ARRANGEMENTS -->
         <div>
           <label class="block text-xs font-black text-slate-700 uppercase tracking-wider mb-2">
             కార్డ్ డిజైన్ లేఅవుట్ (Layout Arrangement)
@@ -443,7 +441,7 @@
           </div>
         </div>
 
-        <!-- 3. RATIO & TEMPLATE PRESET -->
+        <!-- 3. RATIO & TEMPLATES -->
         <div class="grid grid-cols-2 gap-3 text-xs">
           <div>
             <label class="block font-black text-slate-700 uppercase mb-1">కార్డ్ సైజు (Ratio)</label>
@@ -461,7 +459,7 @@
           </div>
 
           <div>
-            <label class="block font-black text-slate-700 uppercase mb-1">కలర్ టెంప్లేట్ (Preset)</label>
+            <label class="block font-black text-slate-700 uppercase mb-1">కలర్ టెంప్లేట్</label>
             <select
               bind:value={selectedTemplate}
               on:change={() => applyPresetStyle(selectedTemplate)}
@@ -477,7 +475,7 @@
           </div>
         </div>
 
-        <!-- 4. SINGLE UNIFIED NEWS INPUT BOX -->
+        <!-- 4. SINGLE SMART NEWS INPUT BOX -->
         <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2">
           <div class="flex items-center justify-between">
             <label class="block text-xs font-black text-slate-800">
@@ -490,22 +488,14 @@
 
           <textarea
             bind:value={rawNewsInput}
-            rows="6"
+            rows="5"
             placeholder="మొదటి లైన్‌లో శీర్షిక (Headline) టైప్ చేయండి...&#10;తర్వాత లైన్లలో సారాంశం (Summary Points) టైప్ చేయండి లేదా పేస్ట్ చేయండి."
             class="w-full bg-white border border-slate-300 rounded-xl p-3 text-slate-900 text-xs leading-relaxed focus:outline-none focus:ring-2 focus:ring-red-500 font-medium"
           ></textarea>
-
-          <p class="text-[10px] text-slate-500 leading-tight">
-            💡 <strong>గమనిక:</strong> మొదటి లైన్ ఆటోమేటిక్‌గా <strong>పెద్ద శీర్షికగా</strong> మారుతుంది. 2వ లైన్ నుండి వచ్చే మేటర్ అంతా <strong>సారాంశ పాయింట్లుగా</strong> కార్డ్‌లోకి సర్దుబాటు అవుతుంది!
-          </p>
         </div>
 
         <!-- 5. TYPOGRAPHY, STYLES & ALIGNMENT -->
         <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-3 text-xs">
-          <span class="font-black text-slate-800 block border-b border-slate-200 pb-1">
-            ✍️ ఫాంట్ శైలి & టెక్స్ట్ అడ్జస్ట్‌మెంట్
-          </span>
-
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block font-bold text-slate-600 mb-1">స్టైల్ బటన్లు</label>
@@ -562,7 +552,6 @@
             </div>
           </div>
 
-          <!-- Font Family & Sizes -->
           <div class="grid grid-cols-3 gap-2 pt-1">
             <div class="col-span-3">
               <label class="block font-bold text-slate-600 mb-1">ఫాంట్ ఎంపిక</label>
@@ -574,8 +563,8 @@
                 <option value="'Noto Sans Telugu', sans-serif">నోటో సాన్స్ (మోడ్రన్)</option>
                 <option value="'Suranna', serif">సూరన్న (క్లాసిక్ పత్రిక)</option>
                 <option value="'Gidugu', sans-serif">గిడుగు (రౌండెడ్)</option>
-                <option value="'Montserrat', sans-serif">Montserrat (English Display)</option>
-                <option value="'Bebas Neue', sans-serif">Bebas Neue (Viral Impact)</option>
+                <option value="'Montserrat', sans-serif">Montserrat (Display)</option>
+                <option value="'Bebas Neue', sans-serif">Bebas Neue (Viral)</option>
               </select>
             </div>
 
@@ -596,7 +585,6 @@
             </div>
           </div>
 
-          <!-- Color Pickers -->
           <div class="grid grid-cols-4 gap-2 pt-1 font-bold text-[10.5px]">
             <div>
               <label class="block text-slate-600 mb-1">శీర్షిక రంగు</label>
@@ -617,12 +605,8 @@
           </div>
         </div>
 
-        <!-- 6. PHOTO CONTROLS (MAIN & OPTIONAL BOTTOM PHOTO) -->
+        <!-- 6. PHOTO CONTROLS -->
         <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2 text-xs">
-          <span class="font-black text-slate-800 block border-b border-slate-200 pb-1">
-            🖼️ ఫోటోల ఎంపిక & పొజిషన్
-          </span>
-
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block font-bold text-slate-600 mb-1">ఫోటో ఫోకస్</label>
@@ -652,12 +636,11 @@
             </div>
 
             {#if layoutArrangement === 'text_middle_dual_img'}
-              <!-- Secondary Bottom Photo for Sandwich Layout -->
               <div class="border-2 border-dashed border-amber-300 bg-amber-50/50 p-2.5 rounded-xl text-center">
                 <input type="file" id="sec-p-in" accept="image/*" on:change={handleSecondaryPhoto} class="hidden" />
                 <label for="sec-p-in" class="cursor-pointer block">
                   <span class="text-lg block">📸</span>
-                  <span class="text-[11px] font-bold text-amber-900">కింది 2వ ఫోటో మార్చండి</span>
+                  <span class="text-[11px] font-bold text-amber-900">కింది 2వ ఫోటో</span>
                 </label>
               </div>
             {:else}
@@ -672,7 +655,7 @@
           </div>
         </div>
 
-        <!-- 7. CATEGORY & LOCATION SELECTORS -->
+        <!-- 7. CATEGORY & LOCATION -->
         <div class="grid grid-cols-2 gap-2 text-xs">
           <div>
             <label class="block font-bold text-slate-600 mb-1">వార్త కేటగిరీ</label>
@@ -693,13 +676,13 @@
           </div>
         </div>
 
-        <!-- 8. DOWNLOAD & MOBILE SHARE BUTTONS -->
+        <!-- 8. DOWNLOAD & SHARE BUTTONS -->
         <div class="grid grid-cols-2 gap-3 pt-2">
           <button
             type="button"
             on:click={downloadCardAsJpeg}
             disabled={isGenerating}
-            class="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 disabled:opacity-50 text-white font-black py-3.5 rounded-2xl shadow-md transition flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+            class="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 disabled:opacity-50 text-white font-black py-3.5 rounded-2xl shadow-md transition flex items-center justify-center gap-2 cursor-pointer active:scale-95 text-xs"
           >
             <span>🖼️</span>
             <span>{isGenerating ? 'సిద్ధమవుతోంది...' : 'HD JPEG డౌన్‌లోడ్'}</span>
@@ -708,7 +691,7 @@
           <button
             type="button"
             on:click={shareMobileNative}
-            class="bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3.5 rounded-2xl shadow-md transition flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+            class="bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3.5 rounded-2xl shadow-md transition flex items-center justify-center gap-2 cursor-pointer active:scale-95 text-xs"
           >
             <span>📲 WhatsApp షేర్</span>
           </button>
@@ -716,7 +699,7 @@
 
       </section>
 
-      <!-- RIGHT SIDE: LIVE PREVIEW STAGE (7 Columns) -->
+      <!-- RIGHT SIDE: LIVE PREVIEW STAGE -->
       <section class="lg:col-span-7 flex flex-col items-center justify-center">
         
         <div class="w-full mb-2.5 flex items-center justify-between text-xs text-slate-500 px-2 font-bold">
@@ -724,7 +707,7 @@
           <span class="text-red-600">లేఅవుట్: {layoutArrangement.toUpperCase()}</span>
         </div>
 
-        <!-- CARD RENDER STAGE CONTAINER -->
+        <!-- CARD RENDER CONTAINER -->
         <div class="overflow-hidden p-2 flex items-center justify-center w-full">
           
           <div
@@ -738,14 +721,12 @@
             "
           >
 
-            <!-- LAYOUT 1: TOP IMAGE - BOTTOM TEXT (Classic Standard) -->
+            <!-- LAYOUT 1: TOP IMAGE - BOTTOM TEXT -->
             {#if layoutArrangement === 'top_img_bottom_text'}
               
-              <!-- Top Photo -->
               <div class="relative w-full overflow-hidden bg-black flex-shrink-0" style="height: {photoHeightPercent}%;">
                 <img src={mainPhotoPreview} alt="News" crossorigin="anonymous" class="w-full h-full object-cover" style="object-position: {imagePosition};" />
 
-                <!-- Badges -->
                 <div class="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between z-10">
                   <div class="flex items-center gap-1.5 bg-black/85 px-2.5 py-1 rounded-lg border border-red-600 shadow">
                     <span class="bg-red-600 text-white font-black text-[10px] px-1.5 py-0.5 rounded">NS</span>
@@ -763,7 +744,6 @@
                 {/if}
               </div>
 
-              <!-- Headline -->
               <div class="px-4 py-2.5 shadow-md flex-shrink-0" style="background-color: {headlineBgColor};">
                 <h2
                   class="leading-snug tracking-tight m-0"
@@ -780,7 +760,6 @@
                 </h2>
               </div>
 
-              <!-- Bottom Summary Body -->
               <div class="flex-1 px-4 py-3 flex flex-col justify-between overflow-hidden" style="background-color: {cardBgColor};">
                 <div
                   class="leading-relaxed whitespace-pre-line"
@@ -804,10 +783,9 @@
                 </div>
               </div>
 
-            <!-- LAYOUT 2: TOP TEXT - BOTTOM IMAGE (Text Top, Photo Down) -->
+            <!-- LAYOUT 2: TOP TEXT - BOTTOM IMAGE -->
             {:else if layoutArrangement === 'top_text_bottom_img'}
 
-              <!-- Top Branding Strip -->
               <div class="p-3 pb-1 flex items-center justify-between border-b border-slate-800/60" style="background-color: {cardBgColor};">
                 <div class="flex items-center gap-1.5 bg-black/85 px-2.5 py-1 rounded-lg border border-red-600 shadow">
                   <span class="bg-red-600 text-white font-black text-[10px] px-1.5 py-0.5 rounded">NS</span>
@@ -818,7 +796,6 @@
                 </span>
               </div>
 
-              <!-- Top Headline Title -->
               <div class="px-4 py-2.5 shadow-md flex-shrink-0" style="background-color: {headlineBgColor};">
                 <h2
                   class="leading-snug tracking-tight m-0"
@@ -835,7 +812,6 @@
                 </h2>
               </div>
 
-              <!-- Summary in the Upper Middle -->
               <div class="px-4 py-2.5 overflow-hidden flex-shrink-0" style="background-color: {cardBgColor};">
                 <div
                   class="leading-relaxed whitespace-pre-line line-clamp-3"
@@ -852,7 +828,6 @@
                 </div>
               </div>
 
-              <!-- Bottom Image Area -->
               <div class="relative w-full flex-1 overflow-hidden bg-black">
                 <img src={mainPhotoPreview} alt="News" crossorigin="anonymous" class="w-full h-full object-cover" style="object-position: {imagePosition};" />
                 
@@ -862,12 +837,11 @@
                 </div>
               </div>
 
-            <!-- LAYOUT 3: TEXT MIDDLE - DUAL IMAGE (Top Photo, Center Text, Bottom Photo) -->
+            <!-- LAYOUT 3: TEXT MIDDLE - DUAL IMAGE -->
             {:else if layoutArrangement === 'text_middle_dual_img'}
 
-              <!-- Top Photo (Half 1) -->
               <div class="relative w-full h-[32%] overflow-hidden bg-black flex-shrink-0">
-                <img src={mainPhotoPreview} alt="Top Scene" crossorigin="anonymous" class="w-full h-full object-cover" style="object-position: {imagePosition};" />
+                <img src={mainPhotoPreview} alt="Top" crossorigin="anonymous" class="w-full h-full object-cover" style="object-position: {imagePosition};" />
                 <div class="absolute top-2 left-2 flex items-center gap-1.5 bg-black/85 px-2 py-0.5 rounded border border-red-600">
                   <span class="bg-red-600 text-white font-black text-[9px] px-1 rounded">NS</span>
                   <span class="font-black text-[11px] text-white">NS NEWS</span>
@@ -877,7 +851,6 @@
                 </span>
               </div>
 
-              <!-- Middle Content Band (Headline + Summary Sandwich) -->
               <div class="flex-1 px-3 py-2 flex flex-col justify-center shadow-inner" style="background-color: {headlineBgColor};">
                 <h2
                   class="leading-tight m-0"
@@ -905,9 +878,8 @@
                 </p>
               </div>
 
-              <!-- Bottom Photo (Half 2) -->
               <div class="relative w-full h-[32%] overflow-hidden bg-black flex-shrink-0">
-                <img src={secondaryPhotoPreview} alt="Bottom Scene" crossorigin="anonymous" class="w-full h-full object-cover" />
+                <img src={secondaryPhotoPreview} alt="Bottom" crossorigin="anonymous" class="w-full h-full object-cover" />
                 
                 <div class="absolute bottom-2 left-2 right-2 flex items-center justify-between text-[10px] font-bold text-white bg-black/80 px-2 py-0.5 rounded">
                   <span class="font-mono text-amber-300">WWW.NEXLIFYNUCLEUS.IN</span>
@@ -915,7 +887,7 @@
                 </div>
               </div>
 
-            <!-- LAYOUT 4: FULL PHOTO OVERLAY (Viral Reels & Status Mode) -->
+            <!-- LAYOUT 4: FULL PHOTO OVERLAY -->
             {:else}
 
               <img
@@ -1002,17 +974,14 @@
             </button>
           </div>
 
-          <!-- Generated Card Image Preview -->
           <div class="overflow-hidden rounded-2xl border border-slate-200 bg-slate-900 max-h-[58vh] flex items-center justify-center">
             <img src={generatedCardImage} alt="Generated HD Card" class="w-full h-auto object-contain" />
           </div>
 
-          <!-- Mobile Direct Save Tip -->
           <div class="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-[11px] text-amber-900 text-left">
             💡 <strong>మొబైల్ సూచన:</strong> పైన ఉన్న ఫోటోపై 2 సెకన్లు వేలితో నొక్కి పట్టుకొని (Long Press) <strong>"Download image"</strong> లేదా <strong>"Save image"</strong> నొక్కండి; నేరుగా ఫోన్ గ్యాలరీలోకి సేవ్ అవుతుంది!
           </div>
 
-          <!-- Action Buttons -->
           <div class="grid grid-cols-2 gap-2 pt-1">
             <a
               href={generatedCardImage}
