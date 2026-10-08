@@ -6,6 +6,7 @@
   let authChecking = true;
   let loadingData = true;
 
+  // Budget state (persisted)
   let budget = 2500000;
   let transactions = [];
   let loanRecords = [];
@@ -33,6 +34,14 @@
   };
 
   onMount(async () => {
+    // Load persisted budget
+    if (typeof window !== 'undefined') {
+      const savedBudget = localStorage.getItem('ASV_CONTRACTOR_BUDGET');
+      if (savedBudget) {
+        budget = Number(savedBudget);
+      }
+    }
+
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       goto('/admin/login');
@@ -49,23 +58,23 @@
         .from('contractor_transactions')
         .select('*')
         .order('date', { ascending: false });
-      transactions = txData || [];
+      transactions = txData ? txData : [];
 
       const { data: loanData } = await supabase
         .from('contractor_loans')
         .select('*')
         .order('id', { ascending: false });
-      loanRecords = loanData || [];
+      loanRecords = loanData ? loanData : [];
 
       const { data: mbData } = await supabase
         .from('contractor_mbook')
         .select('*');
-      mbRecords = mbData || [];
+      mbRecords = mbData ? mbData : [];
 
       const { data: labData } = await supabase
         .from('contractor_labour')
         .select('*');
-      labourRecords = labData || [];
+      labourRecords = labData ? labData : [];
     } catch (e) {
       console.error('Server fetch error:', e);
     } finally {
@@ -73,25 +82,59 @@
     }
   }
 
+  // Edit budget function
+  function editBudget() {
+    const val = prompt('ప్రాజెక్ట్ మొత్తం బడ్జెట్ / వర్క్ ఆర్డర్ విలువ (₹) నమోదు చేయండి:', budget);
+    if (val !== null && !isNaN(val) && Number(val) >= 0) {
+      budget = Number(val);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('ASV_CONTRACTOR_BUDGET', budget);
+      }
+    }
+  }
+
   $: totalInflow = transactions
     .filter(t => t.category === 'Money In')
-    .reduce((s, t) => s + Number(t.amount || 0), 0);
+    .reduce((s, t) => s + (t.amount ? Number(t.amount) : 0), 0);
 
   $: totalPaidExpenses = transactions
     .filter(t => t.category !== 'Money In' && t.source !== 'Credit')
-    .reduce((s, t) => s + Number(t.amount || 0), 0);
+    .reduce((s, t) => s + (t.amount ? Number(t.amount) : 0), 0);
 
   $: totalPayablesDue = transactions
     .filter(t => t.source === 'Credit' && t.status === 'Due')
-    .reduce((s, t) => s + Number(t.balance || t.amount || 0), 0);
+    .reduce((s, t) => {
+      const amt = t.balance ? Number(t.balance) : (t.amount ? Number(t.amount) : 0);
+      return s + amt;
+    }, 0);
 
-  $: cashIn = transactions.filter(t => t.category === 'Money In' && t.source === 'Cash').reduce((s, t) => s + Number(t.amount || 0), 0);
-  $: cashOut = transactions.filter(t => t.category !== 'Money In' && t.source === 'Cash').reduce((s, t) => s + Number(t.amount || 0), 0);$: cashBalance = cashIn - cashOut;
+  $: cashIn = transactions
+    .filter(t => t.category === 'Money In' && t.source === 'Cash')
+    .reduce((s, t) => s + (t.amount ? Number(t.amount) : 0), 0);
 
-  $: bankIn = transactions.filter(t => t.category === 'Money In' && t.source === 'Bank').reduce((s, t) => s + Number(t.amount || 0), 0);
-  $: bankOut = transactions.filter(t => t.category !== 'Money In' && (t.source === 'Bank' || t.source === 'UPI')).reduce((s, t) => s + Number(t.amount || 0), 0);$: bankBalance = bankIn - bankOut;
+  $: cashOut = transactions
+    .filter(t => t.category !== 'Money In' && t.source === 'Cash')
+    .reduce((s, t) => s + (t.amount ? Number(t.amount) : 0), 0);
 
-  $: loanOutstanding = loanRecords.reduce((sum, l) => sum + (Number(l.principal || 0) - Number(l.repaid_amount || 0)), 0);$: totalLiquidity = cashBalance + bankBalance;
+  $: cashBalance = cashIn - cashOut;
+
+  $: bankIn = transactions
+    .filter(t => t.category === 'Money In' && t.source === 'Bank')
+    .reduce((s, t) => s + (t.amount ? Number(t.amount) : 0), 0);
+
+  $: bankOut = transactions
+    .filter(t => t.category !== 'Money In' && (t.source === 'Bank' ? true : t.source === 'UPI'))
+    .reduce((s, t) => s + (t.amount ? Number(t.amount) : 0), 0);
+
+  $: bankBalance = bankIn - bankOut;
+
+  $: loanOutstanding = loanRecords.reduce((sum, l) => {
+    const p = l.principal ? Number(l.principal) : 0;
+    const r = l.repaid_amount ? Number(l.repaid_amount) : 0;
+    return sum + (p - r);
+  }, 0);
+
+  $: totalLiquidity = cashBalance + bankBalance;
   $: budgetRemaining = budget - totalPaidExpenses;
 
   async function submitExpense() {
@@ -234,40 +277,68 @@
       {#if loadingData}
         <div class="py-16 text-center text-slate-400 font-bold text-xs">డేటా లోడ్ అవుతోంది...</div>
       {:else}
+        <!-- 7 Core Financial Cards -->
         <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-          <div class="bg-white border border-slate-200 p-3.5 rounded-2xl shadow-sm">
-            <span class="text-[10px] font-bold text-slate-500 uppercase block">ప్రాజెక్ట్ బడ్జెట్</span>
-            <div class="text-sm sm:text-base font-black font-mono text-slate-900 mt-1">₹ {budget.toLocaleString('en-IN')}</div>
+          
+          <!-- EDITABLE PROJECT BUDGET CARD -->
+          <div class="bg-white border border-slate-200 p-3.5 rounded-2xl shadow-sm flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-bold text-slate-500 uppercase block">ప్రాజెక్ట్ బడ్జెట్</span>
+                <button
+                  type="button"
+                  on:click={editBudget}
+                  class="text-[10.5px] font-bold text-amber-600 hover:text-amber-700 hover:underline cursor-pointer"
+                  title="బడ్జెట్ మార్చండి"
+                >
+                  ✏️ మార్చండి
+                </button>
+              </div>
+              <div class="text-sm sm:text-base font-black font-mono text-slate-900 mt-1">₹ {budget.toLocaleString('en-IN')}</div>
+            </div>
+            <span class="text-[9.5px] text-slate-400 mt-0.5">మంజూరైన వ్యయం</span>
           </div>
+
           <div class="bg-white border border-slate-200 p-3.5 rounded-2xl shadow-sm">
             <span class="text-[10px] font-bold text-emerald-600 uppercase block">మొత్తం ఇన్‌ఫ్లో (In)</span>
             <div class="text-sm sm:text-base font-black font-mono text-emerald-600 mt-1">₹ {totalInflow.toLocaleString('en-IN')}</div>
+            <span class="text-[9.5px] text-slate-400">స్వంత + అప్పులు</span>
           </div>
+
           <div class="bg-white border border-slate-200 p-3.5 rounded-2xl shadow-sm">
             <span class="text-[10px] font-bold text-rose-600 uppercase block">సైట్ ఖర్చులు (Paid)</span>
             <div class="text-sm sm:text-base font-black font-mono text-rose-600 mt-1">₹ {totalPaidExpenses.toLocaleString('en-IN')}</div>
+            <span class="text-[9.5px] text-slate-400">చెల్లించిన నగదు</span>
           </div>
+
           <div class="bg-white border border-slate-200 p-3.5 rounded-2xl shadow-sm">
             <span class="text-[10px] font-bold text-blue-600 uppercase block">చేతిలో నగదు (Cash)</span>
             <div class="text-sm sm:text-base font-black font-mono text-blue-600 mt-1">₹ {cashBalance.toLocaleString('en-IN')}</div>
+            <span class="text-[9.5px] text-slate-400">పెట్టీ క్యాష్</span>
           </div>
+
           <div class="bg-white border border-slate-200 p-3.5 rounded-2xl shadow-sm">
             <span class="text-[10px] font-bold text-indigo-600 uppercase block">బ్యాంక్ / UPI నిల్వ</span>
             <div class="text-sm sm:text-base font-black font-mono text-indigo-600 mt-1">₹ {bankBalance.toLocaleString('en-IN')}</div>
+            <span class="text-[9.5px] text-slate-400">ఖాతా బ్యాలెన్స్</span>
           </div>
+
           <div class="bg-white border border-slate-200 p-3.5 rounded-2xl shadow-sm">
             <span class="text-[10px] font-bold text-amber-700 uppercase block">అప్పులు (Loans Due)</span>
             <div class="text-sm sm:text-base font-black font-mono text-amber-700 mt-1">₹ {loanOutstanding.toLocaleString('en-IN')}</div>
+            <span class="text-[9.5px] text-slate-400">చెల్లించాల్సిన అప్పు</span>
           </div>
+
           <div class="bg-white border border-slate-200 p-3.5 rounded-2xl shadow-sm col-span-2 sm:col-span-1">
             <span class="text-[10px] font-bold text-purple-600 uppercase block">సప్లయర్ బాకీ (Dues)</span>
             <div class="text-sm sm:text-base font-black font-mono text-purple-600 mt-1">₹ {totalPayablesDue.toLocaleString('en-IN')}</div>
+            <span class="text-[9.5px] text-slate-400">ఉధార్ బిల్లులు</span>
           </div>
         </div>
 
         <div class="bg-white border-2 border-slate-200 rounded-3xl p-5 shadow-sm space-y-3">
           <div class="flex items-center justify-between border-b border-slate-100 pb-2">
-            <h3 class="text-xs font-black uppercase text-amber-600 flex items-center gap-2">
+            <h3 class="text-xs font-black uppercase text-amber-600 flex items-center gap-2 font-['Ramabhadra']">
               <span>⚡</span> <span>సర్వర్ డబుల్-ఎంట్రీ లిక్విడిటీ స్టేటస్ (Live Server Match)</span>
             </h3>
             <span class="text-[11px] font-mono font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">● Cloud Connected</span>
@@ -294,25 +365,25 @@
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <a href="/admin/contractor/ledger" class="bg-white border border-slate-200 p-4 rounded-2xl hover:border-amber-500 shadow-sm transition space-y-2">
-            <div class="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-xl">📜</div>
+          <a href="/admin/contractor/ledger" class="bg-white border border-slate-200 p-4 rounded-2xl hover:border-amber-500 shadow-sm transition space-y-2 group">
+            <div class="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-xl group-hover:scale-105 transition">📜</div>
             <h4 class="font-black text-sm text-slate-900">సైట్ లెడ్జర్ & క్యాష్ ఫ్లో</h4>
-            <p class="text-xs text-slate-500">రోజువారీ ఖర్చులు, చెల్లింపుల పూర్తి రికార్డు.</p>
+            <p class="text-xs text-slate-500 leading-relaxed">రోజువారీ ఖర్చులు, చెల్లింపుల పూర్తి రికార్డు.</p>
           </a>
-          <a href="/admin/contractor/party" class="bg-white border border-slate-200 p-4 rounded-2xl hover:border-amber-500 shadow-sm transition space-y-2">
-            <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-xl">👤</div>
+          <a href="/admin/contractor/party" class="bg-white border border-slate-200 p-4 rounded-2xl hover:border-amber-500 shadow-sm transition space-y-2 group">
+            <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-xl group-hover:scale-105 transition">👤</div>
             <h4 class="font-black text-sm text-slate-900">వ్యక్తిగత ఖాతా (Party 360°)</h4>
-            <p class="text-xs text-slate-500">వ్యక్తిగత లెడ్జర్ & వాట్సాప్ స్టేట్‌మెంట్.</p>
+            <p class="text-xs text-slate-500 leading-relaxed">వ్యక్తిగత లెడ్జర్ & వాట్సాప్ స్టేట్‌మెంట్.</p>
           </a>
-          <a href="/admin/contractor/mbook" class="bg-white border border-slate-200 p-4 rounded-2xl hover:border-amber-500 shadow-sm transition space-y-2">
-            <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-xl">📐</div>
+          <a href="/admin/contractor/mbook" class="bg-white border border-slate-200 p-4 rounded-2xl hover:border-amber-500 shadow-sm transition space-y-2 group">
+            <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-xl group-hover:scale-105 transition">📐</div>
             <h4 class="font-black text-sm text-slate-900">సివిల్ M-Book (కొలతలు)</h4>
-            <p class="text-xs text-slate-500">పొడవు, వెడల్పు, లోతు ఆటోమేటిక్ వాల్యూమ్.</p>
+            <p class="text-xs text-slate-500 leading-relaxed">పొడవు, వెడల్పు, లోతు ఆటోమేటిక్ వాల్యూమ్.</p>
           </a>
-          <a href="/admin/contractor/loans" class="bg-white border border-slate-200 p-4 rounded-2xl hover:border-amber-500 shadow-sm transition space-y-2">
-            <div class="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-xl">🏦</div>
+          <a href="/admin/contractor/loans" class="bg-white border border-slate-200 p-4 rounded-2xl hover:border-amber-500 shadow-sm transition space-y-2 group">
+            <div class="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-xl group-hover:scale-105 transition">🏦</div>
             <h4 class="font-black text-sm text-slate-900">అప్పులు & సప్లయర్ బాకీలు</h4>
-            <p class="text-xs text-slate-500">తెచ్చిన రుణాలు, వడ్డీ లెక్కలు, ఉధార్ బిల్లులు.</p>
+            <p class="text-xs text-slate-500 leading-relaxed">తెచ్చిన రుణాలు, వడ్డీ లెక్కలు, ఉధార్ బిల్లులు.</p>
           </a>
         </div>
       {/if}
@@ -322,7 +393,7 @@
       <div class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-3">
         <div class="bg-white rounded-3xl max-w-lg w-full p-5 space-y-4 shadow-2xl">
           <div class="flex items-center justify-between border-b pb-2">
-            <h3 class="font-black text-sm text-slate-900">➕ సైట్ ఖర్చు నమోదు</h3>
+            <h3 class="font-black text-sm text-slate-900 font-['Ramabhadra']">➕ సైట్ ఖర్చు నమోదు</h3>
             <button type="button" on:click={() => showExpenseModal = false} class="text-slate-400 font-bold">✕</button>
           </div>
           <form on:submit|preventDefault={submitExpense} class="space-y-3 text-xs">
@@ -365,7 +436,7 @@
                 <input type="date" bind:value={expForm.date} required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold" />
               </div>
             </div>
-            <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-2xl shadow transition text-xs">
+            <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-2xl shadow transition text-xs cursor-pointer">
               సర్వర్‌లో సేవ్ చేయండి ➔
             </button>
           </form>
@@ -377,7 +448,7 @@
       <div class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-3">
         <div class="bg-white rounded-3xl max-w-sm w-full p-5 space-y-4 shadow-2xl">
           <div class="flex items-center justify-between border-b pb-2">
-            <h3 class="font-black text-sm text-slate-900">💰 నగదు ఇన్‌ఫ్లో నమోదు</h3>
+            <h3 class="font-black text-sm text-slate-900 font-['Ramabhadra']">💰 నగదు ఇన్‌ఫ్లో నమోదు</h3>
             <button type="button" on:click={() => showMoneyInModal = false} class="text-slate-400 font-bold">✕</button>
           </div>
           <form on:submit|preventDefault={submitMoneyIn} class="space-y-3 text-xs">
@@ -407,7 +478,7 @@
                 </select>
               </div>
             </div>
-            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3 rounded-2xl shadow">
+            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3 rounded-2xl shadow cursor-pointer">
               సేవ్ చేయండి ➔
             </button>
           </form>
