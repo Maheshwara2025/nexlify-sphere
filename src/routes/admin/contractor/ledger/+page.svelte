@@ -35,7 +35,7 @@
   });
 
   async function deleteTx(id) {
-    if (!confirm('ఈ లావాదేవీని సర్వర్ నుండి తొలగించాలా?')) return;
+    if (!confirm('ఈ లావాదేవీని తొలగించాలా?')) return;
     const { error } = await supabase.from('contractor_transactions').delete().eq('id', id);
     if (!error) {
       transactions = transactions.filter(t => t.id !== id);
@@ -67,7 +67,7 @@
     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
       <div>
         <a href="/admin/contractor" class="text-xs font-bold text-amber-600 hover:underline">← ప్రధాన డాష్‌బోర్డ్</a>
-        <h1 class="text-base sm:text-xl font-black font-['Ramabhadra']">📜 పూర్తి సైట్ లెడ్జర్ & మనీ ఫ్లో (Cash Flow Ledger)</h1>
+        <h1 class="text-base sm:text-xl font-black font-['Ramabhadra']">📜 పూర్తి సైట్ లెడ్జర్ & క్యాష్ ఫ్లో</h1>
       </div>
 
       <div class="flex items-center gap-2">
@@ -80,7 +80,6 @@
       </div>
     </div>
 
-    <!-- Filters Panel -->
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
       <input
         type="text"
@@ -90,30 +89,29 @@
       />
 
       <select bind:value={filterCategory} class="border border-slate-200 bg-white rounded-xl p-2.5 font-bold shadow-sm">
-        <option value="ALL">అన్ని కేటగిరీలు (All Categories)</option>
-        <option value="Money In">Money In (ఇన్‌ఫ్లో)</option>
-        <option value="Materials">Materials (మెటీరియల్స్)</option>
-        <option value="Labour">Labour (కూలీలు)</option>
-        <option value="Centring">Centring (సెంట్రింగ్)</option>
-        <option value="Transport">Transport (ట్రాన్స్‌పోర్ట్/JCB)</option>
-        <option value="General">General (ఇతర ఖర్చులు)</option>
+        <option value="ALL">అన్ని కేటగిరీలు</option>
+        <option value="Money In">Money In</option>
+        <option value="Materials">Materials</option>
+        <option value="Labour">Labour</option>
+        <option value="Centring">Centring</option>
+        <option value="Transport">Transport</option>
+        <option value="General">General</option>
       </select>
 
       <select bind:value={filterSource} class="border border-slate-200 bg-white rounded-xl p-2.5 font-bold shadow-sm">
-        <option value="ALL">అన్ని పేమెంట్ మార్గాలు (All Sources)</option>
-        <option value="Cash">Cash in Hand (చేతి నగదు)</option>
-        <option value="Bank">Bank Netbanking</option>
-        <option value="UPI">UPI (PhonePe / GPay)</option>
-        <option value="Credit">Credit / ఉధార్ (బాకీ)</option>
+        <option value="ALL">అన్ని పేమెంట్ మార్గాలు</option>
+        <option value="Cash">Cash in Hand</option>
+        <option value="Bank">Bank</option>
+        <option value="UPI">UPI</option>
+        <option value="Credit">Credit (ఉధార్)</option>
       </select>
     </div>
 
-    <!-- Ledger Table -->
     <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
       {#if loading}
         <div class="py-12 text-center text-slate-400 font-bold text-xs">డేటా లోడ్ అవుతోంది...</div>
       {:else if filteredTransactions.length === 0}
-        <div class="py-12 text-center text-slate-400 font-bold text-xs">ఎలాంటి లావాదేవీలు కనుగొనబడలేదు.</div>
+        <div class="py-12 text-center text-slate-400 font-bold text-xs">లావాదేవీలు ఏవీ లేవు.</div>
       {:else}
         <div class="overflow-x-auto">
           <table class="w-full text-xs text-left border-collapse">
@@ -134,4 +132,53 @@
               {#each filteredTransactions as t}
                 <tr class="hover:bg-slate-50 transition">
                   <td class="p-3 font-mono text-slate-500">{t.date}</td>
-                  <td class="p-3
+                  <td class="p-3">
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold {t.category === 'Money In' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-800'}">
+                      {t.category}
+                    </span>
+                  </td>
+                  <td class="p-3 font-bold text-slate-900">{t.description}</td>
+                  <td class="p-3 font-mono">{t.source}</td>
+                  <td class="p-3 font-bold">{t.recipient}</td>
+                  <td class="p-3 text-right font-mono font-black {t.category === 'Money In' ? 'text-emerald-700' : 'text-slate-900'}">
+                    ₹ {Number(t.amount).toLocaleString('en-IN')}
+                  </td>
+                  <td class="p-3 text-right font-mono font-bold {t.status === 'Due' ? 'text-rose-600' : 'text-emerald-600'}">
+                    {t.status === 'Due' ? `బాకీ: ₹ ${t.balance}` : '✓ చెల్లించబడింది'}
+                  </td>
+                  <td class="p-3 text-center">
+                    {#if t.photo_url}
+                      <button on:click={() => previewPhotoUrl = t.photo_url} class="text-blue-600 font-bold hover:underline">
+                        📷 రశీదు
+                      </button>
+                    {:else}
+                      <span class="text-slate-300">-</span>
+                    {/if}
+                  </td>
+                  <td class="p-3 text-center">
+                    <button on:click={() => deleteTx(t.id)} class="text-rose-500 hover:text-rose-700 font-bold">
+                      ✕
+                    </button>
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      {/if}
+    </div>
+
+  </div>
+</div>
+
+{#if previewPhotoUrl}
+  <div class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-3 space-y-2">
+      <div class="flex justify-between items-center border-b pb-1">
+        <span class="text-xs font-bold text-slate-700">రశీదు ప్రివ్యూ</span>
+        <button on:click={() => previewPhotoUrl = null} class="font-bold">✕</button>
+      </div>
+      <img src={previewPhotoUrl} alt="Receipt" class="w-full max-h-[75vh] object-contain rounded-xl bg-slate-100" />
+    </div>
+  </div>
+{/if}
