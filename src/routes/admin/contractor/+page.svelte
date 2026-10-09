@@ -488,3 +488,9 @@
 
   </div>
 {/if}
+<a href="/admin/contractor/materials" class="px-3.5 py-2 border-b-2 border-transparent text-slate-600 hover:text-slate-900 whitespace-nowrap">
+  🧱 మెటీరియల్స్ & రవాణా
+</a>
+<a href="/admin/contractor/daily-work" class="px-3.5 py-2 border-b-2 border-transparent text-slate-600 hover:text-slate-900 whitespace-nowrap">
+  📅 డైలీ సైట్ డైరీ
+</a>
