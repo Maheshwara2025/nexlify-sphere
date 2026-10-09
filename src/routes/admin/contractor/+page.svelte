@@ -6,8 +6,7 @@
   let authChecking = true;
   let loadingData = true;
 
-  // Budget state (persisted)
-  let budget = 2500000;
+  let budget = 200000;
   let transactions = [];
   let loanRecords = [];
   let mbRecords = [];
@@ -34,7 +33,6 @@
   };
 
   onMount(async () => {
-    // Load persisted budget
     if (typeof window !== 'undefined') {
       const savedBudget = localStorage.getItem('ASV_CONTRACTOR_BUDGET');
       if (savedBudget) {
@@ -82,7 +80,6 @@
     }
   }
 
-  // Edit budget function
   function editBudget() {
     const val = prompt('ప్రాజెక్ట్ మొత్తం బడ్జెట్ / వర్క్ ఆర్డర్ విలువ (₹) నమోదు చేయండి:', budget);
     if (val !== null && !isNaN(val) && Number(val) >= 0) {
@@ -211,6 +208,7 @@
 {:else}
   <div class="min-h-screen bg-[#f8fafc] text-slate-900 font-sans pb-28">
 
+    <!-- HEADER -->
     <header class="bg-white border-b-2 border-amber-500 sticky top-0 z-40 shadow-sm">
       <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-3">
@@ -251,9 +249,16 @@
         </div>
       </div>
 
+      <!-- FULL CONNECTED NAVBAR -->
       <div class="max-w-7xl mx-auto px-4 flex items-center gap-1 overflow-x-auto border-t border-slate-100 pt-1 text-xs font-bold scrollbar-none">
         <a href="/admin/contractor" class="px-3.5 py-2 border-b-2 border-amber-600 text-amber-600 font-black whitespace-nowrap">
           📊 డాష్‌బోర్డ్ (Overview)
+        </a>
+        <a href="/admin/contractor/materials" class="px-3.5 py-2 border-b-2 border-transparent text-slate-600 hover:text-slate-900 whitespace-nowrap">
+          🧱 మెటీరియల్స్ & బిల్లులు
+        </a>
+        <a href="/admin/contractor/daily-work" class="px-3.5 py-2 border-b-2 border-transparent text-slate-600 hover:text-slate-900 whitespace-nowrap">
+          📅 డైలీ సైట్ డైరీ & ఫోటోలు
         </a>
         <a href="/admin/contractor/ledger" class="px-3.5 py-2 border-b-2 border-transparent text-slate-600 hover:text-slate-900 whitespace-nowrap">
           📜 పూర్తి లెడ్జర్ (Cash Flow)
@@ -279,8 +284,6 @@
       {:else}
         <!-- 7 Core Financial Cards -->
         <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-          
-          <!-- EDITABLE PROJECT BUDGET CARD -->
           <div class="bg-white border border-slate-200 p-3.5 rounded-2xl shadow-sm flex flex-col justify-between">
             <div>
               <div class="flex items-center justify-between">
@@ -336,6 +339,7 @@
           </div>
         </div>
 
+        <!-- Reconciliation Strip -->
         <div class="bg-white border-2 border-slate-200 rounded-3xl p-5 shadow-sm space-y-3">
           <div class="flex items-center justify-between border-b border-slate-100 pb-2">
             <h3 class="text-xs font-black uppercase text-amber-600 flex items-center gap-2 font-['Ramabhadra']">
@@ -364,31 +368,48 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <a href="/admin/contractor/ledger" class="bg-white border border-slate-200 p-4 rounded-2xl hover:border-amber-500 shadow-sm transition space-y-2 group">
-            <div class="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-xl group-hover:scale-105 transition">📜</div>
-            <h4 class="font-black text-sm text-slate-900">సైట్ లెడ్జర్ & క్యాష్ ఫ్లో</h4>
-            <p class="text-xs text-slate-500 leading-relaxed">రోజువారీ ఖర్చులు, చెల్లింపుల పూర్తి రికార్డు.</p>
+        <!-- 6 CONNECTED ACTION MODULE CARDS -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <a href="/admin/contractor/materials" class="bg-white border border-slate-200 p-4 rounded-2xl hover:border-amber-500 shadow-sm transition space-y-2 group">
+            <div class="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-xl group-hover:scale-105 transition">🧱</div>
+            <h4 class="font-black text-sm text-slate-900">మెటీరియల్స్ & బిల్లులు (Materials + Qty)</h4>
+            <p class="text-xs text-slate-500 leading-relaxed">సిమెంట్, ఇసుక, ఐరన్ పరిమాణం, రేటు, కిరాయి మరియు బిల్లుల ఫోటో రశీదులు.</p>
           </a>
+
+          <a href="/admin/contractor/daily-work" class="bg-white border border-slate-200 p-4 rounded-2xl hover:border-amber-500 shadow-sm transition space-y-2 group">
+            <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-xl group-hover:scale-105 transition">📅</div>
+            <h4 class="font-black text-sm text-slate-900">డైలీ సైట్ డైరీ & ప్రోగ్రెస్ (Daily Log)</h4>
+            <p class="text-xs text-slate-500 leading-relaxed">రోజువారీ పనుల కేటాయింపు, మేస్త్రీల కూలీల హాజరు మరియు లైవ్ సైట్ ఫోటోలు.</p>
+          </a>
+
           <a href="/admin/contractor/party" class="bg-white border border-slate-200 p-4 rounded-2xl hover:border-amber-500 shadow-sm transition space-y-2 group">
-            <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-xl group-hover:scale-105 transition">👤</div>
+            <div class="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-xl group-hover:scale-105 transition">👤</div>
             <h4 class="font-black text-sm text-slate-900">వ్యక్తిగత ఖాతా (Party 360°)</h4>
-            <p class="text-xs text-slate-500 leading-relaxed">వ్యక్తిగత లెడ్జర్ & వాట్సాప్ స్టేట్‌మెంట్.</p>
+            <p class="text-xs text-slate-500 leading-relaxed">ప్రతి సప్లయర్, మేస్త్రి పూర్తి లెక్కలు మరియు 1-క్లిక్ WhatsApp స్టేట్‌మెంట్.</p>
           </a>
+
           <a href="/admin/contractor/mbook" class="bg-white border border-slate-200 p-4 rounded-2xl hover:border-amber-500 shadow-sm transition space-y-2 group">
             <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-xl group-hover:scale-105 transition">📐</div>
             <h4 class="font-black text-sm text-slate-900">సివిల్ M-Book (కొలతలు)</h4>
-            <p class="text-xs text-slate-500 leading-relaxed">పొడవు, వెడల్పు, లోతు ఆటోమేటిక్ వాల్యూమ్.</p>
+            <p class="text-xs text-slate-500 leading-relaxed">PWD ప్రమాణాల ప్రకారం పొడవు, వెడల్పు, లోతు ఆటోమేటిక్ వాల్యూమ్ లెక్కలు.</p>
           </a>
+
+          <a href="/admin/contractor/labour" class="bg-white border border-slate-200 p-4 rounded-2xl hover:border-amber-500 shadow-sm transition space-y-2 group">
+            <div class="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center text-xl group-hover:scale-105 transition">👷</div>
+            <h4 class="font-black text-sm text-slate-900">లేబర్ మస్టర్ & సెంట్రింగ్</h4>
+            <p class="text-xs text-slate-500 leading-relaxed">కూలీల రోజువారీ హాజరు, అడ్వాన్సులు మరియు చెల్లించాల్సిన వేతనాలు.</p>
+          </a>
+
           <a href="/admin/contractor/loans" class="bg-white border border-slate-200 p-4 rounded-2xl hover:border-amber-500 shadow-sm transition space-y-2 group">
-            <div class="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-xl group-hover:scale-105 transition">🏦</div>
+            <div class="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-xl group-hover:scale-105 transition">🏦</div>
             <h4 class="font-black text-sm text-slate-900">అప్పులు & సప్లయర్ బాకీలు</h4>
-            <p class="text-xs text-slate-500 leading-relaxed">తెచ్చిన రుణాలు, వడ్డీ లెక్కలు, ఉధార్ బిల్లులు.</p>
+            <p class="text-xs text-slate-500 leading-relaxed">తెచ్చిన రుణాలు, వడ్డీ లెక్కలు మరియు చెల్లించాల్సిన ఉధార్ బిల్లులు.</p>
           </a>
         </div>
       {/if}
     </main>
 
+    <!-- Modals -->
     {#if showExpenseModal}
       <div class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-3">
         <div class="bg-white rounded-3xl max-w-lg w-full p-5 space-y-4 shadow-2xl">
@@ -488,9 +509,3 @@
 
   </div>
 {/if}
-<a href="/admin/contractor/materials" class="px-3.5 py-2 border-b-2 border-transparent text-slate-600 hover:text-slate-900 whitespace-nowrap">
-  🧱 మెటీరియల్స్ & రవాణా
-</a>
-<a href="/admin/contractor/daily-work" class="px-3.5 py-2 border-b-2 border-transparent text-slate-600 hover:text-slate-900 whitespace-nowrap">
-  📅 డైలీ సైట్ డైరీ
-</a>
