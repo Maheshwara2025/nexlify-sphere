@@ -20,7 +20,12 @@
     bill_photo: ''
   };
 
-  $: materialCost = (Number(form.quantity \vert{}\vert{} 0) * Number(form.unit_rate \vert{}\vert{} 0));$: calculatedTotal = materialCost + Number(form.transport_cost || 0);
+  // Safe math calculations without any symbol errors
+  $: q = form.quantity ? Number(form.quantity) : 0;
+  $: r = form.unit_rate ? Number(form.unit_rate) : 0;
+  $: t = form.transport_cost ? Number(form.transport_cost) : 0;
+  $: materialCost = q * r;
+  $: calculatedTotal = materialCost + t;
 
   onMount(async () => {
     await loadData();
@@ -64,8 +69,16 @@
   }
 
   async function saveMaterial() {
-    if (!form.party_name || !form.quantity || !form.unit_rate) {
-      alert('దయచేసి సప్లయర్ పేరు, పరిమాణం మరియు రేటు నమోదు చేయండి.');
+    if (!form.party_name) {
+      alert('Dayachesi supplier peru enter cheyandi.');
+      return;
+    }
+    if (!form.quantity) {
+      alert('Dayachesi parimanam (quantity) enter cheyandi.');
+      return;
+    }
+    if (!form.unit_rate) {
+      alert('Dayachesi rate enter cheyandi.');
       return;
     }
 
@@ -82,7 +95,7 @@
       quantity: Number(form.quantity),
       unit: form.unit,
       unit_rate: Number(form.unit_rate),
-      transport_cost: Number(form.transport_cost || 0),
+      transport_cost: form.transport_cost ? Number(form.transport_cost) : 0,
       total_amount: total,
       paid_amount: paid,
       balance_amount: bal,
@@ -94,7 +107,7 @@
     await supabase.from('contractor_transactions').insert([{
       date: form.date,
       category: 'Materials',
-      description: `${form.quantity} ${form.unit} ${form.material_name} (కిరాయి: ₹${form.transport_cost})`,
+      description: `${form.quantity} ${form.unit} ${form.material_name} (Kirayi: Rs.${form.transport_cost ? form.transport_cost : 0})`,
       amount: total,
       source: form.payment_mode,
       recipient: form.party_name,
@@ -118,7 +131,7 @@
       };
       await loadData();
     } else {
-      alert('సేవ్ చేయడం విఫలమైంది: ' + matErr.message);
+      alert('Save cheyadam fail ayindi: ' + matErr.message);
     }
   }
 </script>
