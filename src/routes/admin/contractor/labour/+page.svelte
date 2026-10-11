@@ -7,6 +7,7 @@
   let showModal = false;
 
   let form = {
+    date: '2026-10-01',
     worker_name: '',
     role: 'పునాది తవ్వకం కూలీ (Excavation Labour)',
     days: 6,
@@ -27,23 +28,30 @@
     loading = false;
   }
 
+  function setQuickDate(d) {
+    form.date = d;
+  }
+
   async function addLabour() {
     if (!form.worker_name || !form.daily_rate) {
-      alert('Dayachesi kooli peru mariyu daily rate enter cheyandi.');
+      alert('దయచేసి కూలీ పేరు మరియు రోజువారీ రేటు నమోదు చేయండి.');
       return;
     }
 
     const { error } = await supabase.from('contractor_labour').insert([{
+      date: form.date,
       worker_name: form.worker_name,
       role: form.role,
-      days: Number(form.days),
+      days: Number(form.days ? form.days : 1),
       daily_rate: Number(form.daily_rate),
       advance_paid: Number(form.advance_paid ? form.advance_paid : 0)
     }]);
 
     if (!error) {
+      const curDate = form.date;
       showModal = false;
       form = {
+        date: curDate,
         worker_name: '',
         role: 'పునాది తవ్వకం కూలీ (Excavation Labour)',
         days: 6,
@@ -52,12 +60,12 @@
       };
       await fetchLabour();
     } else {
-      alert('Save cheyadam fail ayindi: ' + error.message);
+      alert('సేవ్ చేయడం విఫలమైంది: ' + error.message);
     }
   }
 
   async function deleteLabour(id) {
-    if (!confirm('Ee kooli record ni tholaginchala?')) return;
+    if (!confirm('ఈ కూలీ రికార్డును తొలగించాలా?')) return;
     const { error } = await supabase.from('contractor_labour').delete().eq('id', id);
     if (!error) {
       labourRecords = labourRecords.filter(l => l.id !== id);
@@ -76,6 +84,7 @@
       <div>
         <a href="/admin/contractor" class="text-xs font-bold text-amber-600 hover:underline">← ప్రధాన డాష్‌బోర్డ్</a>
         <h1 class="text-base sm:text-xl font-black font-['Ramabhadra']">👷 డైలీ లేబర్ మస్టర్ రోల్ & వేతనాల రిజిస్టర్</h1>
+        <p class="text-xs text-slate-500">పునాది తవ్వకం, రాతి పని, కూలీల రోజువారీ హాజరు & బాకీల వివరాలు</p>
       </div>
 
       <button on:click={() => showModal = true} class="bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black px-3.5 py-2 rounded-xl shadow transition cursor-pointer">
@@ -87,12 +96,13 @@
       {#if loading}
         <div class="py-12 text-center text-slate-400 font-bold text-xs">మస్టర్ లోడ్ అవుతోంది...</div>
       {:else if labourRecords.length === 0}
-        <div class="py-12 text-center text-slate-400 font-bold text-xs">ప్రస్తుతం ఎలాంటి లేబర్ రికార్డులు లేవు. పైనున్న బటన్ నొక్కి నమోదు చేయండి.</div>
+        <div class="py-12 text-center text-slate-400 font-bold text-xs bg-white">ప్రస్తుతం ఎలాంటి లేబర్ రికార్డులు లేవు. పైనున్న బటన్ నొక్కి 1వ తేదీ నుండి నమోదు చేయండి.</div>
       {:else}
         <div class="overflow-x-auto">
           <table class="w-full text-xs text-left border-collapse">
             <thead>
               <tr class="bg-slate-900 text-white uppercase text-[11px]">
+                <th class="p-3">తేదీ</th>
                 <th class="p-3">కూలీ / మేస్త్రి పేరు</th>
                 <th class="p-3">పని రకం</th>
                 <th class="p-3 text-center">పనిచేసిన రోజులు</th>
@@ -108,6 +118,7 @@
                 {@const totalEarned = Number(l.days) * Number(l.daily_rate)}
                 {@const balanceDue = totalEarned - Number(l.advance_paid ? l.advance_paid : 0)}
                 <tr class="hover:bg-slate-50 transition">
+                  <td class="p-3 font-mono text-slate-500">{l.date ? l.date : '-'}</td>
                   <td class="p-3 font-bold text-slate-900">{l.worker_name}</td>
                   <td class="p-3 text-slate-600 font-bold">{l.role}</td>
                   <td class="p-3 text-center font-mono">{l.days}</td>
@@ -138,6 +149,22 @@
       </div>
 
       <form on:submit|preventDefault={addLabour} class="space-y-3">
+        <!-- Date Selector -->
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="font-bold text-slate-700">పని తేదీ *</label>
+            <div class="flex gap-1">
+              <button type="button" on:click={() => setQuickDate('2026-10-01')} class="text-[10px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded font-bold hover:bg-amber-200">
+                1వ తేదీ
+              </button>
+              <button type="button" on:click={() => setQuickDate(new Date().toISOString().split('T')[0])} class="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-bold hover:bg-slate-200">
+                ఈరోజు
+              </button>
+            </div>
+          </div>
+          <input type="date" bind:value={form.date} required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-mono font-bold" />
+        </div>
+
         <div>
           <label class="block font-bold text-slate-700 mb-1">కూలీ / మేస్త్రి పేరు *</label>
           <input type="text" bind:value={form.worker_name} required placeholder="ఉదా: రాములు మేస్త్రి / పోచయ్య" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold" />

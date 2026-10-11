@@ -291,7 +291,7 @@
 
         <div>
           <label class="block font-bold text-slate-700 mb-1">బిల్లు / చలాన్ రశీదు ఫోటో తీయండి</label>
-          <input type="file" accept="image/*" capture="environment" on:change={handlePhotoUpload} class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-slate-500" />
+          <input type="file" accept="image/*" on:change={handlePhotoUpload} class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-slate-500" />
         </div>
 
         <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-2xl shadow transition">
