@@ -30,10 +30,11 @@
   $: supPaid = partyTx.filter(t => t.status === 'Paid').reduce((s, t) => s + (t.amount ? Number(t.amount) : 0), 0);
   $: supDue = partyTx.filter(t => t.status === 'Due').reduce((s, t) => s + (t.balance ? Number(t.balance) : Number(t.amount || 0)), 0);
 
-  // Calculation for Labour / Mestri
-  $: labTotalDays = partyLabour.reduce((s, l) => s + Number(l.days \vert{}\vert{} 1), 0);$: labTotalEarned = partyLabour.reduce((s, l) => s + (Number(l.days || 1) * Number(l.daily_rate || 0)), 0);
-  $: labAdvancePaid = partyLabour.reduce((s, l) => s + Number(l.advance_paid \vert{}\vert{} 0), 0);$: labNetDue = labTotalEarned - labAdvancePaid;
-
+  // Calculation for Labour / Mestri without any symbol errors
+  $: labTotalDays = partyLabour.reduce((s, l) => s + (l.days ? Number(l.days) : 1), 0);
+  $: labTotalEarned = partyLabour.reduce((s, l) => s + ((l.days ? Number(l.days) : 1) * (l.daily_rate ? Number(l.daily_rate) : 0)), 0);
+  $: labAdvancePaid = partyLabour.reduce((s, l) => s + (l.advance_paid ? Number(l.advance_paid) : 0), 0);
+  $: labNetDue = labTotalEarned - labAdvancePaid;
   function shareWhatsApp() {
     let text = `*A.S.V. ENTERPRISES - వ్యక్తిగత ఖాతా నివేదిక*\n\n`;
     text += `పేరు: ${selectedParty}\n`;

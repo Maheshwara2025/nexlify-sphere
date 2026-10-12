@@ -18,10 +18,14 @@
     advance_paid: 5000,
     notes: 'కాంపౌండ్ వాల్ సెంట్రింగ్ & ప్లేట్స్'
   };
+$: lengthVal = form.length_ft ? Number(form.length_ft) : 0;
+  $: heightVal = form.height_ft ? Number(form.height_ft) : 0;
+  $: rateVal = form.rate_per_unit ? Number(form.rate_per_unit) : 0;
+  $: advanceVal = form.advance_paid ? Number(form.advance_paid) : 0;
 
-  $: calculatedUnits = form.calc_mode === 'Sft' ? (Number(form.length_ft || 0) * Number(form.height_ft || 0)) : Number(form.length_ft || 0);
-  $: totalContractCost = calculatedUnits * Number(form.rate_per_unit \vert{}\vert{} 0);$: balanceDue = totalContractCost - Number(form.advance_paid || 0);
-
+  $: calculatedUnits = form.calc_mode === 'Sft' ? (lengthVal * heightVal) : lengthVal;
+  $: totalContractCost = calculatedUnits * rateVal;
+  $: balanceDue = totalContractCost - advanceVal;
   onMount(async () => {
     await fetchContracts();
   });
