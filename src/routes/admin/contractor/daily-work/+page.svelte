@@ -3,17 +3,17 @@
   import { supabase } from '$lib/supabaseClient';
 
   let dailyLogs = [];
+  let labourRecords = [];
   let loading = true;
   let showModal = false;
   let previewPhoto = null;
 
-  // Work started on 1st of this month - default to manual date
   let form = {
-    date: '2026-10-01',
+    date: '2026-10-04',
     work_title: '',
     section_location: 'కాంపౌండ్ వాల్ / పునాది సైట్',
-    assigned_mestri: 'రాములు మేస్త్రి',
-    workers_count: 5,
+    assigned_mestri: '',
+    workers_count: 1,
     work_status: 'Completed',
     site_photo: '',
     notes: ''
@@ -25,17 +25,48 @@
 
   async function fetchLogs() {
     loading = true;
-    const { data } = await supabase.from('contractor_daily_works').select('*').order('date', { ascending: false });
-    dailyLogs = data ? data : [];
+    // 1. Fetch daily work logs
+    const { data: logs } = await supabase
+      .from('contractor_daily_works')
+      .select('*')
+      .order('date', { ascending: false });
+    dailyLogs = logs ? logs : [];
+
+    // 2. Fetch all labour & mestri records directly from labour muster
+    const { data: labours } = await supabase
+      .from('contractor_labour')
+      .select('*')
+      .order('id', { ascending: false });
+    labourRecords = labours ? labours : [];
+
     loading = false;
   }
 
-  // Quick Date Selectors
+  // Extract distinct Mestri & worker names from labour records
+  $: mestriList = Array.from(new Set(
+    labourRecords
+      .filter(l => l.role && (l.role.includes('మేస్త్రి') || l.role.includes('Mason') || l.role.includes('Head')))
+      .map(l => l.worker_name)
+      .filter(Boolean)
+  ));
+
+  // All workers list for reference
+  $: allWorkersList = Array.from(new Set(labourRecords.map(l => l.worker_name).filter(Boolean)));
+
+  // Auto-count workers present on the selected date
+  $: {
+    if (form.date && labourRecords.length > 0) {
+      const dayWorkers = labourRecords.filter(l => l.date === form.date);
+      if (dayWorkers.length > 0) {
+        form.workers_count = dayWorkers.length;
+      }
+    }
+  }
+
   function setQuickDate(d) {
     form.date = d;
   }
 
-  // Flexible Image Upload from Gallery or Camera
   function handlePhotoUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -65,7 +96,7 @@
 
   async function saveDailyWork() {
     if (!form.work_title || !form.assigned_mestri) {
-      alert('దయచేసి పని వివరాలు మరియు మేస్త్రి పేరు నమోదు చేయండి.');
+      alert('Dayachesi pani vivaralu mariyu mestri peru select cheyandi.');
       return;
     }
 
@@ -81,27 +112,26 @@
     }]);
 
     if (!error) {
-      // Keep the current working date (Sticky Date) so user can enter multiple items for same date
       const currentDate = form.date;
       showModal = false;
       form = {
         date: currentDate,
         work_title: '',
         section_location: 'కాంపౌండ్ వాల్ / పునాది సైట్',
-        assigned_mestri: form.assigned_mestri,
-        workers_count: 5,
+        assigned_mestri: '',
+        workers_count: 1,
         work_status: 'Completed',
         site_photo: '',
         notes: ''
       };
       await fetchLogs();
     } else {
-      alert('సేవ్ చేయడం విఫలమైంది: ' + error.message);
+      alert('Save cheyadam fail ayindi: ' + error.message);
     }
   }
 
   async function deleteLog(id) {
-    if (!confirm('ఈ రోజువారీ పని రికార్డును తొలగించాలా?')) return;
+    if (!confirm('Ee daily work record ni tholaginchala?')) return;
     const { error } = await supabase.from('contractor_daily_works').delete().eq('id', id);
     if (!error) {
       dailyLogs = dailyLogs.filter(d => d.id !== id);
@@ -120,7 +150,7 @@
       <div>
         <a href="/admin/contractor" class="text-xs font-bold text-amber-600 hover:underline">← ప్రధాన డాష్‌బోర్డ్</a>
         <h1 class="text-base sm:text-xl font-black font-['Ramabhadra']">📅 రోజువారీ సైట్ డైరీ & పనుల పురోగతి (Site Work Diary)</h1>
-        <p class="text-xs text-slate-500 font-medium">ఈ నెల 1వ తేదీ నుండి జరిగిన పనుల రిపోర్టులు, మేస్త్రీలు & గ్యాలరీ ఫోటోలు</p>
+        <p class="text-xs text-slate-500 font-medium">లేబర్ మస్టర్ తో అనుసంధానమైన మేస్త్రీలు, కూలీల సంఖ్య & సైట్ ఫోటోలు</p>
       </div>
 
       <button on:click={() => showModal = true} class="bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black px-3.5 py-2 rounded-xl shadow transition cursor-pointer">
@@ -132,7 +162,7 @@
       <div class="py-12 text-center text-slate-400 font-bold text-xs">లోడ్ అవుతోంది...</div>
     {:else if dailyLogs.length === 0}
       <div class="py-12 text-center text-slate-400 font-bold text-xs bg-white rounded-2xl border border-dashed">
-        ప్రస్తుతం ఎలాంటి సైట్ లాగ్స్ లేవు. పైనున్న బటన్ నొక్కి 1వ తేదీ నుండి జరిగిన పనులను నమోదు చేయండి.
+        ప్రస్తుతం ఎలాంటి సైట్ లాగ్స్ లేవు. పైనున్న బటన్ నొక్కి పనులను నమోదు చేయండి.
       </div>
     {:else}
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -156,7 +186,7 @@
 
               <h3 class="font-black text-sm text-slate-900 font-['Ramabhadra']">{log.work_title}</h3>
               <p class="text-xs text-slate-600">📍 స్థలం: <strong>{log.section_location}</strong></p>
-              <p class="text-xs text-slate-600">👷 మేస్త్రి: <strong>{log.assigned_mestri}</strong> ({log.workers_count} మంది కూలీలు)</p>
+              <p class="text-xs text-slate-600">👷 పర్యవేక్షించిన మేస్త్రి: <strong class="text-amber-800">{log.assigned_mestri}</strong> ({log.workers_count} మంది కూలీలు)</p>
               {#if log.notes}
                 <p class="text-[11px] text-slate-600 bg-slate-50 p-2 rounded-lg italic border border-slate-100">{log.notes}</p>
               {/if}
@@ -176,7 +206,7 @@
   </div>
 </div>
 
-<!-- Modal -->
+<!-- Modal with Auto-Linked Labour/Mestri List -->
 {#if showModal}
   <div class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-3">
     <div class="bg-white rounded-3xl max-w-md w-full p-5 space-y-4 shadow-2xl text-xs max-h-[92vh] overflow-y-auto">
@@ -191,11 +221,11 @@
           <div class="flex items-center justify-between mb-1">
             <label class="font-bold text-slate-700">పని జరిగిన తేదీ (Manual Date) *</label>
             <div class="flex gap-1">
-              <button type="button" on:click={() => setQuickDate('2026-10-01')} class="text-[10px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded font-bold hover:bg-amber-200">
-                1వ తేదీ
+              <button type="button" on:click={() => setQuickDate('2026-10-04')} class="text-[10px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded font-bold hover:bg-amber-200">
+                04వ తేదీ
               </button>
-              <button type="button" on:click={() => setQuickDate(new Date(Date.now() - 86400000).toISOString().split('T')[0])} class="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-bold hover:bg-slate-200">
-                నిన్న
+              <button type="button" on:click={() => setQuickDate('2026-10-01')} class="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-bold hover:bg-slate-200">
+                01వ తేదీ
               </button>
               <button type="button" on:click={() => setQuickDate(new Date().toISOString().split('T')[0])} class="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-bold hover:bg-slate-200">
                 ఈరోజు
@@ -203,7 +233,6 @@
             </div>
           </div>
           <input type="date" bind:value={form.date} required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-mono font-bold text-sm" />
-          <span class="text-[10.5px] text-slate-400">పని 1వ తేదీ మొదలైనందున కావలసిన పాత తేదీని సులభంగా ఎంచుకోవచ్చు.</span>
         </div>
 
         <div>
@@ -213,17 +242,34 @@
 
         <div>
           <label class="block font-bold text-slate-700 mb-1">సెక్షన్ / స్థలం (Section Location)</label>
-          <input type="text" bind:value={form.section_location} placeholder="ఉదా: కాంపౌండ్ వాల్ ఉత్తరం వైపు / సీసీ రోడ్డు" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5" />
+          <input type="text" bind:value={form.section_location} placeholder="ఉదా: కాంపౌండ్ వాల్ / పునాది సైట్" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold" />
         </div>
 
         <div class="grid grid-cols-2 gap-2">
+          <!-- Dynamic Mestri Dropdown Auto-Linked to Labour Master -->
           <div>
-            <label class="block font-bold text-slate-700 mb-1">మేస్త్రి పేరు *</label>
-            <input type="text" bind:value={form.assigned_mestri} required placeholder="ఉదా: రాములు మేస్త్రి" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold" />
+            <label class="block font-bold text-slate-700 mb-1">మేస్త్రి పేరు (Master Link) *</label>
+            <input 
+              type="text" 
+              list="labour-mestri-list" 
+              bind:value={form.assigned_mestri} 
+              required 
+              placeholder="మేస్త్రిని ఎంచుకోండి" 
+              class="w-full bg-amber-50 border border-amber-300 rounded-xl p-2.5 font-bold text-slate-900" 
+            />
+            <datalist id="labour-mestri-list">
+              {#each (mestriList.length > 0 ? mestriList : allWorkersList) as name}
+                <option value={name}></option>
+              {/each}
+            </datalist>
+            <span class="text-[9.5px] text-amber-700 font-medium">లేబర్ మస్టర్ నుండి ఆటో-లింక్ అయింది.</span>
           </div>
+
+          <!-- Auto Calculated Labour Count for the Date -->
           <div>
             <label class="block font-bold text-slate-700 mb-1">కూలీల సంఖ్య (Labourers)</label>
             <input type="number" bind:value={form.workers_count} class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-mono font-bold" />
+            <span class="text-[9.5px] text-slate-400">తేదీకి తగినట్లు ఆటోమేటిక్ సంఖ్య.</span>
           </div>
         </div>
 
@@ -236,7 +282,7 @@
           </select>
         </div>
 
-        <!-- Image Upload from Gallery / Files (No Direct Camera Force) -->
+        <!-- Image Upload from Gallery / Files -->
         <div>
           <label class="block font-bold text-slate-700 mb-1">📁 సైట్ ఫోటో అప్‌లోడ్ చేయండి (గ్యాలరీ లేదా కెమెరా)</label>
           <input 
@@ -245,7 +291,6 @@
             on:change={handlePhotoUpload} 
             class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-slate-600 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-amber-100 file:text-amber-800 hover:file:bg-amber-200" 
           />
-          <span class="text-[10px] text-slate-400 block mt-0.5">మొబైల్ గ్యాలరీ లేదా ఫైల్స్ నుండి కూడా ఫోటోను ఎంచుకోవచ్చు.</span>
         </div>
 
         {#if form.site_photo}
