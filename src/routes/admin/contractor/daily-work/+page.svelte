@@ -4,6 +4,7 @@
 
   let dailyLogs = [];
   let labourRecords = [];
+  let profiles = [];
   let loading = true;
   let showModal = false;
   let previewPhoto = null;
@@ -16,8 +17,7 @@
     workers_count: 1,
     work_status: 'Completed',
     site_photo: '',
-    notes: '',
-    gang_breakdown: ''
+    notes: ''
   };
 
   onMount(async () => {
@@ -26,34 +26,24 @@
 
   async function fetchLogs() {
     loading = true;
-    const { data: logs } = await supabase
-      .from('contractor_daily_works')
-      .select('*')
-      .order('date', { ascending: false });
+    const { data: logs } = await supabase.from('contractor_daily_works').select('*').order('date', { ascending: false });
     dailyLogs = logs ? logs : [];
 
-    const { data: labours } = await supabase
-      .from('contractor_labour')
-      .select('*')
-      .order('id', { ascending: false });
+    const { data: labours } = await supabase.from('contractor_labour').select('*').order('id', { ascending: false });
     labourRecords = labours ? labours : [];
+
+    const { data: profs } = await supabase.from('contractor_labour_profiles').select('*');
+    profiles = profs ? profs : [];
 
     loading = false;
   }
 
-  // Workers on selected date
-  $: dayLabourers = labourRecords.filter(l => l.date === form.date);
-  
-  // Role-wise breakdown
-  $: masons = dayLabourers.filter(l => l.role && (l.role.includes('మేస్త్రి') || l.role.includes('Mason')));
+  $: dayLabourers = labourRecords.filter(l => l.date === form.date);$: masons = dayLabourers.filter(l => l.role && (l.role.includes('మేస్త్రి') || l.role.includes('Mason')));
   $: excavationWorkers = dayLabourers.filter(l => l.role && l.role.includes('పునాది'));
   $: femaleHelpers = dayLabourers.filter(l => l.role && l.role.includes('మహిళా'));
   $: maleHelpers = dayLabourers.filter(l => l.role && l.role.includes('పురుష'));
-  
-  // Total wages of the gang for that day
-  $: totalDayWage = dayLabourers.reduce((sum, l) => sum + (Number(l.daily_rate || 0) * Number(l.days || 1)), 0);
+  $: totalDayWage = dayLabourers.reduce((sum, l) => sum + ((l.daily_rate ? Number(l.daily_rate) : 0) * (l.days ? Number(l.days) : 1)), 0);
 
-  // Auto-fill workers count and suggested supervisor
   $: {
     if (dayLabourers.length > 0) {
       form.workers_count = dayLabourers.length;
@@ -63,22 +53,9 @@
     }
   }
 
-  // Dynamic distinct mestri list for dropdown
-  $: mestriList = Array.from(new Set(
-    labourRecords
-      .filter(l => l.role && (l.role.includes('మేస్త్రి') || l.role.includes('Mason') || l.role.includes('Head')))
-      .map(l => l.worker_name)
-      .filter(Boolean)
-  ));
-
-  function setQuickDate(d) {
-    form.date = d;
-  }
-
   function handlePhotoUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = (event) => {
       const img = new Image();
@@ -104,12 +81,11 @@
 
   async function saveDailyWork() {
     if (!form.work_title || !form.assigned_mestri) {
-      alert('Dayachesi pani vivaralu mariyu mestri peru enter cheyandi.');
+      alert('Dayachesi pani vivaralu mariyu mestri peru select cheyandi.');
       return;
     }
 
-    // Auto-generate detailed gang summary text
-    let gangSummary = `${dayLabourers.length} Mandi (`;
+    let gangSummary = `${dayLabourers.length} మంది (`;
     let parts = [];
     if (masons.length > 0) parts.push(`మేస్త్రీలు: ${masons.length}`);
     if (excavationWorkers.length > 0) parts.push(`తవ్వకం కూలీలు: ${excavationWorkers.length}`);
@@ -139,8 +115,7 @@
         workers_count: 1,
         work_status: 'Completed',
         site_photo: '',
-        notes: '',
-        gang_breakdown: ''
+        notes: ''
       };
       await fetchLogs();
     } else {
@@ -149,7 +124,7 @@
   }
 
   async function deleteLog(id) {
-    if (!confirm('Ee daily work record ni tholaginchala?')) return;
+    if (!confirm('Ee daily work record ni delete cheyala?')) return;
     const { error } = await supabase.from('contractor_daily_works').delete().eq('id', id);
     if (!error) {
       dailyLogs = dailyLogs.filter(d => d.id !== id);
@@ -164,15 +139,15 @@
 <div class="min-h-screen bg-[#f8fafc] text-slate-900 p-4 sm:p-6 space-y-6">
   <div class="max-w-7xl mx-auto space-y-4">
     
-    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+    <div class="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
       <div>
         <a href="/admin/contractor" class="text-xs font-bold text-amber-600 hover:underline">← ప్రధాన డాష్‌బోర్డ్</a>
         <h1 class="text-base sm:text-xl font-black font-['Ramabhadra']">📅 రోజువారీ సైట్ డైరీ & పనుల పురోగతి (Site Work Diary)</h1>
-        <p class="text-xs text-slate-500 font-medium">లేబర్ మస్టర్ తో అనుసంధానమైన మేస్త్రీలు, కూలీల వర్గీకరణ & సైట్ ఫోటోలు</p>
+        <p class="text-xs text-slate-500">లేబర్ మస్టర్ తో ఆటోమేటిక్ అనుసంధానం & సైట్ ఫోటోల ఆర్కైవ్</p>
       </div>
 
       <button on:click={() => showModal = true} class="bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black px-3.5 py-2 rounded-xl shadow transition cursor-pointer">
-        ➕ ఈరోజు / గత పని నమోదు చేయండి
+        ➕ సైట్ పని పురోగతి నమోదు
       </button>
     </div>
 
@@ -189,7 +164,7 @@
             <div class="space-y-2">
               <div class="flex items-center justify-between border-b pb-2">
                 <span class="font-mono text-xs font-bold text-amber-900 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                  📅 తేదీ: {log.date}
+                  📅 {log.date}
                 </span>
                 <span class="text-[10px] font-bold px-2 py-0.5 rounded-full {log.work_status === 'Completed' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'}">
                   {log.work_status === 'Completed' ? 'పూర్తయింది ✓' : 'కొనసాగుతోంది'}
@@ -204,7 +179,7 @@
 
               <h3 class="font-black text-sm text-slate-900 font-['Ramabhadra']">{log.work_title}</h3>
               <p class="text-xs text-slate-600">📍 స్థలం: <strong>{log.section_location}</strong></p>
-              <p class="text-xs text-slate-600">👷 పర్యవేక్షించిన మేస్త్రి: <strong class="text-amber-800">{log.assigned_mestri}</strong></p>
+              <p class="text-xs text-slate-600">👷 పర్యవేక్షించిన మేస్త్రి: <strong class="text-amber-800">{log.assigned_mestri}</strong> ({log.workers_count} మంది కూలీలు)</p>
               
               {#if log.notes}
                 <div class="p-2 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-700 leading-relaxed font-medium">
@@ -227,7 +202,7 @@
   </div>
 </div>
 
-<!-- Modal with Auto-Linked Labour/Mestri Granular Breakdown -->
+<!-- Modal with Guaranteed Select Options -->
 {#if showModal}
   <div class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-3">
     <div class="bg-white rounded-3xl max-w-lg w-full p-5 space-y-4 shadow-2xl text-xs max-h-[94vh] overflow-y-auto">
@@ -237,26 +212,12 @@
       </div>
 
       <form on:submit|preventDefault={saveDailyWork} class="space-y-3">
-        <!-- Manual Date Selector -->
         <div>
-          <div class="flex items-center justify-between mb-1">
-            <label class="font-bold text-slate-700">పని జరిగిన తేదీ (Manual Date) *</label>
-            <div class="flex gap-1">
-              <button type="button" on:click={() => setQuickDate('2026-10-04')} class="text-[10px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded font-bold hover:bg-amber-200">
-                04వ తేదీ
-              </button>
-              <button type="button" on:click={() => setQuickDate('2026-10-01')} class="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-bold hover:bg-slate-200">
-                01వ తేదీ
-              </button>
-              <button type="button" on:click={() => setQuickDate(new Date().toISOString().split('T')[0])} class="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-bold hover:bg-slate-200">
-                ఈరోజు
-              </button>
-            </div>
-          </div>
+          <label class="block font-bold text-slate-700 mb-1">పని జరిగిన తేదీ (Date) *</label>
           <input type="date" bind:value={form.date} required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-mono font-bold text-sm" />
         </div>
 
-        <!-- LIVE GRANULAR LABOUR BREAKDOWN CARD (From Labour Master) -->
+        <!-- Live Labour Breakdown Card -->
         {#if dayLabourers.length > 0}
           <div class="p-3 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-2">
             <div class="flex items-center justify-between">
@@ -266,7 +227,6 @@
               <span class="font-mono font-black text-amber-900 text-xs">వేతనం: ₹ {totalDayWage.toLocaleString('en-IN')}</span>
             </div>
 
-            <!-- Role Pills -->
             <div class="flex flex-wrap gap-1.5 text-[10px]">
               {#if masons.length > 0}
                 <span class="bg-blue-100 text-blue-900 font-bold px-2 py-0.5 rounded-md">
@@ -292,7 +252,7 @@
           </div>
         {:else}
           <div class="p-2 bg-slate-50 border border-slate-200 rounded-xl text-[10.5px] text-slate-500 italic">
-            ఈ తేదీకి లేబర్ మస్టర్ లో ఎలాంటి కూలీల ఎంట్రీలు లేవు (మాన్యువల్ గా సంఖ్య నమోదు చేయవచ్చు).
+            ఈ తేదీకి లేబర్ మస్టర్ లో ఎలాంటి కూలీల ఎంట్రీలు లేవు.
           </div>
         {/if}
 
@@ -307,27 +267,12 @@
         </div>
 
         <div class="grid grid-cols-2 gap-2">
-          <!-- Mestri Selection -->
           <div>
             <label class="block font-bold text-slate-700 mb-1">పర్యవేక్షించిన మేస్త్రి *</label>
-            <input 
-              type="text" 
-              list="labour-mestri-list" 
-              bind:value={form.assigned_mestri} 
-              required 
-              placeholder="మేస్త్రి పేరు" 
-              class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold text-slate-900" 
-            />
-            <datalist id="labour-mestri-list">
-              {#each mestriList as name}
-                <option value={name}></option>
-              {/each}
-            </datalist>
+            <input type="text" bind:value={form.assigned_mestri} required placeholder="ఉదా: రాజేందర్ పాచే" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold" />
           </div>
-
-          <!-- Auto Labour Count -->
           <div>
-            <label class="block font-bold text-slate-700 mb-1">మొత్తం కూలీల సంఖ్య</label>
+            <label class="block font-bold text-slate-700 mb-1">కూలీల సంఖ్య</label>
             <input type="number" bind:value={form.workers_count} class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-mono font-bold" />
           </div>
         </div>
@@ -341,23 +286,15 @@
           </select>
         </div>
 
-        <!-- Image Upload from Gallery / Files -->
         <div>
           <label class="block font-bold text-slate-700 mb-1">📁 సైట్ ఫోటో అప్‌లోడ్ చేయండి (గ్యాలరీ లేదా కెమెరా)</label>
-          <input 
-            type="file" 
-            accept="image/*" 
-            on:change={handlePhotoUpload} 
-            class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-slate-600 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-amber-100 file:text-amber-800 hover:file:bg-amber-200" 
-          />
+          <input type="file" accept="image/*" on:change={handlePhotoUpload} class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-slate-600" />
         </div>
 
         {#if form.site_photo}
           <div class="relative h-28 w-full rounded-xl overflow-hidden bg-slate-100 border">
             <img src={form.site_photo} alt="Preview" class="w-full h-full object-cover" />
-            <button type="button" on:click={() => form.site_photo = ''} class="absolute top-1 right-1 bg-rose-600 text-white rounded-full w-5 h-5 flex items-center justify-center font-bold text-[10px]">
-              ✕
-            </button>
+            <button type="button" on:click={() => form.site_photo = ''} class="absolute top-1 right-1 bg-rose-600 text-white rounded-full w-5 h-5 flex items-center justify-center font-bold text-[10px]">✕</button>
           </div>
         {/if}
 

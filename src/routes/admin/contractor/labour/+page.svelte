@@ -8,7 +8,6 @@
   let showAttendanceModal = false;
   let showProfileModal = false;
 
-  // New Profile Form
   let profileForm = {
     worker_id: '',
     name: '',
@@ -16,10 +15,9 @@
     aadhar_no: '',
     role: 'పునాది తవ్వకం కూలీ (Excavation Labour)',
     daily_rate: 800,
-    address: 'ముత్తారం'
+    address: 'Mutharam'
   };
 
-  // Daily Muster Attendance Form
   let form = {
     date: '2026-10-04',
     worker_id: '',
@@ -37,16 +35,22 @@
 
   async function fetchAll() {
     loading = true;
-    const { data: profs } = await supabase.from('contractor_labour_profiles').select('*').order('id', { ascending: true });
+    const { data: profs } = await supabase
+      .from('contractor_labour_profiles')
+      .select('*')
+      .order('id', { ascending: true });
     profiles = profs ? profs : [];
 
-    const { data: records } = await supabase.from('contractor_labour').select('*').order('date', { ascending: false });
+    const { data: records } = await supabase
+      .from('contractor_labour')
+      .select('*')
+      .order('date', { ascending: false });
     labourRecords = records ? records : [];
     loading = false;
   }
 
   function openNewProfileModal() {
-    const nextNum = 101 + profiles.length;
+    const nextNum = String(profiles.length + 1).padStart(3, '0');
     profileForm = {
       worker_id: 'LBR-' + nextNum,
       name: '',
@@ -54,7 +58,7 @@
       aadhar_no: '',
       role: 'పునాది తవ్వకం కూలీ (Excavation Labour)',
       daily_rate: 800,
-      address: 'ముత్తారం'
+      address: 'Mutharam'
     };
     showProfileModal = true;
   }
@@ -67,18 +71,24 @@
 
     const { error } = await supabase.from('contractor_labour_profiles').insert([profileForm]);
     if (error) {
-      alert('Error: ' + error.message);
+      alert('Database Error: ' + error.message);
     } else {
       showProfileModal = false;
       await fetchAll();
+      // Auto-select in attendance
+      form.worker_id = profileForm.worker_id;
+      form.worker_name = profileForm.name;
+      form.role = profileForm.role;
+      form.daily_rate = profileForm.daily_rate;
     }
   }
 
-  function onSelectWorkerName(e) {
-    const selectedName = e.target.value;
-    const found = profiles.find(p => p.name === selectedName);
+  function handleProfileSelect(e) {
+    const selectedId = e.target.value;
+    const found = profiles.find(p => p.worker_id === selectedId);
     if (found) {
       form.worker_id = found.worker_id;
+      form.worker_name = found.name;
       form.role = found.role;
       form.daily_rate = found.daily_rate;
     }
@@ -86,7 +96,7 @@
 
   async function addAttendance() {
     if (!form.worker_name || !form.daily_rate) {
-      alert('Dayachesi kooli peru mariyu daily rate enter cheyandi.');
+      alert('Dayachesi kooli profile ni select cheyandi.');
       return;
     }
 
@@ -95,7 +105,7 @@
 
     const { error } = await supabase.from('contractor_labour').insert([{
       date: form.date,
-      worker_id: form.worker_id || ('LBR-' + (100 + profiles.length)),
+      worker_id: form.worker_id,
       worker_name: form.worker_name,
       role: form.role,
       work_task: form.work_task,
@@ -105,12 +115,12 @@
     }]);
 
     if (!error) {
-      // Auto-post advance to General Ledger if advance is paid
       if (advance > 0) {
         await supabase.from('contractor_transactions').insert([{
+          invoice_no: 'ASV-ADV-' + Date.now().toString().slice(-6),
           date: form.date,
           category: 'Labour & Mestri',
-          description: `${form.worker_name} (${form.role}) - కూలీ అడ్వాన్స్`,
+          description: `${form.worker_name} (${form.worker_id}) - కూలీ అడ్వాన్స్`,
           amount: advance,
           source: 'Cash',
           recipient: form.worker_name,
@@ -138,7 +148,7 @@
   }
 
   async function deleteLabour(id) {
-    if (!confirm('Ee kooli attendance record ni tholaginchala?')) return;
+    if (!confirm('Ee attendance record ni delete cheyala?')) return;
     const { error } = await supabase.from('contractor_labour').delete().eq('id', id);
     if (!error) {
       labourRecords = labourRecords.filter(l => l.id !== id);
@@ -147,27 +157,49 @@
 </script>
 
 <svelte:head>
-  <title>లేబర్ మాస్టర్ & హాజరు | A.S.V. Contractor 360°</title>
+  <title>లేబర్ DBMS మాస్టర్ | A.S.V. Contractor 360°</title>
 </svelte:head>
 
 <div class="min-h-screen bg-[#f8fafc] text-slate-900 p-4 sm:p-6 space-y-6">
   <div class="max-w-7xl mx-auto space-y-4">
     
-    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+    <div class="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
       <div>
         <a href="/admin/contractor" class="text-xs font-bold text-amber-600 hover:underline">← ప్రధాన డాష్‌బోర్డ్</a>
         <h1 class="text-base sm:text-xl font-black font-['Ramabhadra']">👷 లేబర్ DBMS మాస్టర్ & డైలీ వర్క్ హాజరు</h1>
-        <p class="text-xs text-slate-500">వ్యక్తిగత ఐడీ (Worker ID), ఆధార్, ఫోన్ నంబర్లు, రోజూ చేసిన పని & వేతనాల రికార్డు</p>
+        <p class="text-xs text-slate-500">శాశ్వత ఐడీ (Worker ID: LBR-001), పాత్ర, రోజూ చేసిన పని & పేమెంట్ లెక్కలు</p>
       </div>
 
       <div class="flex items-center gap-2">
         <button on:click={openNewProfileModal} class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black px-3 py-2 rounded-xl shadow transition cursor-pointer">
-          👤 కొత్త కూలీ ప్రొఫైల్ (DBMS ID)
+          👤 కొత్త వర్కర్ ప్రొఫైల్ (DBMS ID)
         </button>
         <button on:click={() => showAttendanceModal = true} class="bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black px-3.5 py-2 rounded-xl shadow transition cursor-pointer">
           ➕ రోజువారీ హాజరు నమోదు
         </button>
       </div>
+    </div>
+
+    <!-- Active Worker Profiles Strip -->
+    <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-2">
+      <div class="flex justify-between items-center border-b pb-2">
+        <span class="text-xs font-black text-slate-900 uppercase">రిజిస్టర్ అయిన వర్కర్ ప్రొఫైల్స్ ({profiles.length})</span>
+        <button on:click={openNewProfileModal} class="text-xs font-bold text-indigo-600 hover:underline">+ కొత్త ప్రొఫైల్ చేర్చండి</button>
+      </div>
+      {#if profiles.length === 0}
+        <div class="text-xs text-slate-400 py-2">ఇంకా వర్కర్ ప్రొఫైల్స్ నమోదు కాలేదు. పైన ఉన్న బటన్ నొక్కి వర్కర్లను చేర్చండి.</div>
+      {:else}
+        <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2">
+          {#each profiles as p}
+            <div class="p-2 bg-slate-50 rounded-xl border border-slate-200 text-xs">
+              <span class="font-mono text-[10px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded">{p.worker_id}</span>
+              <strong class="block text-slate-900 truncate mt-1">{p.name}</strong>
+              <span class="text-[10px] text-slate-500 block truncate">{p.role}</span>
+              <span class="text-[10.5px] font-mono font-bold text-emerald-700">₹{p.daily_rate}/రోజు</span>
+            </div>
+          {/each}
+        </div>
+      {/if}
     </div>
 
     <!-- Attendance Table -->
@@ -180,19 +212,19 @@
       {#if loading}
         <div class="py-12 text-center text-slate-400 font-bold text-xs">లోడ్ అవుతోంది...</div>
       {:else if labourRecords.length === 0}
-        <div class="py-12 text-center text-slate-400 font-bold text-xs">ప్రస్తుతం ఎలాంటి రికార్డులు లేవు.</div>
+        <div class="py-12 text-center text-slate-400 font-bold text-xs">ప్రస్తుతం ఎలాంటి హాజరు రికార్డులు లేవు.</div>
       {:else}
         <div class="overflow-x-auto">
           <table class="w-full text-xs text-left border-collapse">
             <thead>
               <tr class="bg-slate-100 text-slate-700 uppercase text-[11px] border-b">
                 <th class="p-3">తేదీ</th>
-                <th class="p-3">ID & కూలీ పేరు</th>
-                <th class="p-3">పని రకం (Role)</th>
-                <th class="p-3">ఆ రోజు చేసిన పని (Daily Task)</th>
+                <th class="p-3">ID & వర్కర్ పేరు</th>
+                <th class="p-3">పని రకం</th>
+                <th class="p-3">ఆ రోజు చేసిన నిర్దిష్ట పని</th>
                 <th class="p-3 text-center">రోజులు</th>
                 <th class="p-3 text-right">రేటు (₹)</th>
-                <th class="p-3 text-right">సంపాదన (₹)</th>
+                <th class="p-3 text-right">మొత్తం (₹)</th>
                 <th class="p-3 text-right">అడ్వాన్స్ (₹)</th>
                 <th class="p-3 text-right font-black text-rose-600">నికర బాకీ (₹)</th>
                 <th class="p-3 text-center">చర్య</th>
@@ -200,8 +232,8 @@
             </thead>
             <tbody class="divide-y divide-slate-100 font-medium">
               {#each labourRecords as l}
-                {@const totalEarned = Number(l.days) * Number(l.daily_rate)}
-                {@const balanceDue = totalEarned - Number(l.advance_paid || 0)}
+                {@const totalEarned = (l.days ? Number(l.days) : 1) * (l.daily_rate ? Number(l.daily_rate) : 0)}
+                {@const balanceDue = totalEarned - (l.advance_paid ? Number(l.advance_paid) : 0)}
                 <tr class="hover:bg-slate-50 transition">
                   <td class="p-3 font-mono text-slate-500">{l.date}</td>
                   <td class="p-3">
@@ -273,20 +305,20 @@
             <input type="tel" bind:value={profileForm.phone} placeholder="98480..." class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-mono" />
           </div>
           <div>
-            <label class="block font-bold text-slate-700 mb-1">ఆధార్ నంబర్ (Optional)</label>
-            <input type="text" bind:value={profileForm.aadhar_no} placeholder="XXXX XXXX XXXX" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-mono" />
+            <label class="block font-bold text-slate-700 mb-1">గ్రామం / చిరునామా</label>
+            <input type="text" bind:value={profileForm.address} class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2" />
           </div>
         </div>
 
         <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 rounded-2xl shadow transition cursor-pointer">
-          DBMS లో భద్రపరచండి ➔
+          ప్రొఫైల్ సేవ్ చేయండి ➔
         </button>
       </form>
     </div>
   </div>
 {/if}
 
-<!-- Modal 2: Daily Attendance & Specific Work Task -->
+<!-- Modal 2: Daily Attendance with Direct Reliable Select Dropdown -->
 {#if showAttendanceModal}
   <div class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-3">
     <div class="bg-white rounded-3xl max-w-sm w-full p-5 space-y-4 shadow-2xl text-xs max-h-[92vh] overflow-y-auto">
@@ -301,27 +333,36 @@
           <input type="date" bind:value={form.date} required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-mono font-bold" />
         </div>
 
+        <!-- RELIABLE SELECT DROPDOWN INSTEAD OF DATALIST -->
         <div>
-          <label class="block font-bold text-slate-700 mb-1">కూలీ / మేస్త్రి పేరు (DBMS Link) *</label>
-          <input 
-            type="text" 
-            list="worker-names" 
-            bind:value={form.worker_name} 
-            on:input={onSelectWorkerName} 
-            required 
-            placeholder="పేరు ఎంచుకోండి లేదా టైప్ చేయండి" 
-            class="w-full bg-amber-50 border border-amber-300 rounded-xl p-2.5 font-bold" 
-          />
-          <datalist id="worker-names">
+          <div class="flex justify-between items-center mb-1">
+            <label class="font-bold text-slate-700">కూలీ / మేస్త్రి ప్రొఫైల్ ఎంచుకోండి *</label>
+            <button type="button" on:click={openNewProfileModal} class="text-[10px] text-indigo-600 font-bold hover:underline">+ కొత్త ప్రొఫైల్</button>
+          </div>
+          <select on:change={handleProfileSelect} required class="w-full bg-amber-50 border border-amber-300 rounded-xl p-2.5 font-bold text-slate-900">
+            <option value="">-- వర్కర్‌ను ఎంచుకోండి --</option>
             {#each profiles as p}
-              <option value={p.name}>{p.worker_id} - {p.role}</option>
+              <option value={p.worker_id}>{p.worker_id} - {p.name} ({p.role})</option>
             {/each}
-          </datalist>
+          </select>
         </div>
 
+        {#if form.worker_name}
+          <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+            <div class="flex justify-between">
+              <span class="text-slate-500">ఎంచుకున్న వర్కర్:</span>
+              <strong class="text-slate-900">{form.worker_name} ({form.worker_id})</strong>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-500">పాత్ర & వేతనం:</span>
+              <span class="font-mono font-bold text-emerald-700">{form.role} • ₹{form.daily_rate}/రోజు</span>
+            </div>
+          </div>
+        {/if}
+
         <div>
-          <label class="block font-bold text-slate-700 mb-1">ఆ రోజు చేసిన పని వివరాలు (Work Done) *</label>
-          <input type="text" bind:value={form.work_task} required placeholder="ఉదా: ఉత్తరం వైపు పునాది తవ్వకం / పిల్లర్ రాడ్ బెండింగ్" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold" />
+          <label class="block font-bold text-slate-700 mb-1">ఆ రోజు చేసిన నిర్దిష్ట పని (Specific Work Task) *</label>
+          <input type="text" bind:value={form.work_task} required placeholder="ఉదా: పునాది తవ్వకం / రాతి కట్టడం బేస్‌మెంట్" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold" />
         </div>
 
         <div class="grid grid-cols-2 gap-2">
