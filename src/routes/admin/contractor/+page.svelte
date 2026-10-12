@@ -14,6 +14,7 @@
   let showMoneyInModal = false;
   let showTransferModal = false;
   let showVoucherModal = false;
+  let showSnapshotModal = false;
   let activeVoucher = null;
 
   // Multi-Category Expense Form
@@ -40,11 +41,11 @@
     photo_url: ''
   };
 
-  // Contra Transfer Form (Cash ⇄ Bank)
+  // Contra Transfer Form (Cash to Bank / Bank to Cash)
   let transferForm = {
-    direction: 'Cash to Bank', // 'Cash to Bank' or 'Bank to Cash'
+    direction: 'Cash to Bank',
     amount: '',
-    bank_name: 'బ్యాంక్ డిపాజిట్ (SBI / Account)',
+    bank_name: 'SBI Mutharam Branch',
     date: new Date().toISOString().split('T')[0],
     photo_url: ''
   };
@@ -88,7 +89,7 @@
   }
 
   function editBudget() {
-    const val = prompt('ప్రాజెక్ట్ మొత్తం బడ్జెట్ / వర్క్ ఆర్డర్ విలువ (₹) నమోదు చేయండి:', budget);
+    const val = prompt('Project mottham budget / work order viluva (Rs.) enter cheyandi:', budget);
     if (val !== null && !isNaN(val) && Number(val) >= 0) {
       budget = Number(val);
       if (typeof window !== 'undefined') {
@@ -129,12 +130,12 @@
     reader.readAsDataURL(file);
   }
 
-  // 1. Total Inflow (Fresh money only)
+  // 1. Total Inflow
   $: totalInflow = transactions
     .filter(t => t.category === 'Money In')
     .reduce((s, t) => s + (t.amount ? Number(t.amount) : 0), 0);
 
-  // 2. Total Paid Expenses (Excludes Transfers)
+  // 2. Total Paid Expenses
   $: totalPaidExpenses = transactions
     .filter(t => t.category !== 'Money In' && t.category !== 'Transfer' && t.source !== 'Credit')
     .reduce((s, t) => s + (t.amount ? Number(t.amount) : 0), 0)
@@ -150,12 +151,12 @@
       return s + amt;
     }, 0);
 
-  // 4. Cash In (Money In Cash + Transfers from Bank to Cash)
+  // 4. Cash In
   $: cashIn = transactions
     .filter(t => (t.category === 'Money In' && t.source === 'Cash') || (t.category === 'Transfer' && t.source === 'Bank to Cash'))
     .reduce((s, t) => s + (t.amount ? Number(t.amount) : 0), 0);
 
-  // 5. Cash Out (Expenses + Advance + Transfers from Cash to Bank)
+  // 5. Cash Out
   $: cashOut = transactions
     .filter(t => t.category !== 'Money In' && t.category !== 'Transfer' && t.source === 'Cash')
     .reduce((s, t) => s + (t.amount ? Number(t.amount) : 0), 0)
@@ -168,12 +169,12 @@
 
   $: cashBalance = cashIn - cashOut;
 
-  // 6. Bank In (Money In Bank + Transfers from Cash to Bank)
+  // 6. Bank In
   $: bankIn = transactions
     .filter(t => (t.category === 'Money In' && t.source === 'Bank') || (t.category === 'Transfer' && t.source === 'Cash to Bank'))
     .reduce((s, t) => s + (t.amount ? Number(t.amount) : 0), 0);
 
-  // 7. Bank Out (Expenses + Transfers from Bank to Cash)
+  // 7. Bank Out
   $: bankOut = transactions
     .filter(t => t.category !== 'Money In' && t.category !== 'Transfer' && ['Bank', 'UPI'].includes(t.source))
     .reduce((s, t) => s + (t.amount ? Number(t.amount) : 0), 0)
@@ -191,6 +192,7 @@
 
   $: totalLiquidity = cashBalance + bankBalance;
   $: budgetRemaining = budget - totalPaidExpenses;
+  $: totalLiabilities = loanOutstanding + totalPayablesDue;
 
   // Category totals
   $: matTotal = transactions.filter(t => t.category === 'Materials').reduce((s, t) => s + Number(t.amount || 0), 0);
@@ -201,7 +203,7 @@
   // Expense Submit
   async function submitExpense() {
     if (!expForm.desc || !expForm.amount || !expForm.recipient) {
-      alert('దయచేసి పూర్తి వివరాలు నమోదు చేయండి.');
+      alert('Dayachesi poorthi vivaralu enter cheyandi.');
       return;
     }
 
@@ -229,7 +231,7 @@
     const { error } = await supabase.from('contractor_transactions').insert([newRecord]);
 
     if (error) {
-      alert('సర్వర్ ఎర్రర్: ' + error.message);
+      alert('Server Error: ' + error.message);
     } else {
       showExpenseModal = false;
       activeVoucher = { ...newRecord, type: 'PAYMENT_VOUCHER' };
@@ -252,7 +254,7 @@
   // Money In Submit
   async function submitMoneyIn() {
     if (!inForm.desc || !inForm.amount) {
-      alert('మొత్తం మరియు వివరాలు నమోదు చేయండి.');
+      alert('Mottham mariyu vivaralu enter cheyandi.');
       return;
     }
     const amt = Number(inForm.amount);
@@ -285,7 +287,7 @@
     }
 
     if (error) {
-      alert('సర్వర్ ఎర్రర్: ' + error.message);
+      alert('Server Error: ' + error.message);
     } else {
       showMoneyInModal = false;
       activeVoucher = { ...newRecord, type: 'RECEIPT_INVOICE' };
@@ -295,27 +297,26 @@
     }
   }
 
-  // Submit Contra Transfer (Cash ⇄ Bank)
+  // Contra Transfer Submit
   async function submitTransfer() {
     if (!transferForm.amount || Number(transferForm.amount) <= 0) {
-      alert('దయచేసి బదిలీ చేయాల్సిన మొత్తాన్ని నమోదు చేయండి.');
+      alert('Dayachesi transfer cheyalsina motthanni enter cheyandi.');
       return;
     }
 
     const amt = Number(transferForm.amount);
     const isCashToBank = transferForm.direction === 'Cash to Bank';
 
-    // Validation
     if (isCashToBank && amt > cashBalance) {
-      if (!confirm('హెచ్చరిక: మీ చేతిలో ఉన్న క్యాష్ (₹ ' + cashBalance.toLocaleString('en-IN') + ') కంటే ఎక్కువ డిపాజిట్ చేస్తున్నారు. కొనసాగించాలా?')) {
+      if (!confirm('Heccharika: Mee chethilo unna cash (Rs. ' + cashBalance.toLocaleString('en-IN') + ') kante ekkuva deposit chesthunnaru. Continue cheyala?')) {
         return;
       }
     }
 
     const invNo = 'ASV-TRF-' + Date.now().toString().slice(-6);
     const desc = isCashToBank 
-      ? 'చేతిలోని నగదు బ్యాంకులో జమ (Cash Deposit: ' + transferForm.bank_name + ')'
-      : 'బ్యాంకు నుండి చేతికి నగదు విత్‌డ్రా (Cash Withdrawal: ' + transferForm.bank_name + ')';
+      ? 'Chethiloni nagadu bank lo jama (Cash Deposit: ' + transferForm.bank_name + ')'
+      : 'Bank nundi chethiki nagadu withdraw (Cash Withdrawal: ' + transferForm.bank_name + ')';
 
     const newRecord = {
       invoice_no: invNo,
@@ -335,7 +336,7 @@
     const { error } = await supabase.from('contractor_transactions').insert([newRecord]);
 
     if (error) {
-      alert('సర్వర్ ఎర్రర్: ' + error.message);
+      alert('Server Error: ' + error.message);
     } else {
       showTransferModal = false;
       activeVoucher = { ...newRecord, type: 'CONTRA_VOUCHER' };
@@ -343,7 +344,7 @@
       transferForm = {
         direction: 'Cash to Bank',
         amount: '',
-        bank_name: 'బ్యాంక్ డిపాజిట్ (SBI / Account)',
+        bank_name: 'SBI Mutharam Branch',
         date: new Date().toISOString().split('T')[0],
         photo_url: ''
       };
@@ -351,19 +352,46 @@
     }
   }
 
+  // Share Financial Snapshot to WhatsApp
+  function shareSnapshotWhatsApp() {
+    let text = '*A.S.V. CONTRACTOR 360° - LIVE FINANCIAL SNAPSHOT*\n\n';
+    text += 'Date: ' + new Date().toLocaleDateString('te-IN') + '\n';
+    text += 'GST: 36AMXPA2915K1ZR • Mutharam, Peddapalli\n';
+    text += '------------------------------------\n';
+    text += '*1. CHETHILO & BANK LO UNNA NIDHULU:*\n';
+    text += '• Chethi Nagadu (Cash): Rs. ' + cashBalance.toLocaleString('en-IN') + '\n';
+    text += '• Bank / UPI Nilva: Rs. ' + bankBalance.toLocaleString('en-IN') + '\n';
+    text += '*👉 Total Usable Cash: Rs. ' + totalLiquidity.toLocaleString('en-IN') + '*\n\n';
+    text += '*2. PROJECT BUDGET & EXPENSES:*\n';
+    text += '• Sanctioned Budget: Rs. ' + budget.toLocaleString('en-IN') + '\n';
+    text += '• Total Spent (Site Paid): Rs. ' + totalPaidExpenses.toLocaleString('en-IN') + '\n';
+    text += '• Budget Remaining: Rs. ' + budgetRemaining.toLocaleString('en-IN') + '\n\n';
+    text += '*3. BAAKEELU & APPULU (LIABILITIES):*\n';
+    text += '• Thechina Appulu (Loans): Rs. ' + loanOutstanding.toLocaleString('en-IN') + '\n';
+    text += '• Supplier / Labour Dues: Rs. ' + totalPayablesDue.toLocaleString('en-IN') + '\n';
+    text += '*👉 Total Dues to Pay: Rs. ' + totalLiabilities.toLocaleString('en-IN') + '*\n';
+    text += '------------------------------------\n';
+    text += 'Generated via A.S.V. Enterprises Nexlify ERP';
+
+    const url = 'https://api.whatsapp.com/send?text=' + encodeURIComponent(text);
+    if (typeof window !== 'undefined') {
+      window.open(url, '_blank');
+    }
+  }
+
   function shareVoucherWhatsApp(v) {
     const phoneClean = v.party_phone ? v.party_phone.replace(/[^0-9]/g, '') : '';
-    let voucherType = 'చెల్లింపు వోచర్ (PAYMENT VOUCHER)';
-    if (v.type === 'RECEIPT_INVOICE') voucherType = 'నగదు స్వీకరణ రసీదు (MONEY INVOICE)';
-    if (v.type === 'CONTRA_VOUCHER') voucherType = 'అంతర్గత నగదు బదిలీ (CONTRA TRANSFER)';
+    let voucherType = 'PAYMENT VOUCHER';
+    if (v.type === 'RECEIPT_INVOICE') voucherType = 'RECEIPT INVOICE';
+    if (v.type === 'CONTRA_VOUCHER') voucherType = 'CONTRA TRANSFER';
 
     let text = '*A.S.V. ENTERPRISES - ' + voucherType + '*\n\n';
-    text += 'వోచర్ నెం: ' + (v.invoice_no || '') + '\n';
-    text += 'తేదీ: ' + (v.date || '') + '\n';
-    text += 'వివరాలు: ' + (v.description || '') + '\n';
-    text += '*మొత్తం విలువ: ₹ ' + Number(v.amount || 0).toLocaleString('en-IN') + '*\n';
-    text += 'బదిలీ మార్గం: ' + (v.source || '') + '\n';
-    text += 'స్టేటస్: విజయవంతం ✓\n\nముత్తారం సైట్, పెద్దపల్లి జిల్లా.';
+    text += 'Voucher No: ' + (v.invoice_no || '') + '\n';
+    text += 'Date: ' + (v.date || '') + '\n';
+    text += 'Details: ' + (v.description || '') + '\n';
+    text += '*Total Amount: Rs. ' + Number(v.amount || 0).toLocaleString('en-IN') + '*\n';
+    text += 'Payment Mode: ' + (v.source || '') + '\n';
+    text += 'Status: Completed\n\nMutharam Site, Peddapalli.';
 
     const url = phoneClean 
       ? 'https://api.whatsapp.com/send?phone=91' + phoneClean + '&text=' + encodeURIComponent(text)
@@ -392,7 +420,7 @@
 {:else}
   <div class="min-h-screen bg-[#f8fafc] text-slate-900 font-sans pb-28">
 
-    <!-- Header -->
+    <!-- Header with Instant Snapshot Executive Button -->
     <header class="bg-white border-b-2 border-amber-500 sticky top-0 z-40 shadow-sm print:hidden">
       <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-3">
@@ -411,6 +439,16 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
+          <!-- INSTANT FINANCIAL SNAPSHOT BUTTON -->
+          <button
+            type="button"
+            on:click={() => showSnapshotModal = true}
+            class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black px-3.5 py-2 rounded-xl shadow-md transition flex items-center gap-1.5 cursor-pointer ring-2 ring-indigo-300"
+            title="Chethilo unna dabbu, bank nilva, karchulu mariyu baakeela thakshana nivedika"
+          >
+            <span class="text-amber-300">⚡</span> <span>సైట్ స్నాప్‌షాట్ (Instant Status)</span>
+          </button>
+
           <!-- Expense Button -->
           <button
             type="button"
@@ -425,7 +463,6 @@
             type="button"
             on:click={() => showTransferModal = true}
             class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-black px-3 py-2 rounded-xl shadow transition flex items-center gap-1 cursor-pointer"
-            title="చేతిలోని నగదు బ్యాంకులో వేయడం లేదా విత్‌డ్రా"
           >
             <span>🔄</span> <span>నగదు బదిలీ (Cash ⇄ Bank)</span>
           </button>
@@ -624,6 +661,115 @@
         </div>
       {/if}
     </main>
+
+    <!-- EXECUTIVE FINANCIAL SNAPSHOT & DECISION MODAL -->
+    {#if showSnapshotModal}
+      <div class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-3">
+        <div class="bg-white rounded-3xl max-w-xl w-full p-6 space-y-4 shadow-2xl text-xs max-h-[94vh] overflow-y-auto print:m-0 print:p-0">
+          <div class="flex items-center justify-between border-b pb-2 print:hidden">
+            <div class="flex items-center gap-2">
+              <span class="text-base">⚡</span>
+              <h3 class="font-black text-sm text-slate-900 font-['Ramabhadra']">తక్షణ సైట్ ఆర్థిక నివేదిక & నిర్ణయాల సారాంశం (Executive Snapshot)</h3>
+            </div>
+            <button type="button" on:click={() => showSnapshotModal = false} class="text-slate-400 font-bold hover:text-slate-700">✕</button>
+          </div>
+
+          <!-- Printable Snapshot Card -->
+          <div class="space-y-4">
+            <!-- 1. Liquid Cash & Bank Position -->
+            <div class="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border border-indigo-200 rounded-2xl space-y-2">
+              <span class="text-[10px] font-black uppercase text-indigo-800 tracking-wider block">1. ప్రస్తుత అందుబాటులో ఉన్న నిధులు (Available Liquid Funds)</span>
+              <div class="grid grid-cols-2 gap-3 pt-1">
+                <div class="bg-white p-3 rounded-xl border border-blue-100 shadow-xs">
+                  <span class="text-[10px] text-slate-500 font-bold block">💵 చేతిలో నగదు (Cash in Hand)</span>
+                  <span class="text-base font-black font-mono text-blue-700">₹ {cashBalance.toLocaleString('en-IN')}</span>
+                </div>
+                <div class="bg-white p-3 rounded-xl border border-indigo-100 shadow-xs">
+                  <span class="text-[10px] text-slate-500 font-bold block">🏦 బ్యాంక్ / UPI నిల్వ</span>
+                  <span class="text-base font-black font-mono text-indigo-700">₹ {bankBalance.toLocaleString('en-IN')}</span>
+                </div>
+              </div>
+              <div class="p-2.5 bg-indigo-600 text-white rounded-xl flex justify-between items-center font-bold">
+                <span class="text-xs">👉 సైట్ లో ఖర్చు పెట్టడానికి రెడీగా ఉన్న మొత్తం:</span>
+                <span class="text-base font-black font-mono">₹ {totalLiquidity.toLocaleString('en-IN')}</span>
+              </div>
+            </div>
+
+            <!-- 2. Budget vs Spent -->
+            <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+              <span class="text-[10px] font-black uppercase text-slate-700 tracking-wider block">2. ప్రాజెక్ట్ బడ్జెట్ & సైట్ ఖర్చులు (Budget vs Spent)</span>
+              <div class="grid grid-cols-3 gap-2 text-center">
+                <div class="bg-white p-2.5 rounded-xl border border-slate-200">
+                  <span class="text-[9.5px] text-slate-500 font-bold block">మంజూరైన బడ్జెట్</span>
+                  <span class="text-xs font-black font-mono text-slate-900">₹ {budget.toLocaleString('en-IN')}</span>
+                </div>
+                <div class="bg-white p-2.5 rounded-xl border border-slate-200">
+                  <span class="text-[9.5px] text-slate-500 font-bold block">ఇప్పటివరకు ఖర్చు</span>
+                  <span class="text-xs font-black font-mono text-rose-600">₹ {totalPaidExpenses.toLocaleString('en-IN')}</span>
+                </div>
+                <div class="bg-white p-2.5 rounded-xl border border-slate-200">
+                  <span class="text-[9.5px] text-slate-500 font-bold block">బడ్జెట్ మిగిలిన నిల్వ</span>
+                  <span class="text-xs font-black font-mono text-amber-700">₹ {budgetRemaining.toLocaleString('en-IN')}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. Dues & Liabilities -->
+            <div class="p-4 bg-rose-50 border border-rose-200 rounded-2xl space-y-2">
+              <span class="text-[10px] font-black uppercase text-rose-800 tracking-wider block">3. చెల్లించాల్సిన బాకీలు & అప్పులు (Commitments & Dues)</span>
+              <div class="grid grid-cols-2 gap-3">
+                <div class="bg-white p-2.5 rounded-xl border border-rose-100">
+                  <span class="text-[10px] text-slate-500 font-bold block">తెచ్చిన రుణాలు (Loans Due)</span>
+                  <span class="text-sm font-black font-mono text-rose-700">₹ {loanOutstanding.toLocaleString('en-IN')}</span>
+                </div>
+                <div class="bg-white p-2.5 rounded-xl border border-rose-100">
+                  <span class="text-[10px] text-slate-500 font-bold block">సప్లయర్ / కూలీ బాకీలు</span>
+                  <span class="text-sm font-black font-mono text-purple-700">₹ {totalPayablesDue.toLocaleString('en-IN')}</span>
+                </div>
+              </div>
+              <div class="flex justify-between items-center text-xs font-black text-rose-900 px-1 pt-1">
+                <span>మొత్తం క్లియర్ చేయాల్సిన బాకీలు:</span>
+                <span class="font-mono text-sm">₹ {totalLiabilities.toLocaleString('en-IN')}</span>
+              </div>
+            </div>
+
+            <!-- 4. Smart Financial Advice / Decision Insight -->
+            <div class="p-3.5 bg-amber-50 border border-amber-300 rounded-2xl space-y-1">
+              <div class="flex items-center gap-1.5 font-black text-amber-950 text-xs">
+                <span>💡</span> <span>ఆర్థిక నిర్ణయాల సలహా (Decision Advisory):</span>
+              </div>
+              <p class="text-[11px] text-amber-900 leading-relaxed font-medium">
+                {#if totalLiquidity > 0 && loanOutstanding > 0}
+                  ప్రస్తుతం మీ వద్ద ఉన్న నగదు నిల్వ (₹ {totalLiquidity.toLocaleString('en-IN')}) బయటి నుండి తెచ్చిన రుణాల ఆధారంగా ఉంది. కాబట్టి కొత్తగా మెటీరియల్స్ ఆర్డర్ చేసేటప్పుడు సాధ్యమైనంత వరకు క్రెడిట్ (ఉధార్) ప్రాతిపదికన తీసుకుని, చేతిలో ఉన్న నగదును రోజువారీ కూలీలు మరియు అత్యవసర ఖర్చులకు మాత్రమే వినియోగించడం లాభదాయకం.
+                {:else if totalLiquidity <= 0}
+                  చేతిలో మరియు బ్యాంకులో లిక్విడిటీ నిల్వ సున్నా లేదా మైనస్ లో ఉంది. వెంటనే రన్నింగ్ బిల్లు క్లెయిమ్ చేయడం లేదా ఇన్‌ఫ్లో నిధులు సమీకరించడం అవసరం.
+                {:else}
+                  మీ వద్ద తగినంత లిక్విడిటీ నిల్వ ఉంది. సైట్ పనులను వేగవంతం చేయవచ్చు.
+                {/if}
+              </p>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="flex gap-2 pt-2 border-t print:hidden">
+            <button
+              type="button"
+              on:click={shareSnapshotWhatsApp}
+              class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 rounded-xl shadow transition flex items-center justify-center gap-1.5 cursor-pointer text-xs"
+            >
+              <span>📲</span> <span>WhatsApp లో నివేదిక షేర్</span>
+            </button>
+            <button
+              type="button"
+              on:click={printVoucher}
+              class="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-black py-2.5 rounded-xl shadow transition flex items-center justify-center gap-1.5 cursor-pointer text-xs"
+            >
+              <span>🖨️</span> <span>ప్రింట్ / PDF సేవ్</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    {/if}
 
     <!-- Contra Transfer Modal (Cash to Bank / Bank to Cash) -->
     {#if showTransferModal}
@@ -841,7 +987,7 @@
             </div>
 
             <div class="flex justify-between items-center p-3 bg-amber-50 rounded-xl border border-amber-200 font-black text-sm">
-              <span class="text-amber-950">బదిలీ చేసిన మొత్తం:</span>
+              <span class="text-amber-950">మొత్తం విలువ:</span>
               <span class="font-mono text-base text-amber-950">₹ {Number(activeVoucher.amount).toLocaleString('en-IN')}</span>
             </div>
 
