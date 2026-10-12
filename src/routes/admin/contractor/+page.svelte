@@ -508,6 +508,9 @@
         <a href="/admin/contractor/loans" class="px-3.5 py-2 border-b-2 border-transparent text-slate-600 hover:text-slate-900 whitespace-nowrap">
           🏦 అప్పులు & సప్లయర్ బాకీలు
         </a>
+        <a href="/admin/contractor/piecework" class="px-3.5 py-2 border-b-2 border-transparent text-slate-600 hover:text-slate-900 whitespace-nowrap">
+  📐 సెంట్రింగ్ & పీస్ వర్క్
+</a>
       </div>
     </header>
 
