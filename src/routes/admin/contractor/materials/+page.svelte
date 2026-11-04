@@ -1,6 +1,11 @@
 <script>
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
+  import { readAllRows, dataErrorMessage, projectToday } from '$lib/contractor/data.js';
+  import { runFinancialMutation, FINANCIAL_WRITES_ENABLED } from '$lib/contractor/financial-write-gate.js';
+
+  let dataError = '';
+  let mutationError = '';
 
   let materials = [];
   let parties = [];
@@ -9,7 +14,7 @@
   let previewPhoto = null;
 
   let form = {
-    date: '2026-10-01',
+    date: projectToday(),
     party_name: '',
     phone: '',
     material_name: 'సిమెంట్ (Cement)',
@@ -37,14 +42,12 @@
   });
 
   async function loadData() {
-    loading = true;
-    const { data: matData } = await supabase.from('contractor_materials').select('*').order('date', { ascending: false });
-    materials = matData ? matData : [];
-
-    const { data: partyData } = await supabase.from('contractor_parties').select('name').eq('party_type', 'Supplier');
-    parties = partyData ? partyData.map(p => p.name) : [];
-
-    loading = false;
+    loading=true; dataError='';
+    try {
+      const [records,suppliers]=await Promise.all([readAllRows(supabase,'contractor_materials',{orderBy:'date'}),readAllRows(supabase,'contractor_parties')]);
+      materials=records; parties=suppliers.filter(p=>p.party_type==='Supplier').map(p=>p.name);
+    } catch(error) { dataError=dataErrorMessage(error); }
+    finally { loading=false; }
   }
 
   function handlePhotoUpload(e) {
@@ -74,67 +77,8 @@
   }
 
   async function saveMaterial() {
-    if (!form.party_name) {
-      alert('దయచేసి సప్లయర్ పేరు నమోదు చేయండి.');
-      return;
-    }
-    if (!form.quantity || !form.unit_rate) {
-      alert('దయచేసి పరిమాణం మరియు రేటు నమోదు చేయండి.');
-      return;
-    }
-
-    const total = calculatedTotal;
-    const isCredit = form.payment_mode === 'Credit';
-    const paid = isCredit ? 0 : total;
-    const bal = isCredit ? total : 0;
-
-    const { error: matErr } = await supabase.from('contractor_materials').insert([{
-      date: form.date,
-      party_name: form.party_name,
-      phone: form.phone,
-      material_name: form.material_name,
-      quantity: Number(form.quantity),
-      unit: form.unit,
-      unit_rate: Number(form.unit_rate),
-      transport_cost: t,
-      total_amount: total,
-      paid_amount: paid,
-      balance_amount: bal,
-      payment_mode: form.payment_mode,
-      bill_photo: form.bill_photo
-    }]);
-
-    await supabase.from('contractor_transactions').insert([{
-      date: form.date,
-      category: 'Materials',
-      description: `${form.quantity} ${form.unit} ${form.material_name} (కిరాయి: ₹${t})`,
-      amount: total,
-      source: form.payment_mode,
-      recipient: form.party_name,
-      balance: bal,
-      status: isCredit ? 'Due' : 'Paid',
-      photo_url: form.bill_photo
-    }]);
-
-    if (!matErr) {
-      const curDate = form.date;
-      showModal = false;
-      form = {
-        date: curDate,
-        party_name: '',
-        phone: '',
-        material_name: 'సిమెంట్ (Cement)',
-        quantity: 50,
-        unit: 'బస్తాలు (Bags)',
-        unit_rate: 380,
-        transport_cost: 1500,
-        payment_mode: 'Credit',
-        bill_photo: ''
-      };
-      await loadData();
-    } else {
-      alert('సేవ్ చేయడం విఫలమైంది: ' + matErr.message);
-    }
+    try { await runFinancialMutation('material-purchase', form); }
+    catch (error) { mutationError=dataErrorMessage(error); }
   }
 
   function shareWhatsApp(m) {
@@ -148,6 +92,14 @@
 <svelte:head>
   <title>మెటీరియల్స్ & సప్లయర్లు | A.S.V. Contractor 360°</title>
 </svelte:head>
+{#if dataError}
+  <div role="alert" class="m-4 rounded-xl border border-rose-300 bg-rose-50 p-4 text-sm text-rose-900">{dataError} <button type="button" on:click={loadData} class="ml-3 font-bold underline">మళ్లీ ప్రయత్నించండి</button></div>
+{/if}
+{#if mutationError}
+  <p role="alert" class="m-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">{mutationError}</p>
+{/if}
+{#if !dataError}
+
 
 <div class="min-h-screen bg-[#f8fafc] text-slate-900 p-4 sm:p-6 space-y-6">
   <div class="max-w-7xl mx-auto space-y-4">
@@ -341,7 +293,7 @@
           <input type="file" accept="image/*" on:change={handlePhotoUpload} class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-slate-600 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-amber-100 file:text-amber-800 hover:file:bg-amber-200" />
         </div>
 
-        <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-2xl shadow transition cursor-pointer">
+        <button disabled={!FINANCIAL_WRITES_ENABLED} type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-2xl shadow transition cursor-pointer">
           ఖాతాలో భద్రపరచండి ➔
         </button>
       </form>
@@ -359,4 +311,6 @@
       <img src={previewPhoto} alt="Bill" class="w-full max-h-[75vh] object-contain rounded-xl bg-slate-100" />
     </div>
   </div>
+{/if}
+
 {/if}

@@ -1,13 +1,18 @@
 <script>
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
+  import { readAllRows, dataErrorMessage, projectToday } from '$lib/contractor/data.js';
+  import { runFinancialMutation, FINANCIAL_WRITES_ENABLED } from '$lib/contractor/financial-write-gate.js';
+
+  let dataError = '';
+  let mutationError = '';
 
   let contracts = [];
   let loading = true;
   let showModal = false;
 
   let form = {
-    date: '2026-10-04',
+    date: projectToday(),
     contractor_name: '',
     phone: '',
     work_type: 'సెంట్రింగ్ పని (Centring Work)',
@@ -31,60 +36,30 @@ $: lengthVal = form.length_ft ? Number(form.length_ft) : 0;
   });
 
   async function fetchContracts() {
-    loading = true;
-    const { data } = await supabase.from('contractor_piecework').select('*').order('date', { ascending: false });
-    contracts = data ? data : [];
-    loading = false;
+    loading=true; dataError='';
+    try {
+      contracts=await readAllRows(supabase,'contractor_piecework',{orderBy:'date'});
+    } catch(error) { dataError=dataErrorMessage(error); }
+    finally { loading=false; }
   }
 
   async function saveContract() {
-    if (!form.contractor_name || !form.rate_per_unit) {
-      alert('Dayachesi contractor peru mariyu rate enter cheyandi.');
-      return;
-    }
-
-    const { error } = await supabase.from('contractor_piecework').insert([{
-      date: form.date,
-      contractor_name: form.contractor_name,
-      phone: form.phone,
-      work_type: form.work_type,
-      calc_mode: form.calc_mode,
-      length_ft: Number(form.length_ft),
-      height_ft: Number(form.height_ft),
-      total_units: calculatedUnits,
-      rate_per_unit: Number(form.rate_per_unit),
-      total_amount: totalContractCost,
-      advance_paid: Number(form.advance_paid || 0),
-      balance_due: balanceDue,
-      notes: form.notes
-    }]);
-
-    if (!error) {
-      // Auto-post advance to General Ledger
-      if (Number(form.advance_paid) > 0) {
-        await supabase.from('contractor_transactions').insert([{
-          date: form.date,
-          category: 'Centring',
-          description: `${form.work_type} (${calculatedUnits} ${form.calc_mode}) - Advance to ${form.contractor_name}`,
-          amount: Number(form.advance_paid),
-          source: 'Cash',
-          recipient: form.contractor_name,
-          balance: balanceDue,
-          status: balanceDue > 0 ? 'Due' : 'Paid'
-        }]);
-      }
-
-      showModal = false;
-      await fetchContracts();
-    } else {
-      alert('Error: ' + error.message);
-    }
+    try { await runFinancialMutation('piecework', form); }
+    catch (error) { mutationError=dataErrorMessage(error); }
   }
 </script>
 
 <svelte:head>
   <title>సెంట్రింగ్ & పీస్ వర్క్ లెక్కలు | A.S.V. Contractor 360°</title>
 </svelte:head>
+{#if dataError}
+  <div role="alert" class="m-4 rounded-xl border border-rose-300 bg-rose-50 p-4 text-sm text-rose-900">{dataError} <button type="button" on:click={fetchContracts} class="ml-3 font-bold underline">మళ్లీ ప్రయత్నించండి</button></div>
+{/if}
+{#if mutationError}
+  <p role="alert" class="m-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">{mutationError}</p>
+{/if}
+{#if !dataError}
+
 
 <div class="min-h-screen bg-[#f8fafc] text-slate-900 p-4 sm:p-6 space-y-6">
   <div class="max-w-7xl mx-auto space-y-4">
@@ -215,10 +190,12 @@ $: lengthVal = form.length_ft ? Number(form.length_ft) : 0;
           <span class="text-[10px] text-slate-400 block mt-0.5">మిగిలిన బాకీ: ₹ {balanceDue.toLocaleString('en-IN')}</span>
         </div>
 
-        <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-2xl shadow transition cursor-pointer">
+        <button disabled={!FINANCIAL_WRITES_ENABLED} type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-2xl shadow transition cursor-pointer">
           సేవ్ చేయండి & లెడ్జర్‌లో నమోదు చేయండి ➔
         </button>
       </form>
     </div>
   </div>
+{/if}
+
 {/if}

@@ -1,9 +1,17 @@
 <script>
   import { onMount } from 'svelte';
-  import { goto } from '$app/navigation';
+  import { calculateFinancialSummary } from '$lib/contractor/accounting.js';
+  import { CATEGORIES } from '$lib/contractor/categories.js';
   import { supabase } from '$lib/supabaseClient';
+  import { readAllRows, dataErrorMessage, projectToday } from '$lib/contractor/data.js';
+  import { runFinancialMutation, FINANCIAL_WRITES_ENABLED } from '$lib/contractor/financial-write-gate.js';
 
-  let authChecking = true;
+  let dataError = '';
+  let mutationError = '';
+
+  let authChecking = false;
+  let labourRecords = [];
+  let pieceworkRecords = [];
   let loadingData = true;
 
   let budget = 400000;
@@ -29,7 +37,7 @@
     recipient: '',
     party_phone: '',
     advance_paid: 0,
-    date: '2026-10-04',
+    date: projectToday(),
     photo_url: ''
   };
 
@@ -40,7 +48,7 @@
     amount: '',
     target: 'Bank',
     party_phone: '',
-    date: '2026-10-04',
+    date: projectToday(),
     photo_url: ''
   };
 
@@ -49,72 +57,43 @@
     direction: 'Cash to Bank',
     amount: '',
     bank_name: 'SBI Mutharam Branch',
-    date: new Date().toISOString().split('T')[0],
+    date: projectToday(),
     photo_url: ''
   };
 
-  onMount(async () => {
-    if (typeof window !== 'undefined') {
-      const savedBudget = localStorage.getItem('ASV_CONTRACTOR_BUDGET');
-      if (savedBudget) {
-        budget = Number(savedBudget);
-      }
-    }
-
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      goto('/admin/login');
-      return;
-    }
-    authChecking = false;
-    await fetchServerData();
+  onMount(() => {
+    let saved=null;
+    try { saved = localStorage.getItem('ASV_CONTRACTOR_BUDGET'); } catch { /* Browser storage is optional. */ }
+    if (saved !== null && Number.isFinite(Number(saved)) && Number(saved) >= 0) budget = Number(saved);
+    else budget = 400000;
+    void fetchServerData();
   });
 
   async function fetchServerData() {
     loadingData = true;
+    dataError = '';
     try {
-      const { data: txData } = await supabase
-        .from('contractor_transactions')
-        .select('*')
-        .order('id', { ascending: false });
-      transactions = txData ? txData : [];
-
-      const { data: loanData } = await supabase
-        .from('contractor_loans')
-        .select('*')
-        .order('id', { ascending: false });
-      loanRecords = loanData ? loanData : [];
-
-      const { count: pCount } = await supabase
-        .from('contractor_labour_profiles')
-        .select('*', { count: 'exact', head: true });
-      profilesCount = pCount || 0;
-
-      const { count: pwCount } = await supabase
-        .from('contractor_piecework')
-        .select('*', { count: 'exact', head: true });
-      pieceworkCount = pwCount || 0;
-
-      const { count: mbCount } = await supabase
-        .from('contractor_mbook')
-        .select('*', { count: 'exact', head: true });
-      mbookCount = mbCount || 0;
-
-    } catch (e) {
-      console.error('Server fetch error:', e);
+      const [tx, loans, profiles, piecework, mbook, labour] = await Promise.all([
+        readAllRows(supabase,'contractor_transactions'), readAllRows(supabase,'contractor_loans'),
+        readAllRows(supabase,'contractor_labour_profiles'), readAllRows(supabase,'contractor_piecework'),
+        readAllRows(supabase,'contractor_mbook'), readAllRows(supabase,'contractor_labour')
+      ]);
+      transactions=tx; loanRecords=loans; labourRecords=labour; pieceworkRecords=piecework;
+      profilesCount=profiles.length; pieceworkCount=piecework.length; mbookCount=mbook.length;
+    } catch (error) {
+      dataError = dataErrorMessage(error);
     } finally {
       loadingData = false;
     }
   }
 
   function editBudget() {
-    const val = prompt('ప్రాజెక్ట్ మొత్తం బడ్జెట్ / వర్క్ ఆర్డర్ విలువ (₹) నమోదు చేయండి:', budget);
-    if (val !== null && !isNaN(val) && Number(val) >= 0) {
-      budget = Number(val);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('ASV_CONTRACTOR_BUDGET', budget);
-      }
-    }
+    const value=prompt('ఈ బ్రౌజర్‌లో మాత్రమే సేవ్ అయ్యే బడ్జెట్ అంచనా (₹):',String(budget));
+    if(value===null)return;
+    const amount=Number(value);
+    if(!Number.isFinite(amount)||amount<0||!Number.isSafeInteger(Math.round(amount*100))){mutationError='సరైన బడ్జెట్ మొత్తం నమోదు చేయండి.';return;}
+    try {localStorage.setItem('ASV_CONTRACTOR_BUDGET',String(amount));budget=amount;}
+    catch {mutationError='ఈ బ్రౌజర్‌లో బడ్జెట్ సేవ్ కాలేదు.';}
   }
 
   function handlePhotoUpload(e, targetForm) {
@@ -149,225 +128,38 @@
     reader.readAsDataURL(file);
   }
 
-  // 1. Total Inflow
-  $: totalInflow = transactions
-    .filter(t => t.category === 'Money In')
-    .reduce((s, t) => s + (t.amount ? Number(t.amount) : 0), 0);
-
-  // 2. Total Paid Expenses
-  $: totalPaidExpenses = transactions
-    .filter(t => t.category !== 'Money In' && t.category !== 'Transfer' && t.source !== 'Credit')
-    .reduce((s, t) => s + (t.amount ? Number(t.amount) : 0), 0)
-    + transactions
-    .filter(t => t.category !== 'Money In' && t.category !== 'Transfer' && t.source === 'Credit')
-    .reduce((s, t) => s + (t.advance_paid ? Number(t.advance_paid) : 0), 0);
-
-  // 3. Supplier / Credit Dues
-  $: totalPayablesDue = transactions
-    .filter(t => t.source === 'Credit' && t.status === 'Due')
-    .reduce((s, t) => {
-      const amt = t.balance ? Number(t.balance) : (t.amount ? Number(t.amount) : 0);
-      return s + amt;
-    }, 0);
-
-  // 4. Cash In
-  $: cashIn = transactions
-    .filter(t => (t.category === 'Money In' && t.source === 'Cash') || (t.category === 'Transfer' && t.source === 'Bank to Cash'))
-    .reduce((s, t) => s + (t.amount ? Number(t.amount) : 0), 0);
-
-  // 5. Cash Out
-  $: cashOut = transactions
-    .filter(t => t.category !== 'Money In' && t.category !== 'Transfer' && t.source === 'Cash')
-    .reduce((s, t) => s + (t.amount ? Number(t.amount) : 0), 0)
-    + transactions
-    .filter(t => t.category !== 'Money In' && t.category !== 'Transfer' && t.source === 'Credit')
-    .reduce((s, t) => s + (t.advance_paid ? Number(t.advance_paid) : 0), 0)
-    + transactions
-    .filter(t => t.category === 'Transfer' && t.source === 'Cash to Bank')
-    .reduce((s, t) => s + (t.amount ? Number(t.amount) : 0), 0);
-
-  $: cashBalance = cashIn - cashOut;
-
-  // 6. Bank In
-  $: bankIn = transactions
-    .filter(t => (t.category === 'Money In' && t.source === 'Bank') || (t.category === 'Transfer' && t.source === 'Cash to Bank'))
-    .reduce((s, t) => s + (t.amount ? Number(t.amount) : 0), 0);
-
-  // 7. Bank Out
-  $: bankOut = transactions
-    .filter(t => t.category !== 'Money In' && t.category !== 'Transfer' && ['Bank', 'UPI'].includes(t.source))
-    .reduce((s, t) => s + (t.amount ? Number(t.amount) : 0), 0)
-    + transactions
-    .filter(t => t.category === 'Transfer' && t.source === 'Bank to Cash')
-    .reduce((s, t) => s + (t.amount ? Number(t.amount) : 0), 0);
-
-  $: bankBalance = bankIn - bankOut;
-
-  $: loanOutstanding = loanRecords.reduce((sum, l) => {
-    const p = l.principal ? Number(l.principal) : 0;
-    const r = l.repaid_amount ? Number(l.repaid_amount) : 0;
-    return sum + (p - r);
-  }, 0);
-
-  $: totalLiquidity = cashBalance + bankBalance;
+  $: summary = calculateFinancialSummary({transactions,loans:loanRecords,labour:labourRecords,piecework:pieceworkRecords});
+  $: ({totalInflow,totalReceipts,ownerCapital,totalPaidExpenses,totalPayablesDue,cashBalance,bankBalance,loanOutstanding,totalLiquidity,totalLiabilities} = summary);
   $: budgetRemaining = budget - totalPaidExpenses;
-  $: totalLiabilities = loanOutstanding + totalPayablesDue;
-
-  // Category totals
-  $: matTotal = transactions.filter(t => t.category === 'Materials').reduce((s, t) => s + Number(t.amount || 0), 0);
-  $: labTotal = transactions.filter(t => t.category === 'Labour & Mestri' || t.category === 'Centring').reduce((s, t) => s + Number(t.amount || 0), 0);
-  $: refTotal = transactions.filter(t => t.category === 'Site Refreshments & Water').reduce((s, t) => s + Number(t.amount || 0), 0);
-  $: trnTotal = transactions.filter(t => t.category === 'Transport & Fuel').reduce((s, t) => s + Number(t.amount || 0), 0);
+  $: matTotal = summary.categoryTotals[CATEGORIES.MATERIALS] || 0;
+  $: labTotal = (summary.categoryTotals[CATEGORIES.LABOUR] || 0) + (summary.categoryTotals[CATEGORIES.CENTRING] || 0);
+  $: refTotal = summary.categoryTotals[CATEGORIES.REFRESHMENTS] || 0;
+  $: trnTotal = summary.categoryTotals[CATEGORIES.TRANSPORT] || 0;
 
   // Expense Submit
   async function submitExpense() {
-    if (!expForm.desc || !expForm.amount || !expForm.recipient) {
-      alert('దయచేసి పూర్తి వివరాలు నమోదు చేయండి.');
-      return;
-    }
-
-    const amt = Number(expForm.amount);
-    const adv = Number(expForm.advance_paid || 0);
-    const isCredit = expForm.source === 'Credit';
-    const bal = isCredit ? (amt - adv) : 0;
-    const invNo = 'ASV-PAY-' + Date.now().toString().slice(-6);
-
-    const newRecord = {
-      invoice_no: invNo,
-      date: expForm.date,
-      category: expForm.category,
-      description: expForm.desc,
-      amount: amt,
-      source: expForm.source,
-      recipient: expForm.recipient,
-      party_phone: expForm.party_phone,
-      advance_paid: adv,
-      balance: bal,
-      status: (isCredit && bal > 0) ? 'Due' : 'Paid',
-      photo_url: expForm.photo_url
-    };
-
-    const { error } = await supabase.from('contractor_transactions').insert([newRecord]);
-
-    if (error) {
-      alert('సర్వర్ ఎర్రర్: ' + error.message);
-    } else {
-      showExpenseModal = false;
-      activeVoucher = { ...newRecord, type: 'PAYMENT_VOUCHER' };
-      showVoucherModal = true;
-      expForm = {
-        category: 'Site Refreshments & Water',
-        desc: '',
-        amount: '',
-        source: 'Cash',
-        recipient: '',
-        party_phone: '',
-        advance_paid: 0,
-        date: expForm.date,
-        photo_url: ''
-      };
-      await fetchServerData();
+    try {
+      await runFinancialMutation('expense', expForm);
+    } catch (error) {
+      mutationError = dataErrorMessage(error);
     }
   }
 
   // Money In Submit
   async function submitMoneyIn() {
-    if (!inForm.desc || !inForm.amount) {
-      alert('మొత్తం మరియు వివరాలు నమోదు చేయండి.');
-      return;
-    }
-    const amt = Number(inForm.amount);
-    const invNo = 'ASV-REC-' + Date.now().toString().slice(-6);
-
-    const newRecord = {
-      invoice_no: invNo,
-      date: inForm.date,
-      category: 'Money In',
-      description: inForm.sourceType + ': ' + inForm.desc,
-      amount: amt,
-      source: inForm.target,
-      recipient: inForm.desc,
-      party_phone: inForm.party_phone,
-      balance: 0,
-      status: 'Received',
-      photo_url: inForm.photo_url
-    };
-
-    const { error } = await supabase.from('contractor_transactions').insert([newRecord]);
-
-    if (inForm.sourceType === 'Borrowed / Loan') {
-      await supabase.from('contractor_loans').insert([{
-        lender_name: inForm.desc,
-        date_borrowed: inForm.date,
-        principal: amt,
-        interest_rate: '1.5% / month',
-        repaid_amount: 0
-      }]);
-    }
-
-    if (error) {
-      alert('సర్వర్ ఎర్రర్: ' + error.message);
-    } else {
-      showMoneyInModal = false;
-      activeVoucher = { ...newRecord, type: 'RECEIPT_INVOICE' };
-      showVoucherModal = true;
-      inForm = { sourceType: 'Running Bill Received', desc: '', amount: '', target: 'Bank', party_phone: '', date: inForm.date, photo_url: '' };
-      await fetchServerData();
+    try {
+      await runFinancialMutation('receipt', inForm);
+    } catch (error) {
+      mutationError = dataErrorMessage(error);
     }
   }
 
   // Contra Transfer Submit
   async function submitTransfer() {
-    if (!transferForm.amount || Number(transferForm.amount) <= 0) {
-      alert('దయచేసి బదిలీ చేయాల్సిన మొత్తాన్ని నమోదు చేయండి.');
-      return;
-    }
-
-    const amt = Number(transferForm.amount);
-    const isCashToBank = transferForm.direction === 'Cash to Bank';
-
-    if (isCashToBank && amt > cashBalance) {
-      if (!confirm('హెచ్చరిక: మీ చేతిలో ఉన్న క్యాష్ కంటే ఎక్కువ డిపాజిట్ చేస్తున్నారు. కొనసాగించాలా?')) {
-        return;
-      }
-    }
-
-    const invNo = 'ASV-TRF-' + Date.now().toString().slice(-6);
-    const desc = isCashToBank 
-      ? 'చేతిలోని నగదు బ్యాంకులో జమ (Cash Deposit: ' + transferForm.bank_name + ')'
-      : 'బ్యాంకు నుండి చేతికి నగదు విత్‌డ్రా (Cash Withdrawal: ' + transferForm.bank_name + ')';
-
-    const newRecord = {
-      invoice_no: invNo,
-      date: transferForm.date,
-      category: 'Transfer',
-      description: desc,
-      amount: amt,
-      source: transferForm.direction,
-      recipient: transferForm.bank_name,
-      party_phone: '',
-      advance_paid: 0,
-      balance: 0,
-      status: 'Transferred',
-      photo_url: transferForm.photo_url
-    };
-
-    const { error } = await supabase.from('contractor_transactions').insert([newRecord]);
-
-    if (error) {
-      alert('సర్వర్ ఎర్రర్: ' + error.message);
-    } else {
-      showTransferModal = false;
-      activeVoucher = { ...newRecord, type: 'CONTRA_VOUCHER' };
-      showVoucherModal = true;
-      transferForm = {
-        direction: 'Cash to Bank',
-        amount: '',
-        bank_name: 'SBI Mutharam Branch',
-        date: new Date().toISOString().split('T')[0],
-        photo_url: ''
-      };
-      await fetchServerData();
+    try {
+      await runFinancialMutation('transfer', transferForm);
+    } catch (error) {
+      mutationError = dataErrorMessage(error);
     }
   }
 
@@ -381,7 +173,7 @@
     text += '• Bank / UPI Nilva: Rs. ' + bankBalance.toLocaleString('en-IN') + '\n';
     text += '*👉 Total Usable Cash: Rs. ' + totalLiquidity.toLocaleString('en-IN') + '*\n\n';
     text += '*2. PROJECT BUDGET & EXPENSES:*\n';
-    text += '• Sanctioned Budget: Rs. ' + budget.toLocaleString('en-IN') + '\n';
+    text += '• Browser-only Budget Estimate: Rs. ' + budget.toLocaleString('en-IN') + '\n';
     text += '• Total Spent: Rs. ' + totalPaidExpenses.toLocaleString('en-IN') + '\n';
     text += '• Budget Remaining: Rs. ' + budgetRemaining.toLocaleString('en-IN') + '\n\n';
     text += '*3. BAAKEELU & APPULU (LIABILITIES):*\n';
@@ -389,7 +181,7 @@
     text += '• Supplier / Labour Dues: Rs. ' + totalPayablesDue.toLocaleString('en-IN') + '\n';
     text += '*👉 Total Liabilities: Rs. ' + totalLiabilities.toLocaleString('en-IN') + '*\n';
     text += '------------------------------------\n';
-    text += 'Generated via A.S.V. Enterprises Nexlify ERP';
+    text += '???????? ????????? ??????? ???????; ??????? ?????.\nGenerated via A.S.V. Enterprises Nexlify ERP';
 
     window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(text), '_blank');
   }
@@ -425,6 +217,14 @@
 <svelte:head>
   <title>A.S.V. Contractor 360° | ERP Dashboard</title>
 </svelte:head>
+{#if dataError}
+  <div role="alert" class="m-4 rounded-xl border border-rose-300 bg-rose-50 p-4 text-sm text-rose-900">{dataError} <button type="button" on:click={fetchServerData} class="ml-3 font-bold underline">మళ్లీ ప్రయత్నించండి</button></div>
+{/if}
+{#if mutationError}
+  <p role="alert" class="m-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">{mutationError}</p>
+{/if}
+{#if !dataError}
+
 
 {#if authChecking}
   <div class="min-h-screen bg-white flex items-center justify-center text-slate-900">
@@ -530,6 +330,13 @@
       {#if loadingData}
         <div class="py-16 text-center text-slate-400 font-bold text-xs">డేటా లోడ్ అవుతోంది...</div>
       {:else}
+        <p class="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-600">బడ్జెట్ ఈ బ్రౌజర్‌లో అంచనా మాత్రమే. చారిత్రక రికార్డుల ఆధారంగా నివేదిక; ఖాతాల ధృవీకరణ అవసరం.</p>
+        {#if summary.warnings.length > 0}
+          <div role="status" class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
+            కొన్ని పాత రికార్డులకు చెల్లింపు ఖాతా లేదా గుర్తింపు వివరాలు లేవు. నిల్వలను తుది లెక్కలుగా పరిగణించవద్దు.
+            <details><summary class="mt-2 cursor-pointer font-bold">నిర్ధారణ అవసరమైన రికార్డులు ({summary.warnings.length})</summary><ul>{#each summary.warnings as warning}<li>{warning.recordKey}: {warning.code}</li>{/each}</ul></details>
+          </div>
+        {/if}
         <!-- Core Financial Cards -->
         <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
           <div class="bg-white border border-slate-200 p-3 rounded-2xl shadow-sm flex flex-col justify-between">
@@ -542,13 +349,21 @@
               </div>
               <div class="text-sm sm:text-base font-black font-mono text-slate-900 mt-1">₹ {budget.toLocaleString('en-IN')}</div>
             </div>
-            <span class="text-[9.5px] text-slate-400 mt-0.5">మంజూరైన వ్యయం</span>
+            <span class="text-[9.5px] text-slate-400 mt-0.5">ఈ బ్రౌజర్‌లో అంచనా మాత్రమే</span>
           </div>
 
           <div class="bg-white border border-slate-200 p-3 rounded-2xl shadow-sm">
-            <span class="text-[10px] font-bold text-emerald-600 uppercase block">మొత్తం ఇన్‌ఫ్లో (In)</span>
-            <div class="text-sm sm:text-base font-black font-mono text-emerald-600 mt-1">₹ {totalInflow.toLocaleString('en-IN')}</div>
-            <span class="text-[9.5px] text-slate-400">స్వంత + బిల్లులు</span>
+            <span class="text-[10px] font-bold text-emerald-600 uppercase block">రాబడి & నిధులు (ఇన్‌ఫ్లో)</span>
+            <div class="text-sm sm:text-base font-black font-mono text-emerald-600 mt-1">₹ {(totalInflow || totalReceipts || 0).toLocaleString('en-IN')}</div>
+            <span class="text-[9.5px] text-slate-400">
+              {#if totalInflow > 0 && ownerCapital > 0}
+                ఆపరేటింగ్: ₹{totalInflow.toLocaleString('en-IN')} | క్యాపిటల్: ₹{ownerCapital.toLocaleString('en-IN')}
+              {:else if ownerCapital > 0}
+                పెట్టుబడి నిధులు (Self/Owner Capital)
+              {:else}
+                ఆపరేటింగ్ రసీదులు (Running Bills/Client)
+              {/if}
+            </span>
           </div>
 
           <div class="bg-white border border-slate-200 p-3 rounded-2xl shadow-sm">
@@ -741,7 +556,7 @@
               <span class="text-[10px] font-black uppercase text-slate-700 tracking-wider block">2. ప్రాజెక్ట్ బడ్జెట్ & సైట్ ఖర్చులు</span>
               <div class="grid grid-cols-3 gap-2 text-center">
                 <div class="bg-white p-2.5 rounded-xl border border-slate-200">
-                  <span class="text-[9.5px] text-slate-500 font-bold block">మంజూరైన బడ్జెట్</span>
+                  <span class="text-[9.5px] text-slate-500 font-bold block">స్థానిక బడ్జెట్ అంచనా</span>
                   <span class="text-xs font-black font-mono text-slate-900">₹ {budget.toLocaleString('en-IN')}</span>
                 </div>
                 <div class="bg-white p-2.5 rounded-xl border border-slate-200">
@@ -827,7 +642,7 @@
               <input type="date" bind:value={transferForm.date} required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-mono font-bold" />
             </div>
 
-            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-3 rounded-2xl shadow transition cursor-pointer text-xs">
+            <button disabled={!FINANCIAL_WRITES_ENABLED} title="భద్రతా ధృవీకరణ పూర్తయ్యే వరకు నమోదు నిలిపివేయబడింది" type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-3 rounded-2xl shadow transition cursor-pointer text-xs">
               బదిలీని నమోదు చేయండి ➔
             </button>
           </form>
@@ -908,7 +723,7 @@
               <input type="file" accept="image/*" on:change={(e) => handlePhotoUpload(e, 'exp')} class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2" />
             </div>
 
-            <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-2xl shadow transition cursor-pointer text-xs">
+            <button disabled={!FINANCIAL_WRITES_ENABLED} title="భద్రతా ధృవీకరణ పూర్తయ్యే వరకు నమోదు నిలిపివేయబడింది" type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-2xl shadow transition cursor-pointer text-xs">
               ఖాతాల్లో సేవ్ చేయండి & వోచర్ పొందండి ➔
             </button>
           </form>
@@ -955,7 +770,7 @@
               <label class="block font-bold text-slate-700 mb-1">తేదీ</label>
               <input type="date" bind:value={inForm.date} required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold" />
             </div>
-            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3 rounded-2xl shadow cursor-pointer">
+            <button disabled={!FINANCIAL_WRITES_ENABLED} title="భద్రతా ధృవీకరణ పూర్తయ్యే వరకు నమోదు నిలిపివేయబడింది" type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3 rounded-2xl shadow cursor-pointer">
               సేవ్ చేయండి & రసీదు పొందండి ➔
             </button>
           </form>
@@ -1024,4 +839,5 @@
     {/if}
 
   </div>
+{/if}
 {/if}

@@ -225,9 +225,7 @@
           <p class="text-[10px] text-slate-400">Mobile Photos ni CamScanner la clean chesi A4 Printing Ready chese Tool</p>
         </div>
       </div>
-      <a href="/admin/contractor" class="bg-slate-800 text-xs px-3 py-1.5 rounded-xl font-bold border border-slate-700">
-        ← Contractor Desk
-      </a>
+
     </div>
   </header>
 

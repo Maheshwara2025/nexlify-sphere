@@ -1,6 +1,11 @@
 <script>
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
+  import { readAllRows, dataErrorMessage, projectToday } from '$lib/contractor/data.js';
+  import { runFinancialMutation, FINANCIAL_WRITES_ENABLED } from '$lib/contractor/financial-write-gate.js';
+
+  let dataError = '';
+  let mutationError = '';
 
   let loans = [];
   let creditBills = [];
@@ -13,7 +18,7 @@
     principal: '',
     interest_rate: '1.5% నెలకు',
     repaid_amount: 0,
-    date_borrowed: new Date().toISOString().split('T')[0]
+    date_borrowed: projectToday()
   };
 
   onMount(async () => {
@@ -21,74 +26,46 @@
   });
 
   async function fetchLoansAndDues() {
-    loading = true;
-    const { data: loanData } = await supabase.from('contractor_loans').select('*').order('id', { ascending: false });
-    loans = loanData || [];
-
-    const { data: txData } = await supabase
-      .from('contractor_transactions')
-      .select('*')
-      .eq('source', 'Credit')
-      .eq('status', 'Due');
-    creditBills = txData || [];
-
-    loading = false;
+    loading=true; dataError='';
+    try {
+      const [records,tx]=await Promise.all([readAllRows(supabase,'contractor_loans'),readAllRows(supabase,'contractor_transactions')]);
+      loans=records; creditBills=tx.filter(t=>t.source==='Credit' && t.status==='Due');
+    } catch(error) { dataError=dataErrorMessage(error); }
+    finally { loading=false; }
   }
 
   async function saveLoan() {
-    if (!loanForm.lender_name || !loanForm.principal) {
-      alert('దయచేసి అప్పు ఇచ్చిన వ్యక్తి పేరు మరియు అసలు మొత్తం నమోదు చేయండి.');
-      return;
-    }
-
-    if (loanForm.id) {
-      await supabase.from('contractor_loans').update({
-        lender_name: loanForm.lender_name,
-        principal: Number(loanForm.principal),
-        interest_rate: loanForm.interest_rate,
-        repaid_amount: Number(loanForm.repaid_amount),
-        date_borrowed: loanForm.date_borrowed
-      }).eq('id', loanForm.id);
-    } else {
-      await supabase.from('contractor_loans').insert([{
-        lender_name: loanForm.lender_name,
-        principal: Number(loanForm.principal),
-        interest_rate: loanForm.interest_rate,
-        repaid_amount: 0,
-        date_borrowed: loanForm.date_borrowed
-      }]);
-    }
-
-    showLoanModal = false;
-    await fetchLoansAndDues();
+    try { await runFinancialMutation('loan', loanForm); }
+    catch (error) { mutationError=dataErrorMessage(error); }
   }
 
   async function repayAmount(loan) {
-    const curDue = loan.principal - loan.repaid_amount;
-    const val = prompt(`ప్రస్తుత బాకీ: ₹ ${curDue.toLocaleString('en-IN')}\nఎంత మొత్తం చెల్లించారు?`, '0');
-    if (val && !isNaN(val) && Number(val) > 0) {
-      const newRepaid = Number(loan.repaid_amount) + Number(val);
-      await supabase.from('contractor_loans').update({ repaid_amount: newRepaid }).eq('id', loan.id);
-      await fetchLoansAndDues();
-    }
+    try { await runFinancialMutation('loan-repayment', loan); }
+    catch (error) { mutationError=dataErrorMessage(error); }
   }
 
   async function deleteLoan(id) {
-    if (!confirm('ఈ అప్పు రికార్డును తొలగించాలా?')) return;
-    await supabase.from('contractor_loans').delete().eq('id', id);
-    loans = loans.filter(l => l.id !== id);
+    try { await runFinancialMutation('reverse-loan', {id}); }
+    catch (error) { mutationError=dataErrorMessage(error); }
   }
 
   async function clearCreditBill(id) {
-    if (!confirm('ఈ సప్లయర్ బిల్లు చెల్లించబడిందా?')) return;
-    await supabase.from('contractor_transactions').update({ status: 'Paid', balance: 0 }).eq('id', id);
-    creditBills = creditBills.filter(c => c.id !== id);
+    try { await runFinancialMutation('supplier-payment', {id}); }
+    catch (error) { mutationError=dataErrorMessage(error); }
   }
 </script>
 
 <svelte:head>
   <title>అప్పులు & సప్లయర్ బాకీలు | A.S.V. Contractor 360°</title>
 </svelte:head>
+{#if dataError}
+  <div role="alert" class="m-4 rounded-xl border border-rose-300 bg-rose-50 p-4 text-sm text-rose-900">{dataError} <button type="button" on:click={fetchLoansAndDues} class="ml-3 font-bold underline">మళ్లీ ప్రయత్నించండి</button></div>
+{/if}
+{#if mutationError}
+  <p role="alert" class="m-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">{mutationError}</p>
+{/if}
+{#if !dataError}
+
 
 <div class="min-h-screen bg-[#f8fafc] text-slate-900 p-4 sm:p-6 space-y-6">
   <div class="max-w-7xl mx-auto space-y-6">
@@ -100,7 +77,7 @@
       </div>
 
       <button
-        on:click={() => { loanForm = { id: null, lender_name: '', principal: '', interest_rate: '1.5% నెలకు', repaid_amount: 0, date_borrowed: new Date().toISOString().split('T')[0] }; showLoanModal = true; }}
+        on:click={() => { loanForm = { id: null, lender_name: '', principal: '', interest_rate: '1.5% నెలకు', repaid_amount: 0, date_borrowed: projectToday() }; showLoanModal = true; }}
         class="bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black px-3.5 py-2 rounded-xl shadow transition"
       >
         ➕ కొత్త అప్పు నమోదు
@@ -140,13 +117,13 @@
                   <td class="p-2.5 text-right font-mono text-emerald-700">₹ {Number(l.repaid_amount).toLocaleString('en-IN')}</td>
                   <td class="p-2.5 text-right font-mono font-black text-amber-700">₹ {bal.toLocaleString('en-IN')}</td>
                   <td class="p-2.5 text-center flex items-center justify-center gap-1.5">
-                    <button on:click={() => repayAmount(l)} class="bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold px-2 py-1 rounded text-[10.5px]">
+                    <button disabled={!FINANCIAL_WRITES_ENABLED} on:click={() => repayAmount(l)} class="bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold px-2 py-1 rounded text-[10.5px]">
                       💵 చెల్లించు
                     </button>
                     <button on:click={() => { loanForm = { ...l }; showLoanModal = true; }} class="bg-amber-50 text-amber-800 border border-amber-300 font-bold px-2 py-1 rounded text-[10.5px]">
                       ✏️ ఎడిట్
                     </button>
-                    <button on:click={() => deleteLoan(l.id)} class="text-rose-500 font-bold hover:text-rose-700 px-1">
+                    <button disabled={!FINANCIAL_WRITES_ENABLED} on:click={() => deleteLoan(l.id)} class="text-rose-500 font-bold hover:text-rose-700 px-1">
                       ✕
                     </button>
                   </td>
@@ -184,7 +161,7 @@
                   <td class="p-2.5 text-right font-mono">₹ {Number(b.amount).toLocaleString('en-IN')}</td>
                   <td class="p-2.5 text-right font-mono font-black text-rose-600">₹ {Number(b.balance || b.amount).toLocaleString('en-IN')}</td>
                   <td class="p-2.5 text-center">
-                    <button on:click={() => clearCreditBill(b.id)} class="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded-lg text-[10.5px] font-bold shadow">
+                    <button disabled={!FINANCIAL_WRITES_ENABLED} on:click={() => clearCreditBill(b.id)} class="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded-lg text-[10.5px] font-bold shadow">
                       చెల్లించబడింది ✓
                     </button>
                   </td>
@@ -231,10 +208,12 @@
           <input type="date" bind:value={loanForm.date_borrowed} required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold" />
         </div>
 
-        <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-2xl shadow transition text-xs">
+        <button disabled={!FINANCIAL_WRITES_ENABLED} type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-2xl shadow transition text-xs">
           సర్వర్‌లో సేవ్ చేయండి ➔
         </button>
       </form>
     </div>
   </div>
+{/if}
+
 {/if}

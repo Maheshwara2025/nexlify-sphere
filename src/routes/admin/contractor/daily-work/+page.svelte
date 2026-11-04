@@ -1,6 +1,11 @@
 <script>
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
+  import { readAllRows, dataErrorMessage, projectToday } from '$lib/contractor/data.js';
+  import { runFinancialMutation, FINANCIAL_WRITES_ENABLED } from '$lib/contractor/financial-write-gate.js';
+
+  let dataError = '';
+  let mutationError = '';
 
   let dailyLogs = [];
   let labourRecords = [];
@@ -10,7 +15,7 @@
   let previewPhoto = null;
 
   let form = {
-    date: '2026-10-04',
+    date: projectToday(),
     work_title: '',
     section_location: 'కాంపౌండ్ వాల్ / పునాది సైట్',
     assigned_mestri: '',
@@ -26,16 +31,15 @@
 
   async function fetchLogs() {
     loading = true;
-    const { data: logs } = await supabase.from('contractor_daily_works').select('*').order('date', { ascending: false });
-    dailyLogs = logs ? logs : [];
-
-    const { data: labours } = await supabase.from('contractor_labour').select('*').order('id', { ascending: false });
-    labourRecords = labours ? labours : [];
-
-    const { data: profs } = await supabase.from('contractor_labour_profiles').select('*');
-    profiles = profs ? profs : [];
-
-    loading = false;
+    dataError = '';
+    try {
+      const [logs, labour, workers] = await Promise.all([readAllRows(supabase,'contractor_daily_works',{orderBy:'date'}),readAllRows(supabase,'contractor_labour'),readAllRows(supabase,'contractor_labour_profiles')]);
+      dailyLogs=logs; labourRecords=labour; profiles=workers;
+    } catch (error) {
+      dataError = dataErrorMessage(error);
+    } finally {
+      loading = false;
+    }
   }
 
   $: dayLabourers = labourRecords.filter(l => l.date === form.date);$: masons = dayLabourers.filter(l => l.role && (l.role.includes('మేస్త్రి') || l.role.includes('Mason')));
@@ -80,54 +84,18 @@
   }
 
   async function saveDailyWork() {
-    if (!form.work_title || !form.assigned_mestri) {
-      alert('Dayachesi pani vivaralu mariyu mestri peru select cheyandi.');
-      return;
-    }
-
-    let gangSummary = `${dayLabourers.length} మంది (`;
-    let parts = [];
-    if (masons.length > 0) parts.push(`మేస్త్రీలు: ${masons.length}`);
-    if (excavationWorkers.length > 0) parts.push(`తవ్వకం కూలీలు: ${excavationWorkers.length}`);
-    if (femaleHelpers.length > 0) parts.push(`మహిళా కూలీలు: ${femaleHelpers.length}`);
-    if (maleHelpers.length > 0) parts.push(`పురుష కూలీలు: ${maleHelpers.length}`);
-    gangSummary += parts.join(', ') + `) • వేతనం: ₹${totalDayWage.toLocaleString('en-IN')}`;
-
-    const { error } = await supabase.from('contractor_daily_works').insert([{
-      date: form.date,
-      work_title: form.work_title,
-      section_location: form.section_location,
-      assigned_mestri: form.assigned_mestri,
-      workers_count: Number(form.workers_count || 1),
-      work_status: form.work_status,
-      site_photo: form.site_photo,
-      notes: form.notes ? `${form.notes} | [గ్యాంగ్: ${gangSummary}]` : `[గ్యాంగ్: ${gangSummary}]`
-    }]);
-
-    if (!error) {
-      const currentDate = form.date;
-      showModal = false;
-      form = {
-        date: currentDate,
-        work_title: '',
-        section_location: 'కాంపౌండ్ వాల్ / పునాది సైట్',
-        assigned_mestri: '',
-        workers_count: 1,
-        work_status: 'Completed',
-        site_photo: '',
-        notes: ''
-      };
-      await fetchLogs();
-    } else {
-      alert('Save cheyadam fail ayindi: ' + error.message);
+    try {
+      await runFinancialMutation('site-diary', form);
+    } catch (error) {
+      mutationError = dataErrorMessage(error);
     }
   }
 
   async function deleteLog(id) {
-    if (!confirm('Ee daily work record ni delete cheyala?')) return;
-    const { error } = await supabase.from('contractor_daily_works').delete().eq('id', id);
-    if (!error) {
-      dailyLogs = dailyLogs.filter(d => d.id !== id);
+    try {
+      await runFinancialMutation('reverse-site-diary', {id});
+    } catch (error) {
+      mutationError = dataErrorMessage(error);
     }
   }
 </script>
@@ -135,6 +103,14 @@
 <svelte:head>
   <title>రోజువారీ సైట్ డైరీ | A.S.V. Contractor 360°</title>
 </svelte:head>
+{#if dataError}
+  <div role="alert" class="m-4 rounded-xl border border-rose-300 bg-rose-50 p-4 text-sm text-rose-900">{dataError} <button type="button" on:click={fetchLogs} class="ml-3 font-bold underline">మళ్లీ ప్రయత్నించండి</button></div>
+{/if}
+{#if mutationError}
+  <p role="alert" class="m-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">{mutationError}</p>
+{/if}
+{#if !dataError}
+
 
 <div class="min-h-screen bg-[#f8fafc] text-slate-900 p-4 sm:p-6 space-y-6">
   <div class="max-w-7xl mx-auto space-y-4">
@@ -190,7 +166,7 @@
 
             <div class="pt-2 border-t flex justify-between items-center text-xs">
               <span class="text-[10px] text-slate-400 font-mono">ID: #{log.id}</span>
-              <button on:click={() => deleteLog(log.id)} class="text-rose-500 hover:text-rose-700 font-bold">
+              <button disabled={!FINANCIAL_WRITES_ENABLED} on:click={() => deleteLog(log.id)} class="text-rose-500 hover:text-rose-700 font-bold">
                 తొలగించండి ✕
               </button>
             </div>
@@ -303,7 +279,7 @@
           <textarea bind:value={form.notes} rows="2" placeholder="ఉదా: పునాది తవ్వకం పూర్తి చేసి బెడ్ కాంక్రీట్ ప్రారంభించాము..." class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2"></textarea>
         </div>
 
-        <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-2xl shadow transition cursor-pointer text-xs">
+        <button disabled={!FINANCIAL_WRITES_ENABLED} title="భద్రతా ధృవీకరణ పూర్తయ్యే వరకు నమోదు నిలిపివేయబడింది" type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-2xl shadow transition cursor-pointer text-xs">
           సైట్ డైరీలో భద్రపరచండి ➔
         </button>
       </form>
@@ -321,4 +297,5 @@
       <img src={previewPhoto} alt="Site" class="w-full max-h-[75vh] object-contain rounded-xl bg-slate-100" />
     </div>
   </div>
+{/if}
 {/if}

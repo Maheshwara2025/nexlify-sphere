@@ -1,43 +1,49 @@
 <script>
   import { onMount } from 'svelte';
+  import { getPartyOptions,getPartyAccount } from '$lib/contractor/accounting.js';
   import { supabase } from '$lib/supabaseClient';
+  import { readAllRows, dataErrorMessage, projectToday } from '$lib/contractor/data.js';
+  import { runFinancialMutation, FINANCIAL_WRITES_ENABLED } from '$lib/contractor/financial-write-gate.js';
+
+  let dataError = '';
+  let mutationError = '';
 
   let transactions = [];
   let labourRecords = [];
+  let profiles=[];
+  let parties=[];
+  let pieceworkRecords=[];
   let selectedParty = '';
   let loading = true;
 
-  onMount(async () => {
-    const { data: tx } = await supabase.from('contractor_transactions').select('*').order('date', { ascending: false });
-    transactions = tx ? tx : [];
+  onMount(() => { void fetchPartyData(); });
 
-    const { data: lab } = await supabase.from('contractor_labour').select('*').order('date', { ascending: false });
-    labourRecords = lab ? lab : [];
+  async function fetchPartyData() {
+    loading=true; dataError='';
+    try {
+      const [tx,labour,workers,suppliers,contracts]=await Promise.all([readAllRows(supabase,'contractor_transactions',{orderBy:'date'}),readAllRows(supabase,'contractor_labour',{orderBy:'date'}),readAllRows(supabase,'contractor_labour_profiles'),readAllRows(supabase,'contractor_parties'),readAllRows(supabase,'contractor_piecework')]);
+      transactions=tx; labourRecords=labour; profiles=workers; parties=suppliers; pieceworkRecords=contracts;
+    } catch(error) { dataError=dataErrorMessage(error); }
+    finally { loading=false; }
+  }
 
-    loading = false;
-  });
-
-  // Combine both supplier names and worker names into Party List
-  $: supplierNames = transactions.map(t => t.recipient).filter(Boolean);
-  $: workerNames = labourRecords.map(l => l.worker_name).filter(Boolean);$: allParties = Array.from(new Set([...supplierNames, ...workerNames])).sort();
-
-  // Filter transactions for selected party
-  $: partyTx = transactions.filter(t => t.recipient === selectedParty);
-  $: partyLabour = labourRecords.filter(l => l.worker_name === selectedParty);$: isWorker = partyLabour.length > 0;
-
-  // Calculation for Suppliers
-  $: supBilled = partyTx.reduce((s, t) => s + (t.amount ? Number(t.amount) : 0), 0);
-  $: supPaid = partyTx.filter(t => t.status === 'Paid').reduce((s, t) => s + (t.amount ? Number(t.amount) : 0), 0);
-  $: supDue = partyTx.filter(t => t.status === 'Due').reduce((s, t) => s + (t.balance ? Number(t.balance) : Number(t.amount || 0)), 0);
-
-  // Calculation for Labour / Mestri without any symbol errors
-  $: labTotalDays = partyLabour.reduce((s, l) => s + (l.days ? Number(l.days) : 1), 0);
-  $: labTotalEarned = partyLabour.reduce((s, l) => s + ((l.days ? Number(l.days) : 1) * (l.daily_rate ? Number(l.daily_rate) : 0)), 0);
-  $: labAdvancePaid = partyLabour.reduce((s, l) => s + (l.advance_paid ? Number(l.advance_paid) : 0), 0);
-  $: labNetDue = labTotalEarned - labAdvancePaid;
+  $: partyData={transactions,labour:labourRecords,profiles,parties,piecework:pieceworkRecords};
+  $: allParties=getPartyOptions(partyData);
+  $: account=getPartyAccount(selectedParty,partyData);
+  $: partyLabel=account.label || '';
+  $: partyTx=account.transactions;
+  $: partyLabour=account.labour;
+  $: isWorker=account.type==='worker';
+  $: supBilled=account.totalBilled;
+  $: supPaid=account.totalPaid;
+  $: supDue=account.totalDue;
+  $: labTotalDays=account.totalDays;
+  $: labTotalEarned=account.totalBilled;
+  $: labAdvancePaid=account.totalPaid;
+  $: labNetDue=account.totalDue;
   function shareWhatsApp() {
     let text = `*A.S.V. ENTERPRISES - వ్యక్తిగత ఖాతా నివేదిక*\n\n`;
-    text += `పేరు: ${selectedParty}\n`;
+    text += `పేరు: ${partyLabel}\n`;
     if (isWorker) {
       text += `హోదా: కూలీ / మేస్త్రి\n`;
       text += `మొత్తం పనిచేసిన రోజులు: ${labTotalDays} రోజులు\n`;
@@ -58,6 +64,14 @@
 <svelte:head>
   <title>వ్యక్తిగత ఖాతా | A.S.V. Contractor 360°</title>
 </svelte:head>
+{#if dataError}
+  <div role="alert" class="m-4 rounded-xl border border-rose-300 bg-rose-50 p-4 text-sm text-rose-900">{dataError} <button type="button" on:click={fetchPartyData} class="ml-3 font-bold underline">మళ్లీ ప్రయత్నించండి</button></div>
+{/if}
+{#if mutationError}
+  <p role="alert" class="m-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">{mutationError}</p>
+{/if}
+{#if !dataError}
+
 
 <div class="min-h-screen bg-[#f8fafc] text-slate-900 p-4 sm:p-6 space-y-6">
   <div class="max-w-7xl mx-auto space-y-4">
@@ -72,7 +86,7 @@
         <select bind:value={selectedParty} class="bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold shadow-xs">
           <option value="">-- సప్లయర్ లేదా కూలీ / మేస్త్రిని ఎంచుకోండి --</option>
           {#each allParties as p}
-            <option value={p}>{p}</option>
+            <option value={p.key}>{p.label}</option>
           {/each}
         </select>
         {#if selectedParty}
@@ -90,6 +104,7 @@
         డ్రాప్‌డౌన్ నుండి సప్లయర్ లేదా కూలీ / మేస్త్రి పేరును ఎంచుకోండి.
       </div>
     {:else}
+      {#if account.warnings.length > 0}<p class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">ఈ పాత రికార్డులకు శాశ్వత పార్టీ గుర్తింపు లేదా చెల్లింపు వివరాల నిర్ధారణ అవసరం.</p>{/if}
       <!-- Summary Cards -->
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div class="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm">
@@ -113,7 +128,7 @@
       {#if isWorker}
         <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm space-y-2">
           <div class="p-3 bg-slate-900 text-white text-xs font-bold">
-            👷 {selectedParty} - రోజువారీ పనుల హాజరు & పేమెంట్ పాస్‌బుక్
+            👷 {partyLabel} - రోజువారీ పనుల హాజరు & పేమెంట్ పాస్‌బుక్
           </div>
           <table class="w-full text-xs text-left border-collapse">
             <thead>
@@ -178,3 +193,5 @@
 
   </div>
 </div>
+
+{/if}

@@ -1,6 +1,11 @@
 <script>
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
+  import { readAllRows, dataErrorMessage, projectToday } from '$lib/contractor/data.js';
+  import { runFinancialMutation, FINANCIAL_WRITES_ENABLED } from '$lib/contractor/financial-write-gate.js';
+
+  let dataError = '';
+  let mutationError = '';
 
   let labourRecords = [];
   let profiles = [];
@@ -19,7 +24,7 @@
   };
 
   let form = {
-    date: '2026-10-04',
+    date: projectToday(),
     worker_id: '',
     worker_name: '',
     role: 'పునాది తవ్వకం కూలీ (Excavation Labour)',
@@ -35,18 +40,15 @@
 
   async function fetchAll() {
     loading = true;
-    const { data: profs } = await supabase
-      .from('contractor_labour_profiles')
-      .select('*')
-      .order('id', { ascending: true });
-    profiles = profs ? profs : [];
-
-    const { data: records } = await supabase
-      .from('contractor_labour')
-      .select('*')
-      .order('date', { ascending: false });
-    labourRecords = records ? records : [];
-    loading = false;
+    dataError = '';
+    try {
+      const [workers, attendance] = await Promise.all([readAllRows(supabase,'contractor_labour_profiles',{ascending:true}),readAllRows(supabase,'contractor_labour',{orderBy:'date'})]);
+      profiles=workers; labourRecords=attendance;
+    } catch (error) {
+      dataError = dataErrorMessage(error);
+    } finally {
+      loading = false;
+    }
   }
 
   function openNewProfileModal() {
@@ -64,22 +66,10 @@
   }
 
   async function saveProfile() {
-    if (!profileForm.name || !profileForm.worker_id) {
-      alert('Dayachesi peru mariyu Worker ID enter cheyandi.');
-      return;
-    }
-
-    const { error } = await supabase.from('contractor_labour_profiles').insert([profileForm]);
-    if (error) {
-      alert('Database Error: ' + error.message);
-    } else {
-      showProfileModal = false;
-      await fetchAll();
-      // Auto-select in attendance
-      form.worker_id = profileForm.worker_id;
-      form.worker_name = profileForm.name;
-      form.role = profileForm.role;
-      form.daily_rate = profileForm.daily_rate;
+    try {
+      await runFinancialMutation('worker-profile', profileForm);
+    } catch (error) {
+      mutationError = dataErrorMessage(error);
     }
   }
 
@@ -95,63 +85,18 @@
   }
 
   async function addAttendance() {
-    if (!form.worker_name || !form.daily_rate) {
-      alert('Dayachesi kooli profile ni select cheyandi.');
-      return;
-    }
-
-    const totalEarned = Number(form.days || 1) * Number(form.daily_rate);
-    const advance = Number(form.advance_paid || 0);
-
-    const { error } = await supabase.from('contractor_labour').insert([{
-      date: form.date,
-      worker_id: form.worker_id,
-      worker_name: form.worker_name,
-      role: form.role,
-      work_task: form.work_task,
-      days: Number(form.days || 1),
-      daily_rate: Number(form.daily_rate),
-      advance_paid: advance
-    }]);
-
-    if (!error) {
-      if (advance > 0) {
-        await supabase.from('contractor_transactions').insert([{
-          invoice_no: 'ASV-ADV-' + Date.now().toString().slice(-6),
-          date: form.date,
-          category: 'Labour & Mestri',
-          description: `${form.worker_name} (${form.worker_id}) - కూలీ అడ్వాన్స్`,
-          amount: advance,
-          source: 'Cash',
-          recipient: form.worker_name,
-          balance: 0,
-          status: 'Paid'
-        }]);
-      }
-
-      const curDate = form.date;
-      showAttendanceModal = false;
-      form = {
-        date: curDate,
-        worker_id: '',
-        worker_name: '',
-        role: 'పునాది తవ్వకం కూలీ (Excavation Labour)',
-        work_task: 'పునాది తవ్వకం & రాతి కట్టడం బేస్‌మెంట్',
-        days: 1,
-        daily_rate: 800,
-        advance_paid: 0
-      };
-      await fetchAll();
-    } else {
-      alert('Save cheyadam fail ayindi: ' + error.message);
+    try {
+      await runFinancialMutation('attendance', form);
+    } catch (error) {
+      mutationError = dataErrorMessage(error);
     }
   }
 
   async function deleteLabour(id) {
-    if (!confirm('Ee attendance record ni delete cheyala?')) return;
-    const { error } = await supabase.from('contractor_labour').delete().eq('id', id);
-    if (!error) {
-      labourRecords = labourRecords.filter(l => l.id !== id);
+    try {
+      await runFinancialMutation('reverse-attendance', {id});
+    } catch (error) {
+      mutationError = dataErrorMessage(error);
     }
   }
 </script>
@@ -159,6 +104,14 @@
 <svelte:head>
   <title>లేబర్ DBMS మాస్టర్ | A.S.V. Contractor 360°</title>
 </svelte:head>
+{#if dataError}
+  <div role="alert" class="m-4 rounded-xl border border-rose-300 bg-rose-50 p-4 text-sm text-rose-900">{dataError} <button type="button" on:click={fetchAll} class="ml-3 font-bold underline">మళ్లీ ప్రయత్నించండి</button></div>
+{/if}
+{#if mutationError}
+  <p role="alert" class="m-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">{mutationError}</p>
+{/if}
+{#if !dataError}
+
 
 <div class="min-h-screen bg-[#f8fafc] text-slate-900 p-4 sm:p-6 space-y-6">
   <div class="max-w-7xl mx-auto space-y-4">
@@ -248,7 +201,7 @@
                   <td class="p-3 text-right font-mono text-emerald-700">₹ {Number(l.advance_paid || 0).toLocaleString('en-IN')}</td>
                   <td class="p-3 text-right font-mono font-black text-rose-600">₹ {balanceDue.toLocaleString('en-IN')}</td>
                   <td class="p-3 text-center">
-                    <button on:click={() => deleteLabour(l.id)} class="text-rose-500 font-bold hover:text-rose-700">✕</button>
+                    <button disabled={!FINANCIAL_WRITES_ENABLED} on:click={() => deleteLabour(l.id)} class="text-rose-500 font-bold hover:text-rose-700">✕</button>
                   </td>
                 </tr>
               {/each}
@@ -310,7 +263,7 @@
           </div>
         </div>
 
-        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 rounded-2xl shadow transition cursor-pointer">
+        <button disabled={!FINANCIAL_WRITES_ENABLED} title="భద్రతా ధృవీకరణ పూర్తయ్యే వరకు నమోదు నిలిపివేయబడింది" type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 rounded-2xl shadow transition cursor-pointer">
           ప్రొఫైల్ సేవ్ చేయండి ➔
         </button>
       </form>
@@ -381,10 +334,11 @@
           <input type="number" bind:value={form.advance_paid} class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-mono font-bold text-emerald-700" />
         </div>
 
-        <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-2xl shadow transition cursor-pointer">
+        <button disabled={!FINANCIAL_WRITES_ENABLED} title="భద్రతా ధృవీకరణ పూర్తయ్యే వరకు నమోదు నిలిపివేయబడింది" type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-2xl shadow transition cursor-pointer">
           హాజరు నమోదు చేయండి ➔
         </button>
       </form>
     </div>
   </div>
+{/if}
 {/if}

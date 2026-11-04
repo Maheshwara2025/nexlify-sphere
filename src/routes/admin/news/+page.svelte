@@ -2,25 +2,27 @@
     import { supabase } from '$lib/supabaseClient';
     import { goto } from '$app/navigation';
     import { onMount } from 'svelte';
+    import { createVerifiedAccessGuard } from '$lib/verifiedAccess';
 
     let authChecking = true;
+    let authUnavailable = false;
 
-    onMount(async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-            goto('/admin/login');
-        } else {
-            authChecking = false;
-        }
-
-        const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-            if (!session) {
-                goto('/admin/login');
+    onMount(() => {
+        let active = true;
+        const stop = createVerifiedAccessGuard(supabase, {
+            onStateChange(state) {
+                authChecking = state !== 'allowed';
+                authUnavailable = state === 'unavailable';
+            },
+            onSignedOut() {
+                void goto('/admin/login', { replaceState: true }).catch(() => {
+                    if (active) authUnavailable = true;
+                });
             }
         });
-
         return () => {
-            authListener.subscription.unsubscribe();
+            active = false;
+            stop();
         };
     });
 
@@ -267,7 +269,11 @@
     <div class="min-h-screen bg-slate-900 flex items-center justify-center text-white font-sans">
         <div class="text-center space-y-3">
             <div class="w-8 h-8 border-4 border-red-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-            <p class="text-xs text-slate-400 font-medium">సెక్యూరిటీ చెక్ అవుతోంది...</p>
+            {#if authUnavailable}
+                <p class="text-xs text-slate-400 font-medium">లాగిన్ నిర్ధారించలేకపోయాం. మళ్లీ ప్రయత్నించండి.</p>
+            {:else}
+                <p class="text-xs text-slate-400 font-medium">సెక్యూరిటీ చెక్ అవుతోంది...</p>
+            {/if}
         </div>
     </div>
 {:else}

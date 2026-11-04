@@ -354,9 +354,7 @@
           <a href="/admin/news" class="bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs px-3 py-1.5 rounded-xl font-bold border border-slate-200 transition">
             📰 న్యూస్ డెస్క్
           </a>
-          <a href="/admin/contractor" class="bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs px-3 py-1.5 rounded-xl font-black transition shadow">
-            🏗️ కాంట్రాక్టర్ డెస్క్
-          </a>
+
           <a href="/admin/doc-cleaner" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 rounded-xl font-bold transition shadow">
             🖨️ డాక్ క్లీనర్
           </a>

@@ -1,6 +1,13 @@
 <script>
   import { onMount } from 'svelte';
+  import { CATEGORIES, normalizeCategory } from '$lib/contractor/categories.js';
+  import { ledgerCsv } from '$lib/contractor/export.js';
   import { supabase } from '$lib/supabaseClient';
+  import { readAllRows, dataErrorMessage, projectToday } from '$lib/contractor/data.js';
+  import { runFinancialMutation, FINANCIAL_WRITES_ENABLED } from '$lib/contractor/financial-write-gate.js';
+
+  let dataError = '';
+  let mutationError = '';
 
   let transactions = [];
   let loading = true;
@@ -14,52 +21,45 @@
   });
 
   async function fetchLedger() {
-    loading = true;
-    const { data, error } = await supabase
-      .from('contractor_transactions')
-      .select('*')
-      .order('date', { ascending: false });
-
-    if (!error) {
-      transactions = data || [];
-    }
-    loading = false;
+    loading=true; dataError='';
+    try {
+      transactions = await readAllRows(supabase,'contractor_transactions',{orderBy:'date'});
+    } catch(error) { dataError=dataErrorMessage(error); }
+    finally { loading=false; }
   }
 
   $: filteredTransactions = transactions.filter(t => {
     const q = searchQuery.toLowerCase().trim();
     const matchQ = !q || (t.description && t.description.toLowerCase().includes(q)) || (t.recipient && t.recipient.toLowerCase().includes(q));
-    const matchCat = filterCategory === 'ALL' || t.category === filterCategory;
+    const matchCat = filterCategory === 'ALL' || normalizeCategory(t.category) === filterCategory;
     const matchSrc = filterSource === 'ALL' || t.source === filterSource;
     return matchQ && matchCat && matchSrc;
   });
 
   async function deleteTx(id) {
-    if (!confirm('ఈ లావాదేవీని తొలగించాలా?')) return;
-    const { error } = await supabase.from('contractor_transactions').delete().eq('id', id);
-    if (!error) {
-      transactions = transactions.filter(t => t.id !== id);
-    } else {
-      alert('తొలగించడం విఫలమైంది: ' + error.message);
-    }
+    try { await runFinancialMutation('reverse-transaction', {id}); }
+    catch (error) { mutationError=dataErrorMessage(error); }
   }
 
   function exportCSV() {
-    let csv = 'ID,Date,Category,Description,Source,Recipient,Amount,Status\n';
-    filteredTransactions.forEach(t => {
-      csv += `"${t.id}","${t.date}","${t.category}","${t.description}","${t.source}","${t.recipient}","${t.amount}","${t.status}"\n`;
-    });
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `Ledger_${Date.now()}.csv`;
-    link.click();
+    const blob=new Blob(['\ufeff'+ledgerCsv(filteredTransactions)],{type:'text/csv;charset=utf-8;'});
+    const link=document.createElement('a'); const url=URL.createObjectURL(blob);
+    link.href=url; link.download='Ledger_'+projectToday()+'.csv'; link.click();
+    setTimeout(()=>URL.revokeObjectURL(url),0);
   }
 </script>
 
 <svelte:head>
   <title>సైట్ లెడ్జర్ | A.S.V. Contractor 360°</title>
 </svelte:head>
+{#if dataError}
+  <div role="alert" class="m-4 rounded-xl border border-rose-300 bg-rose-50 p-4 text-sm text-rose-900">{dataError} <button type="button" on:click={fetchLedger} class="ml-3 font-bold underline">మళ్లీ ప్రయత్నించండి</button></div>
+{/if}
+{#if mutationError}
+  <p role="alert" class="m-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">{mutationError}</p>
+{/if}
+{#if !dataError}
+
 
 <div class="min-h-screen bg-[#f8fafc] text-slate-900 p-4 sm:p-6 space-y-6">
   <div class="max-w-7xl mx-auto space-y-4">
@@ -89,14 +89,11 @@
       />
 
       <select bind:value={filterCategory} class="border border-slate-200 bg-white rounded-xl p-2.5 font-bold shadow-sm">
-        <option value="ALL">అన్ని కేటగిరీలు</option>
-        <option value="Money In">Money In</option>
-        <option value="Materials">Materials</option>
-        <option value="Labour">Labour</option>
-        <option value="Centring">Centring</option>
-        <option value="Transport">Transport</option>
-        <option value="General">General</option>
-      </select>
+          <option value="ALL">అన్ని కేటగిరీలు</option>
+          {#each Object.values(CATEGORIES) as category}
+            <option value={category}>{category}</option>
+          {/each}
+        </select>
 
       <select bind:value={filterSource} class="border border-slate-200 bg-white rounded-xl p-2.5 font-bold shadow-sm">
         <option value="ALL">అన్ని పేమెంట్ మార్గాలు</option>
@@ -156,7 +153,7 @@
                     {/if}
                   </td>
                   <td class="p-3 text-center">
-                    <button on:click={() => deleteTx(t.id)} class="text-rose-500 hover:text-rose-700 font-bold">
+                    <button disabled={!FINANCIAL_WRITES_ENABLED} on:click={() => deleteTx(t.id)} class="text-rose-500 hover:text-rose-700 font-bold">
                       ✕
                     </button>
                   </td>
@@ -181,4 +178,6 @@
       <img src={previewPhotoUrl} alt="Receipt" class="w-full max-h-[75vh] object-contain rounded-xl bg-slate-100" />
     </div>
   </div>
+{/if}
+
 {/if}

@@ -1,6 +1,11 @@
 <script>
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
+  import { readAllRows, dataErrorMessage, projectToday } from '$lib/contractor/data.js';
+  import { runFinancialMutation, FINANCIAL_WRITES_ENABLED } from '$lib/contractor/financial-write-gate.js';
+
+  let dataError = '';
+  let mutationError = '';
 
   let mbookRecords = [];
   let loading = true;
@@ -47,10 +52,11 @@
   });
 
   async function fetchMbook() {
-    loading = true;
-    const { data } = await supabase.from('contractor_mbook').select('*').order('id', { ascending: false });
-    mbookRecords = data ? data : [];
-    loading = false;
+    loading=true; dataError='';
+    try {
+      mbookRecords=await readAllRows(supabase,'contractor_mbook');
+    } catch(error) { dataError=dataErrorMessage(error); }
+    finally { loading=false; }
   }
 
   function onCategoryChange() {
@@ -78,49 +84,27 @@
   }
 
   async function saveMbook() {
-    if (!form.description || !form.rate) {
-      alert('Dayachesi vivaralu mariyu rate enter cheyandi.');
-      return;
-    }
-
-    const { error } = await supabase.from('contractor_mbook').insert([{
-      work_category: form.work_category,
-      description: form.description,
-      nos: Number(form.nos),
-      length: Number(form.length),
-      breadth: Number(form.breadth),
-      depth: Number(form.depth),
-      unit: form.unit,
-      rate: Number(form.rate),
-      total_qty: volume,
-      total_amount: totalAmount,
-      est_cement_bags: estCement,
-      est_sand_tons: estSand,
-      est_metal_tons: estMetal,
-      est_steel_kg: estSteel,
-      est_bricks: estBricks
-    }]);
-
-    if (!error) {
-      showModal = false;
-      await fetchMbook();
-    } else {
-      alert('Error: ' + error.message);
-    }
+    try { await runFinancialMutation('measurement', form); }
+    catch (error) { mutationError=dataErrorMessage(error); }
   }
 
   async function deleteMbook(id) {
-    if (!confirm('Ee M-Book record ni tholaginchala?')) return;
-    const { error } = await supabase.from('contractor_mbook').delete().eq('id', id);
-    if (!error) {
-      mbookRecords = mbookRecords.filter(m => m.id !== id);
-    }
+    try { await runFinancialMutation('reverse-measurement', {id}); }
+    catch (error) { mutationError=dataErrorMessage(error); }
   }
 </script>
 
 <svelte:head>
   <title>సివిల్ M-Book & మెటీరియల్ ఎస్టిమేషన్ | A.S.V. Contractor 360°</title>
 </svelte:head>
+{#if dataError}
+  <div role="alert" class="m-4 rounded-xl border border-rose-300 bg-rose-50 p-4 text-sm text-rose-900">{dataError} <button type="button" on:click={fetchMbook} class="ml-3 font-bold underline">మళ్లీ ప్రయత్నించండి</button></div>
+{/if}
+{#if mutationError}
+  <p role="alert" class="m-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">{mutationError}</p>
+{/if}
+{#if !dataError}
+
 
 <div class="min-h-screen bg-[#f8fafc] text-slate-900 p-4 sm:p-6 space-y-6">
   <div class="max-w-7xl mx-auto space-y-4">
@@ -187,7 +171,7 @@
                     {/if}
                   </td>
                   <td class="p-3 text-center">
-                    <button on:click={() => deleteMbook(m.id)} class="text-rose-500 font-bold hover:text-rose-700">✕</button>
+                    <button disabled={!FINANCIAL_WRITES_ENABLED} on:click={() => deleteMbook(m.id)} class="text-rose-500 font-bold hover:text-rose-700">✕</button>
                   </td>
                 </tr>
               {/each}
@@ -278,10 +262,12 @@
           </div>
         </div>
 
-        <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-2xl shadow transition cursor-pointer">
+        <button disabled={!FINANCIAL_WRITES_ENABLED} type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-2xl shadow transition cursor-pointer">
           M-Book లో సేవ్ చేయండి ➔
         </button>
       </form>
     </div>
   </div>
+{/if}
+
 {/if}
