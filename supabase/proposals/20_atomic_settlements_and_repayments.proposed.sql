@@ -32,6 +32,7 @@ CREATE OR REPLACE FUNCTION public.settle_supplier_credit_bill(
   p_funding_source text,
   p_payment_date date,
   p_idempotency_key text,
+  p_material_id bigint DEFAULT NULL,
   p_notes text DEFAULT ''
 )
 RETURNS jsonb
@@ -106,14 +107,13 @@ BEGIN
       status = v_new_status
   WHERE id = p_obligation_id;
 
-  -- F. Also update matching contractor_materials record if linked
-  UPDATE public.contractor_materials
-  SET paid_amount = coalesce(paid_amount, 0) + p_payment_amount,
-      balance_amount = v_new_balance
-  WHERE party_name = v_bill.recipient
-    AND date = v_bill.date
-    AND total_amount = v_bill.amount
-    AND balance_amount = v_bill.balance;
+  -- F. Also update matching contractor_materials record by immutable ID if provided
+  IF p_material_id IS NOT NULL THEN
+    UPDATE public.contractor_materials
+    SET paid_amount = coalesce(paid_amount, 0) + p_payment_amount,
+        balance_amount = greatest(0, coalesce(total_amount, 0) - (coalesce(paid_amount, 0) + p_payment_amount))
+    WHERE id = p_material_id;
+  END IF;
 
   -- G. Insert Linked Payment Ledger Entry (Cash/Bank Outflow)
   v_voucher_no := 'ASV-PMT-' || lpad(p_obligation_id::text, 4, '0') || '-' || to_char(clock_timestamp(), 'HH24MISS');
@@ -133,7 +133,7 @@ BEGIN
     v_voucher_no,
     p_payment_date,
     v_bill.category,
-    coalesce(nullif(p_notes, ''), 'సప్లయర్ బిల్లు చెల్లింపు: ' || v_bill.recipient || ' (Ref: ' || coalesce(v_bill.invoice_no, ('#' || p_obligation_id::text)) || ')'),
+    coalesce(nullif(p_notes, ''), 'సప్లయర్ బిల్లు చెల్లింపు: ' || v_bill.recipient || ' (Obligation Ref: #' || p_obligation_id::text || CASE WHEN p_material_id IS NOT NULL THEN ', Material ID: #' || p_material_id::text ELSE '' END || ')'),
     p_payment_amount,
     p_funding_source,
     v_bill.recipient,
@@ -172,8 +172,8 @@ BEGIN
 END;
 $settle$;
 
-REVOKE ALL ON FUNCTION public.settle_supplier_credit_bill(bigint, numeric, text, date, text, text) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.settle_supplier_credit_bill(bigint, numeric, text, date, text, text) TO authenticated;
+REVOKE ALL ON FUNCTION public.settle_supplier_credit_bill(bigint, numeric, text, date, text, bigint, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.settle_supplier_credit_bill(bigint, numeric, text, date, text, bigint, text) TO authenticated;
 
 
 -- 3. Atomic Loan Repayment RPC
@@ -351,5 +351,31 @@ $repay$;
 
 REVOKE ALL ON FUNCTION public.record_loan_repayment(bigint, numeric, numeric, text, date, text, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.record_loan_repayment(bigint, numeric, numeric, text, date, text, text) TO authenticated;
+
+
+DO $postflight$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public' AND p.proname = 'settle_supplier_credit_bill' AND p.prosecdef
+  ) THEN
+    RAISE EXCEPTION 'Postflight: settle_supplier_credit_bill was not created properly';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public' AND p.proname = 'record_loan_repayment' AND p.prosecdef
+  ) THEN
+    RAISE EXCEPTION 'Postflight: record_loan_repayment was not created properly';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'contractor_private' AND c.relname = 'idempotency_log' AND c.relrowsecurity
+  ) THEN
+    RAISE EXCEPTION 'Postflight: contractor_private.idempotency_log was not created properly';
+  END IF;
+END;
+$postflight$;
 
 COMMIT;
