@@ -6,7 +6,7 @@ import {
 } from '../src/lib/contractor/atomic-entry-client.js';
 
 test('Stage 3 permits only defined operations and never modifies global legacy gate',()=>{
-  assert.equal(STAGE3_ATOMIC_ENTRIES_ENABLED,false);
+  assert.equal(STAGE3_ATOMIC_ENTRIES_ENABLED,true);
   assert.ok(STAGE3_OPERATIONS.includes('expense'));
   assert.ok(STAGE3_OPERATIONS.includes('material_purchase'));
   assert.ok(STAGE3_OPERATIONS.includes('labour_payment'));
@@ -15,13 +15,27 @@ test('Stage 3 permits only defined operations and never modifies global legacy g
   assert.match(source,/export const FINANCIAL_WRITES_ENABLED = false/);
 });
 
-test('disabled Stage 3 cannot call database even with a populated form',async()=>{
-  let calls=0;
-  const poster=createAtomicEntryPoster({rpc:async()=>{calls++;return {data:{success:true},error:null}}},
-    ()=>'asv_test_key_123456789000');
-  await assert.rejects(poster('expense',{category:'General Overheads',amount:100}),
-    e=>e.code==='FINANCIAL_WRITES_DISABLED');
-  assert.equal(calls,0);
+test('Stage 3 calls only the reviewed RPC and reuses the idempotency key on failed retries',async()=>{
+  let calls=[];
+  let attempt=0;
+  const poster=createAtomicEntryPoster({
+    rpc:async(name,args)=>{
+      calls.push({name,args});
+      attempt++;
+      if(attempt===1)return {data:null,error:new Error('connection lost')};
+      return {data:{success:true,transaction_id:21},error:null};
+    }
+  },()=>'asv_test_key_123456789000');
+  const payload={category:'General Overheads',source:'Cash',amount:'100.00',desc:'Test desk',recipient:'Test desk'};
+  await assert.rejects(poster('expense',payload),/connection lost/);
+  const result=await poster('expense',payload);
+  assert.equal(result.success,true);
+  assert.equal(calls.length,2);
+  assert.equal(calls[0].name,'contractor_post_entry_v1');
+  assert.equal(calls[0].args.p_idempotency_key,calls[1].args.p_idempotency_key);
+  assert.equal(calls[0].args.p_operation,'expense');
+  await assert.rejects(poster('unreviewed_delete',payload),/Unsupported financial operation/);
+  assert.equal(calls.length,2);
 });
 
 test('every Stage 3 UI invokes reviewed atomic client and shows disabled-gate selector',()=>{
