@@ -2,14 +2,15 @@
     import { supabase } from '$lib/supabaseClient';
     import { goto } from '$app/navigation';
     import { onMount } from 'svelte';
-    import { createVerifiedAccessGuard } from '$lib/verifiedAccess';
+    import { createContractorAccessGuard } from '$lib/verifiedAccess';
+    import { checkNewsFile, newNewsObjectPath, getYouTubeEmbedUrl, NEWS_EXTRA_PHOTO_LIMIT } from '$lib/newsMedia';
 
     let authChecking = true;
     let authUnavailable = false;
 
     onMount(() => {
         let active = true;
-        const stop = createVerifiedAccessGuard(supabase, {
+        const stop = createContractorAccessGuard(supabase, {
             onStateChange(state) {
                 authChecking = state !== 'allowed';
                 authUnavailable = state === 'unavailable';
@@ -23,6 +24,7 @@
         return () => {
             active = false;
             stop();
+            clearMediaPreviews();
         };
     });
 
@@ -43,9 +45,17 @@
     let custom_town = '';
     let headline = '';
     let alert_type = 'none';
-    let category = 'రాజకీయాలు';
+    let category = 'స్థానిక వార్తలు';
     let content = '';
     let youtube_url = '';
+    let videoMode = 'none';
+    /** @type {File | null} */
+    let videoFile = null;
+    /** @type {string | null} */
+    let videoPreview = null;
+    let video_caption = '';
+    /** @type {Array<{file:File, preview:string, caption:string}>} */
+    let extraImages = [];
     let show_in_ticker = true;
 
     // Photo Layout Options
@@ -77,7 +87,7 @@
     ];
 
     const categories = [
-        'రాజకీయాలు', 'వ్యాపారం & ఫైనాన్స్', 'టెక్నాలజీ', 'ఆరోగ్యం',
+        'స్థానిక వార్తలు', 'రాజకీయాలు', 'వ్యాపారం & ఫైనాన్స్', 'టెక్నాలజీ', 'ఆరోగ్యం',
         'వాతావరణం & పర్యావరణం', 'విద్య & ఉద్యోగాలు', 'సైన్స్ & పరిశోధనలు',
         'క్రీడలు & గేమ్స్', 'సంస్కృతి & సమాజం', 'ప్రపంచ వార్తలు'
     ];
@@ -146,51 +156,118 @@
         }
     }
 
-    /**
-     * @param {Event} e
-     * @param {number} num
-     */
+    function clearMediaPreviews() {
+        if (imagePreview1) URL.revokeObjectURL(imagePreview1);
+        if (imagePreview2) URL.revokeObjectURL(imagePreview2);
+        if (videoPreview) URL.revokeObjectURL(videoPreview);
+        for (const item of extraImages) URL.revokeObjectURL(item.preview);
+    }
+
+    /** @param {Event} e @param {number} num */
     function handleImageSelect(e, num) {
-        const target = /** @type {HTMLInputElement} */ (e.target);
-        if (target && target.files && target.files[0]) {
+        const input = /** @type {HTMLInputElement} */ (e.currentTarget);
+        const file = input.files?.[0];
+        if (!file) return;
+        try {
+            checkNewsFile(file, 'image');
             if (num === 1) {
-                imageFile1 = target.files[0];
-                imagePreview1 = URL.createObjectURL(imageFile1);
+                if (imagePreview1) URL.revokeObjectURL(imagePreview1);
+                imageFile1 = file;
+                imagePreview1 = URL.createObjectURL(file);
             } else {
-                imageFile2 = target.files[0];
-                imagePreview2 = URL.createObjectURL(imageFile2);
-                if (image_layout === 'full') {
-                    image_layout = 'grid';
-                }
+                if (imagePreview2) URL.revokeObjectURL(imagePreview2);
+                imageFile2 = file;
+                imagePreview2 = URL.createObjectURL(file);
+                if (image_layout === 'full') image_layout = 'grid';
             }
+            statusMsg = '';
+        } catch (/** @type {any} */ error) {
+            input.value = '';
+            statusType = 'error';
+            statusMsg = error.message;
+        }
+    }
+
+    /** @param {Event} e */
+    function handleExtraImages(e) {
+        const input = /** @type {HTMLInputElement} */ (e.currentTarget);
+        const files = Array.from(input.files || []);
+        if (!files.length) return;
+        try {
+            if (extraImages.length + files.length > NEWS_EXTRA_PHOTO_LIMIT) {
+                throw new Error('అదనపు ఫోటోలు గరిష్టంగా 6 మాత్రమే. మొత్తం 8 ఫోటోలు జోడించవచ్చు.');
+            }
+            files.forEach(file => checkNewsFile(file, 'image'));
+            extraImages = [...extraImages, ...files.map(file => ({
+                file,
+                preview: URL.createObjectURL(file),
+                caption: ''
+            }))];
+            statusMsg = '';
+        } catch (/** @type {any} */ error) {
+            statusType = 'error';
+            statusMsg = error.message;
+        }
+        input.value = '';
+    }
+
+    /** @param {number} index */
+    function removeExtraImage(index) {
+        const photo = extraImages[index];
+        if (photo) URL.revokeObjectURL(photo.preview);
+        extraImages = extraImages.filter((_, i) => i !== index);
+    }
+
+    /** @param {Event} e */
+    function handleVideoSelect(e) {
+        const input = /** @type {HTMLInputElement} */ (e.currentTarget);
+        const file = input.files?.[0];
+        if (!file) return;
+        try {
+            checkNewsFile(file, 'video');
+            if (videoPreview) URL.revokeObjectURL(videoPreview);
+            videoFile = file;
+            videoPreview = URL.createObjectURL(file);
+            statusMsg = '';
+        } catch (/** @type {any} */ error) {
+            input.value = '';
+            statusType = 'error';
+            statusMsg = error.message;
         }
     }
 
     /**
      * @param {File} file
+     * @param {'news-images'|'ns-news-videos'} bucket
+     * @param {'photos'|'videos'} kind
      */
-    async function uploadSingleImage(file) {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
-        const filePath = `articles/${fileName}`;
-
+    async function uploadNewsMedia(file, bucket, kind) {
+        const filePath = newNewsObjectPath(bucket, kind, file);
         const { error: uploadError } = await supabase.storage
-            .from('news-images')
-            .upload(filePath, file, { cacheControl: '3600', upsert: true });
-
+            .from(bucket)
+            .upload(filePath, file, { cacheControl: '3600', upsert: false, contentType: file.type });
         if (uploadError) throw uploadError;
-
-        const { data } = supabase.storage.from('news-images').getPublicUrl(filePath);
-        return data.publicUrl;
+        const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
+        return { url: data.publicUrl, filePath, bucket };
     }
 
     async function handleSubmit() {
-        if (!headline || !content) {
-            statusMsg = 'Dayachesi headline mariyu content vivaralu enter cheyandi.';
+        if (!headline.trim() || !content.trim()) {
+            statusMsg = 'హెడ్‌లైన్, పూర్తి కథనం తప్పనిసరిగా నమోదు చేయండి.';
             statusType = 'error';
             return;
         }
 
+        if (videoMode === 'youtube' && youtube_url.trim() && !getYouTubeEmbedUrl(youtube_url)) {
+            statusType = 'error';
+            statusMsg = 'సరైన YouTube వీడియో URL ఇవ్వండి.';
+            return;
+        }
+        if (videoMode === 'upload' && !videoFile) {
+            statusType = 'error';
+            statusMsg = 'వీడియో ఫైల్ ఎంచుకోండి లేదా YouTube ఎంపిక ఉపయోగించండి.';
+            return;
+        }
         isUploading = true;
         statusMsg = '';
 
@@ -198,47 +275,58 @@
             ? (custom_town.trim() || 'తెలంగాణ') 
             : location_town;
 
+        /** @type {Array<{url:string,filePath:string,bucket:string}>} */
+        const uploaded = [];
         try {
             let imageUrl1 = null;
             let imageUrl2 = null;
-
+            let videoUrl = null;
+            /** @type {Array<{url:string,caption:string}>} */
+            const gallery = [];
             if (imageFile1) {
-                imageUrl1 = await uploadSingleImage(imageFile1);
+                const result = await uploadNewsMedia(imageFile1, 'news-images', 'photos');
+                uploaded.push(result); imageUrl1 = result.url;
             }
             if (imageFile2) {
-                imageUrl2 = await uploadSingleImage(imageFile2);
+                const result = await uploadNewsMedia(imageFile2, 'news-images', 'photos');
+                uploaded.push(result); imageUrl2 = result.url;
+            }
+            for (const item of extraImages) {
+                const result = await uploadNewsMedia(item.file, 'news-images', 'photos');
+                uploaded.push(result);
+                gallery.push({url: result.url, caption: item.caption.trim().slice(0,300)});
+            }
+            if (videoMode === 'upload' && videoFile) {
+                const result = await uploadNewsMedia(videoFile, 'ns-news-videos', 'videos');
+                uploaded.push(result); videoUrl = result.url;
             }
 
-            // Layout code safe format
             const layoutStyleCode = `${image_layout}|${is_rounded ? 'rounded' : 'sharp'}`;
-
-            const { error } = await supabase.from('news_articles').insert([
-                {
-                    location_town: finalLocation,
-                    headline,
-                    // subline_1 lo layoutStyleCode save avuthundi (Constraint errors raavu)
-                    subline_1: layoutStyleCode,
-                    subline_2: '',
-                    subline_3: '',
-                    // news_tone ki eppatilaage 'soft' pampadam valla constraint error raadu
-                    news_tone: 'soft',
-                    alert_type,
-                    category,
-                    content,
-                    image_url: imageUrl1,
-                    image_caption_1: image_caption_1 || '',
-                    image_url_2: imageUrl2,
-                    image_caption_2: image_caption_2 || '',
-                    youtube_url: youtube_url || null,
-                    show_in_ticker
-                }
-            ]);
-
+            const { error } = await supabase.from('news_articles').insert([{
+                location_town: finalLocation,
+                headline: headline.trim(),
+                subline_1: layoutStyleCode,
+                subline_2: '',
+                subline_3: '',
+                news_tone: 'soft',
+                alert_type,
+                category,
+                content: content.trim(),
+                image_url: imageUrl1,
+                image_caption_1: image_caption_1 || '',
+                image_url_2: imageUrl2,
+                image_caption_2: image_caption_2 || '',
+                media_gallery: gallery,
+                video_url: videoUrl,
+                video_caption: video_caption.trim().slice(0,300),
+                youtube_url: videoMode === 'youtube' ? youtube_url.trim() || null : null,
+                show_in_ticker
+            }]);
             if (error) throw error;
 
-            statusMsg = 'వార్త విజయవంతంగా పబ్లిష్ అయ్యింది!';
+            statusMsg = 'వార్త, ఫోటోలు మరియు వీడియో విజయవంతంగా పబ్లిష్ అయ్యాయి!';
             statusType = 'success';
-
+            clearMediaPreviews();
             rawNewsInput = '';
             headline = '';
             content = '';
@@ -248,11 +336,18 @@
             imageFile2 = null;
             imagePreview2 = null;
             image_caption_2 = '';
+            extraImages = [];
+            videoFile = null;
+            videoPreview = null;
+            video_caption = '';
+            videoMode = 'none';
             youtube_url = '';
             custom_town = '';
             image_layout = 'full';
         } catch (/** @type {any} */ err) {
             console.error('Submit Error:', err);
+            // Remove objects uploaded during a failed publish; database remains unchanged.
+            await Promise.allSettled(uploaded.map(item => supabase.storage.from(item.bucket).remove([item.filePath])));
             statusMsg = `లోపం: ${err.message || 'మళ్లీ ప్రయత్నించండి'}`;
             statusType = 'error';
         } finally {
@@ -482,6 +577,34 @@
                         </div>
                     </div>
 
+                    <!-- Related photo gallery; part of the same text story -->
+                    <section class="rounded-2xl border border-red-100 bg-white p-4 sm:p-5 space-y-4" aria-label="వార్తకు సంబంధించిన ఫోటోలు">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                                <h3 class="font-black text-slate-900 text-sm sm:text-base">📷 వార్తకు సంబంధించిన ఫోటో గ్యాలరీ</h3>
+                                <p class="text-xs text-slate-600 mt-1">ప్రధాన రెండు ఫోటోలతో కలిపి గరిష్టంగా 8 ఫోటోలు; ఒక్కొక్కటి 8 MB లోపు (JPG, PNG, WebP)</p>
+                            </div>
+                            <span class="rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-800">
+                                {(imageFile1 ? 1 : 0) + (imageFile2 ? 1 : 0) + extraImages.length} / 8
+                            </span>
+                        </div>
+                        <label class="block w-full cursor-pointer rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-center text-sm font-bold text-slate-700 hover:border-red-400">
+                            ＋ మరిన్ని ఫోటోలు ఎంచుకోండి
+                            <input class="mt-2 block w-full text-xs font-normal" type="file" accept="image/jpeg,image/png,image/webp" multiple on:change={handleExtraImages} />
+                        </label>
+                        {#if extraImages.length}
+                            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                {#each extraImages as item, idx}
+                                    <div class="rounded-xl border border-slate-200 p-2 bg-slate-50 space-y-2">
+                                        <img src={item.preview} alt="ఫోటో {idx + 3} ప్రివ్యూ" class="h-28 w-full object-cover rounded-lg" />
+                                        <input type="text" bind:value={item.caption} maxlength="300" placeholder="ఈ ఫోటో క్యాప్షన్" class="w-full px-2 py-2 border border-slate-300 rounded-lg text-xs" />
+                                        <button type="button" on:click={() => removeExtraImage(idx)} class="text-xs font-bold text-red-700 underline">ఫోటో తీసివేయండి</button>
+                                    </div>
+                                {/each}
+                            </div>
+                        {/if}
+                    </section>
+
                     <!-- Photo Design Selection -->
                     <div class="bg-gradient-to-r from-red-50/50 via-slate-50 to-amber-50/50 p-4 rounded-2xl border-2 border-red-200 space-y-3">
                         <div class="flex flex-wrap items-center justify-between gap-2">
@@ -553,27 +676,51 @@
                         ></textarea>
                     </div>
 
-                    <!-- Ticker Check & YouTube -->
-                    <div class="flex flex-wrap items-center justify-between gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                        <div class="flex items-center gap-2">
-                            <input
-                                id="ticker-check"
-                                type="checkbox"
-                                bind:checked={show_in_ticker}
-                                class="w-4 h-4 text-red-600 rounded border-slate-300 focus:ring-0 cursor-pointer"
-                            />
-                            <label for="ticker-check" class="text-xs font-bold text-slate-700 cursor-pointer">లైవ్ న్యూస్ టిక్కర్‌లో చూపించు</label>
+                    <!-- Video augments the text news, never a separate video-news category -->
+                    <section class="rounded-2xl bg-slate-50 border border-slate-200 p-4 sm:p-5 space-y-4" aria-label="వార్త వీడియో">
+                        <div>
+                            <h3 class="text-sm sm:text-base font-black text-slate-900">🎥 వార్తకు సంబంధించిన వీడియో (ఐచ్ఛికం)</h3>
+                            <p class="mt-1 text-xs text-slate-600">మీ పూర్తి వార్తలోనే వీడియో కనిపిస్తుంది. వేరే వీడియో వార్తల కేటగిరీ సృష్టించబడదు.</p>
                         </div>
-
-                        <div class="flex-1 max-w-xs">
-                            <input
-                                type="url"
-                                bind:value={youtube_url}
-                                placeholder="యూట్యూబ్ వీడియో లింక్ (ఐచ్ఛికం)"
-                                class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-red-500"
-                            />
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <label class="rounded-xl border border-slate-300 p-3 bg-white text-xs font-bold">
+                                <input type="radio" bind:group={videoMode} value="none" class="mr-2 accent-red-600" />వీడియో వద్దు
+                            </label>
+                            <label class="rounded-xl border border-slate-300 p-3 bg-white text-xs font-bold">
+                                <input type="radio" bind:group={videoMode} value="upload" class="mr-2 accent-red-600" />వీడియో అప్‌లోడ్
+                            </label>
+                            <label class="rounded-xl border border-slate-300 p-3 bg-white text-xs font-bold">
+                                <input type="radio" bind:group={videoMode} value="youtube" class="mr-2 accent-red-600" />YouTube లింక్
+                            </label>
                         </div>
-                    </div>
+                        {#if videoMode === 'upload'}
+                            <div class="space-y-2">
+                                <label for="ns-video" class="block text-xs font-bold text-slate-700">MP4 / WebM వీడియో (40 MB లోపు)</label>
+                                <input id="ns-video" type="file" accept="video/mp4,video/webm" on:change={handleVideoSelect} class="w-full rounded-xl border bg-white border-slate-300 p-3 text-xs" />
+                                {#if videoPreview}
+                                    <video controls playsinline preload="metadata" class="rounded-xl w-full max-h-80 bg-black" src={videoPreview}>
+                                        మీ బ్రౌజర్‌లో వీడియో ప్లేబ్యాక్ అందుబాటులో లేదు.
+                                    </video>
+                                {/if}
+                                <p class="text-[11px] text-slate-500">పెద్ద వీడియోలకు YouTube ఉపయోగించండి. మొబైల్ నెట్‌వర్క్‌పై అప్‌లోడ్ మధ్యలో ఆగవచ్చు.</p>
+                            </div>
+                        {:else if videoMode === 'youtube'}
+                            <div class="space-y-2">
+                                <label for="ns-youtube" class="block text-xs font-bold text-slate-700">YouTube వీడియో లింక్</label>
+                                <input id="ns-youtube" type="url" bind:value={youtube_url} placeholder="https://www.youtube.com/watch?v=..." class="w-full rounded-xl border bg-white border-slate-300 p-3 text-sm" />
+                                {#if youtube_url && !getYouTubeEmbedUrl(youtube_url)}
+                                    <p role="alert" class="text-xs font-bold text-red-700">YouTube URL సరిగా లేదు.</p>
+                                {/if}
+                            </div>
+                        {/if}
+                        {#if videoMode !== 'none'}
+                            <input type="text" maxlength="300" bind:value={video_caption} placeholder="వీడియో క్యాప్షన్ / వివరణ (ఐచ్ఛికం)" class="w-full rounded-xl border bg-white border-slate-300 p-3 text-xs sm:text-sm" />
+                        {/if}
+                        <label class="flex items-center gap-2 rounded-xl bg-white p-3 border border-slate-200">
+                            <input type="checkbox" bind:checked={show_in_ticker} class="w-4 h-4 accent-red-600" />
+                            <span class="text-xs sm:text-sm font-bold text-slate-700">వార్తను న్యూస్ టిక్కర్‌లో చూపించు</span>
+                        </label>
+                    </section>
 
                     <button
                         type="submit"

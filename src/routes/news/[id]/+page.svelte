@@ -3,6 +3,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
   import { formatNewsContent } from '$lib/newsContent';
+  import { getYouTubeEmbedUrl } from '$lib/newsMedia';
 
   let article = null;
   let loading = true;
@@ -134,6 +135,11 @@
     const words = article.content.trim().split(/\s+/).length;
     return Math.max(1, Math.ceil(words / 150));
   })();
+
+  $: extraPhotos = Array.isArray(article?.media_gallery)
+    ? article.media_gallery.filter(item => item && typeof item.url === 'string' && /^https:\/\//.test(item.url)).slice(0,6)
+    : [];
+  $: youtubeEmbedUrl = getYouTubeEmbedUrl(article?.youtube_url || '');
 
   $: articleTags = (() => {
     if (!article) return [];
@@ -431,6 +437,65 @@
               </p>
             {/if}
           </div>
+        {/if}
+
+        <!-- Article photo gallery; each image stays associated with this text story -->
+        {#if extraPhotos.length > 0}
+          <section aria-label="వార్తకు సంబంధించిన ఫోటో గ్యాలరీ" class="my-5">
+            <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h2 class="text-base sm:text-lg font-black text-slate-900">📷 వార్తా చిత్రాలు</h2>
+              <span class="text-xs font-semibold text-slate-500">{extraPhotos.length} అదనపు ఫోటోలు</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              {#each extraPhotos as photo, i}
+                <figure class="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm">
+                  <a href={photo.url} target="_blank" rel="noopener noreferrer" aria-label="ఫోటో {i + 3} పెద్దగా తెరవండి">
+                    <img src={photo.url} alt={photo.caption || article.headline || 'వార్తా ఫోటో'} loading="lazy" class="w-full max-h-[420px] object-contain bg-slate-100" />
+                  </a>
+                  {#if photo.caption}
+                    <figcaption class="px-3 py-2 text-xs text-slate-700 font-semibold">📸 {photo.caption}</figcaption>
+                  {/if}
+                </figure>
+              {/each}
+            </div>
+          </section>
+        {/if}
+
+        <!-- Related footage; not a standalone news category -->
+        {#if article.video_url || youtubeEmbedUrl}
+          <section class="no-print my-6 overflow-hidden rounded-2xl border border-slate-200 bg-slate-950 shadow-lg" aria-label="వార్తకు సంబంధించిన వీడియో">
+            <div class="px-4 py-3 border-b border-slate-700 text-white flex items-center gap-2">
+              <span class="text-xl">🎥</span>
+              <h2 class="font-black text-sm sm:text-base">వార్తకు సంబంధించిన వీడియో</h2>
+            </div>
+            {#if article.video_url}
+              <video
+                controls
+                playsinline
+                preload="metadata"
+                class="w-full max-h-[540px] bg-black"
+                src={article.video_url}
+                aria-label="వార్తకు సంబంధించిన వీడియో"
+              >
+                ఈ బ్రౌజర్‌లో వీడియో ప్లే కాలేదు.
+              </video>
+            {:else if youtubeEmbedUrl}
+              <div class="relative w-full aspect-video bg-black">
+                <iframe
+                  src={youtubeEmbedUrl}
+                  title="NS News వీడియో"
+                  loading="lazy"
+                  referrerpolicy="strict-origin-when-cross-origin"
+                  allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowfullscreen
+                  class="absolute inset-0 w-full h-full"
+                ></iframe>
+              </div>
+            {/if}
+            {#if article.video_caption}
+              <p class="px-4 py-3 text-sm leading-relaxed text-slate-200">{article.video_caption}</p>
+            {/if}
+          </section>
         {/if}
 
         <!-- 7. టాపిక్స్ / Tags -->
