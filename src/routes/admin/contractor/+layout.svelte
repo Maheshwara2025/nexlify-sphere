@@ -17,8 +17,8 @@
   });
 </script>
 {#if accessState === 'allowed'}
-  <aside class="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 print:hidden" role="status">
-    భద్రతా ధృవీకరణ పూర్తయ్యే వరకు కొత్త నమోదు, చెల్లింపులు, మార్పులు, తొలగింపులు నిలిపివేయబడ్డాయి. పాత రికార్డులు, నివేదికలు చూడవచ్చు.
+  <aside class="border-b border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950 print:hidden" role="status">
+    Stage 3 భద్రమైన అటామిక్ నమోదులు అందుబాటులో ఉన్నాయి. పాత లావాదేవీల తొలగింపు, రివర్సల్ మరియు పరిశీలించని మార్పులు ఇంకా నిలిపివేయబడ్డాయి.
   </aside>
   <nav aria-label="కాంట్రాక్టర్ విభాగాలు" class="flex flex-wrap gap-3 border-b border-slate-200 bg-white px-4 py-3 text-xs font-bold print:hidden">
     {#each sections as [route,label]}<a class="text-slate-700 hover:underline" href={'/admin/contractor'+(route?'/'+route:'')}>{label}</a>{/each}
