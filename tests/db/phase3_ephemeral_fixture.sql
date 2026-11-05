@@ -1,3 +1,14 @@
+-- Add optional fields already present in real legacy Supabase tables but absent from minimal Stage 2 fixture.
+ALTER TABLE public.contractor_transactions
+  ADD COLUMN party_phone text,
+  ADD COLUMN photo_url text;
+ALTER TABLE public.contractor_materials
+  ADD COLUMN phone text,
+  ADD COLUMN payment_mode text DEFAULT 'Credit',
+  ADD COLUMN bill_photo text;
+ALTER TABLE public.contractor_loans
+  ADD COLUMN date_borrowed date DEFAULT current_date;
+
 -- Test-only schema supplement for disposable GitHub Actions Postgres.
 -- Must be run after tests/db/stage2_ephemeral_fixture.sql and BEFORE Stage 3.
 CREATE TABLE public.contractor_labour_profiles (
