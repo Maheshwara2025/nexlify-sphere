@@ -82,7 +82,7 @@ VALUES
 
 INSERT INTO public.contractor_materials
   (id,total_amount,paid_amount,balance_amount,obligation_tx_id)
-VALUES (201,10000,0,10000,101);
+VALUES (201,10000,0,10000,101), (202,10000,0,10000,NULL);
 
 INSERT INTO public.contractor_loans
   (id,lender_name,principal,interest_rate,repaid_amount)
