@@ -30,6 +30,17 @@ test('readiness preflight is read-only and checks 19 base column contracts', () 
   assert.doesNotMatch(preflight, /^\s*(?:CREATE|ALTER|DROP|INSERT|UPDATE|DELETE|GRANT|REVOKE|TRUNCATE)\s+/im);
 });
 
+test('RLS readiness verifies effective owner restriction, not FORCE RLS ownership semantics', () => {
+  assert.match(preflight, /rls_table_status AS/);
+  assert.match(preflight, /policyname = 'contractor_owner_gate'/);
+  assert.match(preflight, /p\.permissive = 'RESTRICTIVE'/);
+  assert.match(preflight, /p\.cmd = 'ALL'/);
+  assert.match(preflight, /'authenticated' = ANY\(p\.roles\)/);
+  assert.match(preflight, /has_table_privilege\('anon'/);
+  assert.match(preflight, /bool_and\(rls_enabled\)/);
+  assert.doesNotMatch(preflight, /bool_and\(c\.relforcerowsecurity\)/);
+});
+
 test('proposal requires immutable material IDs and rejects conflicting links', () => {
   assert.match(proposed, /Material credit bill requires a verified immutable material ID/);
   assert.match(proposed, /Missing or conflicting immutable material mapping/);
