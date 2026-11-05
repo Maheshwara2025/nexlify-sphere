@@ -270,7 +270,7 @@ BEGIN
       OR v_rate<=0 OR v_rate>1000000 OR round(v_rate,2)<>v_rate
       OR length(trim(coalesce(p_payload->>'worker_id','')))<3
     THEN RAISE EXCEPTION 'Invalid worker profile'; END IF;
-    PERFORM pg_advisory_xact_lock(hashtext('asv_worker:'||p_payload->>'worker_id'));
+    PERFORM pg_advisory_xact_lock(hashtext('asv_worker:'||(p_payload->>'worker_id')));
     IF EXISTS(SELECT 1 FROM public.contractor_labour_profiles WHERE worker_id=p_payload->>'worker_id') THEN
       RAISE EXCEPTION 'Worker ID already exists; reload profiles';
     END IF;
