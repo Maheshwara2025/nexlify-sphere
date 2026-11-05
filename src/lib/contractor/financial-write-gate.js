@@ -73,6 +73,14 @@ export function preparePaymentCommand(draft) {
 	) {
 		throw new TypeError('A valid payment date is required.');
 	}
+	let materialId = null;
+	if (draft.materialId !== undefined && draft.materialId !== null) {
+		if (typeof draft.materialId !== 'string' && typeof draft.materialId !== 'number') {
+			throw new TypeError('Material ID must be a valid identifier.');
+		}
+		materialId = String(draft.materialId).trim();
+		if (!materialId) throw new TypeError('Material ID cannot be empty.');
+	}
 	const amountPaise = moneyToPaise(draft.amount);
 	const outstandingPaise = moneyToPaise(draft.outstanding);
 	if (amountPaise <= 0) throw new RangeError('Payment must be greater than zero.');
@@ -85,8 +93,30 @@ export function preparePaymentCommand(draft) {
 		amountPaise,
 		fundingAccount: draft.fundingAccount,
 		idempotencyKey: draft.idempotencyKey,
-		date: draft.date
+		date: draft.date,
+		...(materialId ? { materialId } : {})
 	});
+}
+
+/**
+ * Generate collision-resistant voucher reference matching PostgreSQL backend format:
+ * PREFIX-YYYYMMDD-ID-HASH8
+ * @param {string} prefix
+ * @param {string|number} entityId
+ * @param {string} idempotencyKey
+ * @param {Date} [date]
+ * @param {string} [salt]
+ */
+export function generateCollisionResistantVoucher(prefix, entityId, idempotencyKey, date = new Date(), salt = '') {
+	const ymd = date.toISOString().slice(0, 10).replace(/-/g, '');
+	const paddedId = String(entityId).padStart(4, '0');
+	let hash = 0;
+	const seed = `${prefix}:${entityId}:${idempotencyKey}:${salt}`;
+	for (let i = 0; i < seed.length; i++) {
+		hash = ((hash << 5) - hash + seed.charCodeAt(i)) | 0;
+	}
+	const hex = (Math.abs(hash) + 0x10000000).toString(16).slice(-8);
+	return `${prefix}-${ymd}-${paddedId}-${hex}`;
 }
 
 /**
