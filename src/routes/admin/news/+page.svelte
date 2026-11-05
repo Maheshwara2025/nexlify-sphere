@@ -156,10 +156,6 @@
         }
     }
 
-    /**
-     * @param {Event} e
-     * @param {number} num
-     */
     function clearMediaPreviews() {
         if (imagePreview1) URL.revokeObjectURL(imagePreview1);
         if (imagePreview2) URL.revokeObjectURL(imagePreview2);
