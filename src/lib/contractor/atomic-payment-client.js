@@ -3,7 +3,7 @@
  * IMPORTANT: INACTIVE until the Stage 2 migration passes independent review.
  * These adapters never issue sequential browser-side writes.
  */
-import { FINANCIAL_WRITES_ENABLED, moneyToPaise } from './financial-write-gate.js';
+import { moneyToPaise } from './financial-write-gate.js';
 
 export const STAGE2_ATOMIC_PAYMENTS_ENABLED = false;
 
@@ -102,12 +102,15 @@ export function prepareLoanRepaymentRpc(draft) {
   });
 }
 
-/** Never calls the database until BOTH write switches have explicit approval.
+/** Never calls the database until the separate Stage 2 approval switch is enabled.
+ * The legacy global financial write gate remains permanently disabled, so
+ * unsupported expense/material/attendance mutations cannot become active.
+
  * @param {{rpc:Function}} client
  * @param {{rpc:string,params:Record<string,unknown>}} command
  */
 export async function submitStage2AtomicPayment(client, command) {
-  if (!FINANCIAL_WRITES_ENABLED || !STAGE2_ATOMIC_PAYMENTS_ENABLED) {
+  if (!STAGE2_ATOMIC_PAYMENTS_ENABLED) {
     const error = new Error('Financial payments disabled pending Stage 2 migration approval.');
     Object.assign(error, { code: 'FINANCIAL_WRITES_DISABLED' });
     throw error;
