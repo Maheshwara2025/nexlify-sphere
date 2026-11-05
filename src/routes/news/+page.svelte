@@ -1,6 +1,7 @@
 <script>
   import { supabase } from '$lib/supabaseClient';
   import { onMount } from 'svelte';
+  import { hasNewsVideo } from '$lib/newsMedia';
 
   let articles = [];
   let loading = true;
@@ -9,6 +10,7 @@
 
   const categories = [
     'అన్నీ',
+    'స్థానిక వార్తలు',
     'రాజకీయాలు',
     'వ్యాపారం & ఫైనాన్స్',
     'టెక్నాలజీ',
@@ -196,6 +198,12 @@
                       <div class="w-full h-full flex items-center justify-center bg-slate-100 text-slate-400 font-bold text-xs">
                         NS NEWS
                       </div>
+                    {/if}
+
+                    {#if hasNewsVideo(item)}
+                      <span class="absolute bottom-2 right-2 rounded-lg bg-slate-950/90 px-2.5 py-1 text-[11px] font-bold text-white shadow-lg" title="ఈ కథనంతో వీడియో కూడా ఉంది">
+                        ▶ వీడియో ఉంది
+                      </span>
                     {/if}
 
                     <!-- అలర్ట్ బ్యాడ్జ్ (బ్రేకింగ్ / ఫ్లాష్) -->
