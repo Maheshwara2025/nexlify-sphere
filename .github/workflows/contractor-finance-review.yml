@@ -69,3 +69,45 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f /tmp/asv_contractor_stage2_ephemeral_ci.sql
       - name: Test atomicity, retry consistency, mapping and owner authorization
         run: psql -v ON_ERROR_STOP=1 -f tests/db/stage2_ephemeral_verify.sql
+
+  stage3-postgres-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: stage3_ci_only_password
+          POSTGRES_DB: asv_contract_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d asv_contract_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: 5432
+      PGDATABASE: asv_contract_test
+      PGUSER: postgres
+      PGPASSWORD: stage3_ci_only_password
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure PostgreSQL client
+        run: command -v psql || (sudo apt-get update && sudo apt-get install -y postgresql-client)
+      - name: Create isolated Stage 2 schema and fixtures
+        run: psql -v ON_ERROR_STOP=1 -f tests/db/stage2_ephemeral_fixture.sql
+      - name: Add four original Contractor finance tables
+        run: psql -v ON_ERROR_STOP=1 -f tests/db/phase3_ephemeral_fixture.sql
+      - name: Apply reviewed Stage 2 foundation in test DB only
+        run: |
+          node tests/db/prepare_stage2_ephemeral_ci.mjs
+          psql -v ON_ERROR_STOP=1 -f /tmp/asv_contractor_stage2_ephemeral_ci.sql
+      - name: Prepare Stage 3 test-only migration
+        run: node tests/db/prepare_phase3_ephemeral_ci.mjs
+      - name: Apply proposed Stage 3 schema and RPC in disposable DB
+        run: psql -v ON_ERROR_STOP=1 -f /tmp/asv_stage3_ephemeral_ci.sql
+      - name: Test expenses, income, transfers, credit, loans and labour
+        run: psql -v ON_ERROR_STOP=1 -f tests/db/phase3_ephemeral_verify.sql

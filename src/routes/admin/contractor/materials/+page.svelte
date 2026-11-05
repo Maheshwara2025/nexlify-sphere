@@ -2,7 +2,9 @@
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
   import { readAllRows, dataErrorMessage, projectToday } from '$lib/contractor/data.js';
-  import { runFinancialMutation, FINANCIAL_WRITES_ENABLED } from '$lib/contractor/financial-write-gate.js';
+  import { STAGE3_ATOMIC_ENTRIES_ENABLED, createAtomicEntryPoster } from '$lib/contractor/atomic-entry-client.js';
+  const postEntry = createAtomicEntryPoster(supabase);
+  let savingMaterial = false;
 
   let dataError = '';
   let mutationError = '';
@@ -23,6 +25,8 @@
     unit_rate: 380,
     transport_cost: 1500,
     payment_mode: 'Credit',
+    advance_paid: 0,
+    advance_source: 'Cash',
     bill_photo: ''
   };
 
@@ -77,8 +81,14 @@
   }
 
   async function saveMaterial() {
-    try { await runFinancialMutation('material-purchase', form); }
-    catch (error) { mutationError=dataErrorMessage(error); }
+    if (savingMaterial) return;
+    savingMaterial = true; mutationError = '';
+    try {
+      await postEntry('material_purchase', form);
+      showModal = false;
+      await loadData();
+    } catch (error) { mutationError=dataErrorMessage(error); }
+    finally { savingMaterial = false; }
   }
 
   function shareWhatsApp(m) {
@@ -282,6 +292,22 @@
           </div>
         </div>
 
+        {#if form.payment_mode === 'Credit'}
+          <div class="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
+            <label class="block font-bold text-amber-950">ఇప్పటికే ఇచ్చిన అడ్వాన్స్ (₹)
+              <input type="number" min="0" step="0.01" bind:value={form.advance_paid}
+                class="mt-1 w-full rounded-lg border border-amber-300 p-2" />
+            </label>
+            {#if Number(form.advance_paid || 0) > 0}
+              <label class="block font-bold text-amber-950">అడ్వాన్స్ చెల్లింపు ఖాతా
+                <select bind:value={form.advance_source} class="mt-1 w-full rounded-lg border border-amber-300 p-2">
+                  <option value="Cash">Cash</option><option value="Bank">Bank</option><option value="UPI">UPI</option>
+                </select>
+              </label>
+            {/if}
+          </div>
+        {/if}
+
         <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl flex justify-between items-center font-bold">
           <span class="text-amber-900">మొత్తం బిల్లు (ఆటోమేటిక్):</span>
           <span class="text-base text-amber-950 font-mono font-black">₹ {calculatedTotal.toLocaleString('en-IN')}</span>
@@ -293,7 +319,7 @@
           <input type="file" accept="image/*" on:change={handlePhotoUpload} class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-slate-600 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-amber-100 file:text-amber-800 hover:file:bg-amber-200" />
         </div>
 
-        <button disabled={!FINANCIAL_WRITES_ENABLED} type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-2xl shadow transition cursor-pointer">
+        <button disabled={!STAGE3_ATOMIC_ENTRIES_ENABLED || savingMaterial} type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-2xl shadow transition cursor-pointer">
           ఖాతాలో భద్రపరచండి ➔
         </button>
       </form>

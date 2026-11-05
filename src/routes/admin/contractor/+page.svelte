@@ -4,7 +4,11 @@
   import { CATEGORIES } from '$lib/contractor/categories.js';
   import { supabase } from '$lib/supabaseClient';
   import { readAllRows, dataErrorMessage, projectToday } from '$lib/contractor/data.js';
-  import { runFinancialMutation, FINANCIAL_WRITES_ENABLED } from '$lib/contractor/financial-write-gate.js';
+  import { STAGE3_ATOMIC_ENTRIES_ENABLED, createAtomicEntryPoster } from '$lib/contractor/atomic-entry-client.js';
+  const postEntry = createAtomicEntryPoster(supabase);
+  let savingExpense = false;
+  let savingMoneyIn = false;
+  let savingTransfer = false;
 
   let dataError = '';
   let mutationError = '';
@@ -37,6 +41,7 @@
     recipient: '',
     party_phone: '',
     advance_paid: 0,
+    advance_source: 'Cash',
     date: projectToday(),
     photo_url: ''
   };
@@ -138,28 +143,49 @@
 
   // Expense Submit
   async function submitExpense() {
+    if (savingExpense) return;
+    savingExpense = true;
+    mutationError = '';
     try {
-      await runFinancialMutation('expense', expForm);
+      await postEntry('expense', expForm);
+      showExpenseModal = false;
+      await fetchServerData();
     } catch (error) {
       mutationError = dataErrorMessage(error);
+    } finally {
+      savingExpense = false;
     }
   }
 
   // Money In Submit
   async function submitMoneyIn() {
+    if (savingMoneyIn) return;
+    savingMoneyIn = true;
+    mutationError = '';
     try {
-      await runFinancialMutation('receipt', inForm);
+      await postEntry('receipt', inForm);
+      showMoneyInModal = false;
+      await fetchServerData();
     } catch (error) {
       mutationError = dataErrorMessage(error);
+    } finally {
+      savingMoneyIn = false;
     }
   }
 
   // Contra Transfer Submit
   async function submitTransfer() {
+    if (savingTransfer) return;
+    savingTransfer = true;
+    mutationError = '';
     try {
-      await runFinancialMutation('transfer', transferForm);
+      await postEntry('transfer', transferForm);
+      showTransferModal = false;
+      await fetchServerData();
     } catch (error) {
       mutationError = dataErrorMessage(error);
+    } finally {
+      savingTransfer = false;
     }
   }
 
@@ -642,7 +668,7 @@
               <input type="date" bind:value={transferForm.date} required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-mono font-bold" />
             </div>
 
-            <button disabled={!FINANCIAL_WRITES_ENABLED} title="భద్రతా ధృవీకరణ పూర్తయ్యే వరకు నమోదు నిలిపివేయబడింది" type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-3 rounded-2xl shadow transition cursor-pointer text-xs">
+            <button disabled={!STAGE3_ATOMIC_ENTRIES_ENABLED || savingTransfer} type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-3 rounded-2xl shadow transition cursor-pointer text-xs">
               బదిలీని నమోదు చేయండి ➔
             </button>
           </form>
@@ -714,7 +740,11 @@
             {#if expForm.source === 'Credit'}
               <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1">
                 <label class="block font-bold text-amber-900">ఇచ్చిన అడ్వాన్స్ (Advance ₹):</label>
-                <input type="number" bind:value={expForm.advance_paid} placeholder="0" class="w-full bg-white border border-amber-300 rounded-lg p-2 font-mono font-bold" />
+                <input type="number" min="0" step="0.01" bind:value={expForm.advance_paid} placeholder="0" class="w-full bg-white border border-amber-300 rounded-lg p-2 font-mono font-bold" />
+                <label class="block font-bold text-amber-900">అడ్వాన్స్ చెల్లింపు ఖాతా</label>
+                <select bind:value={expForm.advance_source} class="w-full bg-white border border-amber-300 rounded-lg p-2">
+                  <option value="Cash">Cash</option><option value="Bank">Bank</option><option value="UPI">UPI</option>
+                </select>
               </div>
             {/if}
 
@@ -723,7 +753,7 @@
               <input type="file" accept="image/*" on:change={(e) => handlePhotoUpload(e, 'exp')} class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2" />
             </div>
 
-            <button disabled={!FINANCIAL_WRITES_ENABLED} title="భద్రతా ధృవీకరణ పూర్తయ్యే వరకు నమోదు నిలిపివేయబడింది" type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-2xl shadow transition cursor-pointer text-xs">
+            <button disabled={!STAGE3_ATOMIC_ENTRIES_ENABLED || savingExpense} type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-2xl shadow transition cursor-pointer text-xs">
               ఖాతాల్లో సేవ్ చేయండి & వోచర్ పొందండి ➔
             </button>
           </form>
@@ -770,7 +800,7 @@
               <label class="block font-bold text-slate-700 mb-1">తేదీ</label>
               <input type="date" bind:value={inForm.date} required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold" />
             </div>
-            <button disabled={!FINANCIAL_WRITES_ENABLED} title="భద్రతా ధృవీకరణ పూర్తయ్యే వరకు నమోదు నిలిపివేయబడింది" type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3 rounded-2xl shadow cursor-pointer">
+            <button disabled={!STAGE3_ATOMIC_ENTRIES_ENABLED || savingMoneyIn} type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3 rounded-2xl shadow cursor-pointer">
               సేవ్ చేయండి & రసీదు పొందండి ➔
             </button>
           </form>

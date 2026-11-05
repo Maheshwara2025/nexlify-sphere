@@ -3,6 +3,9 @@
   import { supabase } from '$lib/supabaseClient';
   import { readAllRows, dataErrorMessage, projectToday } from '$lib/contractor/data.js';
   import { runFinancialMutation, FINANCIAL_WRITES_ENABLED } from '$lib/contractor/financial-write-gate.js';
+  import { STAGE3_ATOMIC_ENTRIES_ENABLED, createAtomicEntryPoster } from '$lib/contractor/atomic-entry-client.js';
+  const postEntry = createAtomicEntryPoster(supabase);
+  let savingLoan = false;
   import {
     STAGE2_ATOMIC_PAYMENTS_ENABLED,
     prepareSupplierSettlementRpc,
@@ -29,7 +32,8 @@
     principal: '',
     interest_rate: '1.5% నెలకు',
     repaid_amount: 0,
-    date_borrowed: projectToday()
+    date_borrowed: projectToday(),
+    funding_source: 'Bank'
   };
 
   onMount(async () => {
@@ -46,8 +50,19 @@
   }
 
   async function saveLoan() {
-    try { await runFinancialMutation('loan', loanForm); }
-    catch (error) { mutationError=dataErrorMessage(error); }
+    if (savingLoan) return;
+    mutationError = '';
+    if (loanForm.id != null) {
+      mutationError = 'పాత లోన్‌లో మార్పుల కోసం Audit-safe Correction ప్రక్రియ అవసరం. కొత్త అప్పు మాత్రమే నమోదు చేయవచ్చు.';
+      return;
+    }
+    savingLoan = true;
+    try {
+      await postEntry('loan_create', loanForm);
+      showLoanModal = false;
+      await fetchLoansAndDues();
+    } catch (error) { mutationError = dataErrorMessage(error); }
+    finally { savingLoan = false; }
   }
 
   function openLoanRepayment(loan) {
@@ -141,7 +156,7 @@
       </div>
 
       <button
-        on:click={() => { loanForm = { id: null, lender_name: '', principal: '', interest_rate: '1.5% నెలకు', repaid_amount: 0, date_borrowed: projectToday() }; showLoanModal = true; }}
+        on:click={() => { loanForm = { id: null, lender_name: '', principal: '', interest_rate: '1.5% నెలకు', repaid_amount: 0, date_borrowed: projectToday(), funding_source: 'Bank' }; showLoanModal = true; }}
         class="bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black px-3.5 py-2 rounded-xl shadow transition"
       >
         ➕ కొత్త అప్పు నమోదు
@@ -184,7 +199,7 @@
                     <button on:click={() => openLoanRepayment(l)} class="bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold px-2 py-1 rounded text-[10.5px]">
                       💵 చెల్లించు
                     </button>
-                    <button on:click={() => { loanForm = { ...l }; showLoanModal = true; }} class="bg-amber-50 text-amber-800 border border-amber-300 font-bold px-2 py-1 rounded text-[10.5px]">
+                    <button disabled title="Audit-safe loan edits are not yet available" class="bg-amber-50 text-amber-800 border border-amber-300 font-bold px-2 py-1 rounded text-[10.5px]">
                       ✏️ ఎడిట్
                     </button>
                     <button disabled={!FINANCIAL_WRITES_ENABLED} on:click={() => deleteLoan(l.id)} class="text-rose-500 font-bold hover:text-rose-700 px-1">
@@ -272,7 +287,12 @@
           <input type="date" bind:value={loanForm.date_borrowed} required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold" />
         </div>
 
-        <button disabled={!FINANCIAL_WRITES_ENABLED} type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-2xl shadow transition text-xs">
+        <label class="block font-bold text-slate-700">అప్పు వచ్చిన ఖాతా
+          <select bind:value={loanForm.funding_source} class="mt-1 w-full rounded-lg border p-2">
+            <option value="Cash">Cash</option><option value="Bank">Bank</option><option value="UPI">UPI</option>
+          </select>
+        </label>
+                <button disabled={!STAGE3_ATOMIC_ENTRIES_ENABLED || savingLoan || loanForm.id != null} type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-2xl shadow transition text-xs">
           సర్వర్‌లో సేవ్ చేయండి ➔
         </button>
       </form>
