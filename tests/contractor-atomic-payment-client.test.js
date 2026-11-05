@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   STAGE2_ATOMIC_PAYMENTS_ENABLED,
   prepareSupplierSettlementRpc,
@@ -101,4 +102,20 @@ test('the staged client refuses network calls until both approvals are present',
     error => error?.code === 'FINANCIAL_WRITES_DISABLED'
   );
   assert.equal(calls, 0);
+});
+
+
+test('loan and supplier UI uses staged atomic request adapters without legacy one-click writes', () => {
+  const source = readFileSync(
+    new URL('../src/routes/admin/contractor/loans/+page.svelte', import.meta.url),
+    'utf8'
+  );
+  assert.match(source, /openSupplierSettlement\(b\)/);
+  assert.match(source, /openLoanRepayment\(l\)/);
+  assert.match(source, /prepareSupplierSettlementRpc\(/);
+  assert.match(source, /prepareLoanRepaymentRpc\(/);
+  assert.match(source, /submitStage2AtomicPayment\(supabase, command\)/);
+  assert.match(source, /disabled=\{!FINANCIAL_WRITES_ENABLED \|\| !STAGE2_ATOMIC_PAYMENTS_ENABLED \|\| paymentBusy\}/);
+  assert.doesNotMatch(source, /runFinancialMutation\('loan-repayment'/);
+  assert.doesNotMatch(source, /runFinancialMutation\('supplier-payment'/);
 });
