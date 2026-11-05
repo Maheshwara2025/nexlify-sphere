@@ -19,6 +19,15 @@
   let profiles = [];
   let loading = true;
   let showAttendanceModal = false;
+  let attendanceWarning = '';
+  let attendanceSaveError = '';
+
+  $: duplicateAttendance = labourRecords.find(row =>
+    form.worker_id && form.date && row.worker_id === form.worker_id && row.date === form.date
+  ) || null;
+  $: if (duplicateAttendance) attendanceWarning = 'ఈ కార్మికుడికి ఈ తేదీన హాజరు ఇప్పటికే నమోదైంది (Already Entered). మరోసారి సేవ్ చేయలేరు.';
+  $: if (!duplicateAttendance) attendanceWarning = '';
+
   let showProfileModal = false;
 
   let profileForm = {
@@ -98,13 +107,39 @@
 
   async function addAttendance() {
     if (savingAttendance) return;
+    attendanceSaveError = '';
+    if (!form.worker_id || !form.date) {
+      attendanceSaveError = 'తేదీ మరియు కార్మికుడిని ఎంచుకోండి.';
+      return;
+    }
+    // Friendly client check. The database UNIQUE constraint is the final authority.
+    if (duplicateAttendance) {
+      attendanceSaveError = attendanceWarning;
+      return;
+    }
     savingAttendance = true; mutationError = '';
     try {
+      // A second operator or browser might have saved the record since this page loaded.
+      const { data: existing, error: checkError } = await supabase.from('contractor_labour')
+        .select('id').eq('worker_id', form.worker_id).eq('date', form.date).limit(1);
+      if (checkError) throw checkError;
+      if (existing?.length) {
+        attendanceSaveError = 'ఈ కార్మికుడికి ఈ తేదీన హాజరు ఇప్పటికే నమోదైంది (Already Entered).';
+        await fetchAll();
+        return;
+      }
       await postEntry('attendance', form);
       showAttendanceModal = false;
       await fetchAll();
-    } catch (error) { mutationError = dataErrorMessage(error); }
-    finally { savingAttendance = false; }
+    } catch (error) {
+      // PostgreSQL UNIQUE violation (23505) is authoritative for concurrent submits.
+      if (error?.code === '23505' || /contractor_labour_worker_date_unique|duplicate key value/i.test(error?.message || '')) {
+        attendanceSaveError = 'ఈ కార్మికుడికి ఈ తేదీన హాజరు ఇప్పటికే నమోదైంది (Already Entered).';
+      } else {
+        attendanceSaveError = dataErrorMessage(error);
+      }
+      await fetchAll();
+    } finally { savingAttendance = false; }
   }
 
   async function saveLabourPayment() {
@@ -308,10 +343,13 @@
     <div class="bg-white rounded-3xl max-w-sm w-full p-5 space-y-4 shadow-2xl text-xs max-h-[92vh] overflow-y-auto">
       <div class="flex items-center justify-between border-b pb-2">
         <h3 class="font-black text-sm text-slate-900 font-['Ramabhadra']">👷 రోజువారీ హాజరు నమోదు</h3>
-        <button on:click={() => showAttendanceModal = false} class="font-bold text-slate-400">✕</button>
+        <button type="button" on:click={() => { showAttendanceModal = false; attendanceSaveError = ''; }} class="font-bold text-slate-400">✕</button>
       </div>
 
       <form on:submit|preventDefault={addAttendance} class="space-y-3">
+        {#if attendanceSaveError}
+          <div role="alert" class="rounded-xl border border-red-300 bg-red-50 p-3 text-sm font-bold text-red-800">{attendanceSaveError}</div>
+        {/if}
         <div>
           <label class="block font-bold text-slate-700 mb-1">పని తేదీ *</label>
           <input type="date" bind:value={form.date} required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-mono font-bold" />
@@ -330,6 +368,12 @@
             {/each}
           </select>
         </div>
+
+        {#if duplicateAttendance}
+          <div role="alert" class="p-3 rounded-xl border border-amber-300 bg-amber-50 text-amber-900 text-sm font-bold">
+            ⚠️ {attendanceWarning}<br />Record ID: {duplicateAttendance.id} · {form.date}
+          </div>
+        {/if}
 
         {#if form.worker_name}
           <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
@@ -372,8 +416,8 @@
           </label>
         {/if}
 
-        <button disabled={!STAGE3_ATOMIC_ENTRIES_ENABLED || savingAttendance} type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-2xl shadow transition cursor-pointer">
-          హాజరు నమోదు చేయండి ➔
+        <button disabled={!STAGE3_ATOMIC_ENTRIES_ENABLED || savingAttendance || !!duplicateAttendance} type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-2xl shadow transition cursor-pointer">
+          {savingAttendance ? 'సేవ్ అవుతోంది…' : duplicateAttendance ? 'ఇప్పటికే నమోదు అయింది' : 'హాజరు నమోదు చేయండి ➔'}
         </button>
       </form>
     </div>
