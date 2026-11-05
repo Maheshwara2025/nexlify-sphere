@@ -7,8 +7,8 @@ DECLARE
   r jsonb;
   r2 jsonb;
   vmsg text;
-  labour_id bigint;
-  piece_id bigint;
+  v_labour_id bigint;
+  v_piece_id bigint;
   mat_id bigint;
   ob_id bigint;
   newloan bigint;
@@ -85,22 +85,22 @@ BEGIN
   r:=public.contractor_post_entry_v1('attendance',
     '{"date":"2026-11-05","worker_id":"TEST-LBR-01","work_task":"Site work","days":"1","daily_rate":"800.00","advance_paid":"200.00","funding_source":"Cash"}'::jsonb,
     'asv_ci_stage3_attendance_0001');
-  labour_id:=(r->>'attendance_id')::bigint;
+  v_labour_id:=(r->>'attendance_id')::bigint;
   IF NOT EXISTS(SELECT 1 FROM public.contractor_transactions
-    WHERE labour_id=labour_id AND entry_type='labour_advance' AND amount=200)
+    WHERE labour_id=v_labour_id AND entry_type='labour_advance' AND amount=200)
     THEN RAISE EXCEPTION 'Labour advance funding entry missing'; END IF;
 
   r:=public.contractor_post_entry_v1('labour_payment',
-    jsonb_build_object('date','2026-11-05','labour_id',labour_id,
+    jsonb_build_object('date','2026-11-05','labour_id',v_labour_id,
       'funding_source','Bank','amount','600.00'),
     'asv_ci_stage3_labour_payment_01');
   IF NOT EXISTS(SELECT 1 FROM public.contractor_transactions
-    WHERE labour_id=labour_id AND entry_type='labour_payment' AND amount=600)
+    WHERE labour_id=v_labour_id AND entry_type='labour_payment' AND amount=600)
     THEN RAISE EXCEPTION 'Labour settlement ledger entry missing'; END IF;
 
   BEGIN
     PERFORM public.contractor_post_entry_v1('labour_payment',
-      jsonb_build_object('date','2026-11-05','labour_id',labour_id,
+      jsonb_build_object('date','2026-11-05','labour_id',v_labour_id,
         'funding_source','Cash','amount','1.00'),
       'asv_ci_stage3_labour_overpay_01');
     RAISE EXCEPTION 'EXPECTED_LABOUR_OVERPAY_REJECTION';
@@ -113,17 +113,17 @@ BEGIN
   r:=public.contractor_post_entry_v1('piecework',
     '{"date":"2026-11-05","contractor_name":"Test Mestri","calc_mode":"Sft","length_ft":"10","height_ft":"2","rate_per_unit":"40.00","advance_paid":"100.00","funding_source":"Cash"}'::jsonb,
     'asv_ci_stage3_piecework_00001');
-  piece_id:=(r->>'piecework_id')::bigint;
-  IF (SELECT balance_due FROM public.contractor_piecework WHERE id=piece_id)<>700
+  v_piece_id:=(r->>'piecework_id')::bigint;
+  IF (SELECT balance_due FROM public.contractor_piecework WHERE id=v_piece_id)<>700
     THEN RAISE EXCEPTION 'Piecework balance mismatch'; END IF;
 
   r:=public.contractor_post_entry_v1('piecework_payment',
-    jsonb_build_object('date','2026-11-05','piecework_id',piece_id,
+    jsonb_build_object('date','2026-11-05','piecework_id',v_piece_id,
       'funding_source','UPI','amount','700.00'),
     'asv_ci_stage3_piecework_pay_01');
-  IF (SELECT balance_due FROM public.contractor_piecework WHERE id=piece_id)<>0
+  IF (SELECT balance_due FROM public.contractor_piecework WHERE id=v_piece_id)<>0
      OR NOT EXISTS(SELECT 1 FROM public.contractor_transactions
-       WHERE piecework_id=piece_id AND entry_type='piecework_payment' AND amount=700)
+       WHERE piecework_id=v_piece_id AND entry_type='piecework_payment' AND amount=700)
     THEN RAISE EXCEPTION 'Piecework settlement mismatch'; END IF;
 
   r:=public.contractor_post_entry_v1('site_diary',
