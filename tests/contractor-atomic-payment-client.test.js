@@ -89,19 +89,36 @@ test('invalid loan repayments are rejected, while a pure interest payment is per
   }
 });
 
-test('the staged client refuses network calls until both approvals are present', async () => {
-  assert.equal(STAGE2_ATOMIC_PAYMENTS_ENABLED, false);
-  let calls = 0;
-  const mock = { rpc: async () => { calls++; return { data: { success: true }, error: null }; } };
+test('Stage 2 payment adapters call only reviewed RPCs and propagate database errors', async () => {
+  assert.equal(STAGE2_ATOMIC_PAYMENTS_ENABLED, true);
+  const calls = [];
+  const mock = { rpc: async (name, params) => {
+    calls.push({name, params});
+    return { data: { success: true, operation: name }, error: null };
+  } };
+  const supplierResult = await submitStage2AtomicPayment(mock, prepareSupplierSettlementRpc(supplier));
+  const loanResult = await submitStage2AtomicPayment(mock, prepareLoanRepaymentRpc(loan));
+  assert.equal(supplierResult.success, true);
+  assert.equal(loanResult.success, true);
+  assert.equal(calls.length, 2);
+  assert.deepEqual(calls.map(call => call.name), [
+    'settle_supplier_credit_bill', 'record_loan_repayment'
+  ]);
   await assert.rejects(
-    submitStage2AtomicPayment(mock, prepareSupplierSettlementRpc(supplier)),
-    error => error?.code === 'FINANCIAL_WRITES_DISABLED'
+    submitStage2AtomicPayment(mock, { rpc: 'unsafe_financial_write', params: {} }),
+    /Unsupported atomic payment/
+  );
+  assert.equal(calls.length, 2);
+  await assert.rejects(
+    submitStage2AtomicPayment({rpc: async () => ({error: new Error('DB rejected'),data:null})},
+      prepareLoanRepaymentRpc(loan)),
+    /DB rejected/
   );
   await assert.rejects(
-    submitStage2AtomicPayment(mock, prepareLoanRepaymentRpc(loan)),
-    error => error?.code === 'FINANCIAL_WRITES_DISABLED'
+    submitStage2AtomicPayment({rpc: async () => ({error:null,data:{success:false}})},
+      prepareSupplierSettlementRpc(supplier)),
+    /did not return verified success/
   );
-  assert.equal(calls, 0);
 });
 
 
@@ -130,7 +147,7 @@ test('Stage 2 is separately gated; enabling it will not enable legacy expense an
     new URL('../src/lib/contractor/financial-write-gate.js', import.meta.url),
     'utf8'
   );
-  assert.match(adapter, /export const STAGE2_ATOMIC_PAYMENTS_ENABLED = false/);
+  assert.match(adapter, /export const STAGE2_ATOMIC_PAYMENTS_ENABLED = true/);
   assert.match(adapter, /if \(!STAGE2_ATOMIC_PAYMENTS_ENABLED\)/);
   assert.doesNotMatch(adapter, /if \(!FINANCIAL_WRITES_ENABLED/);
   assert.match(oldGate, /export const FINANCIAL_WRITES_ENABLED = false/);
