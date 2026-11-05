@@ -3,6 +3,14 @@
   import { supabase } from '$lib/supabaseClient';
   import { readAllRows, dataErrorMessage, projectToday } from '$lib/contractor/data.js';
   import { runFinancialMutation, FINANCIAL_WRITES_ENABLED } from '$lib/contractor/financial-write-gate.js';
+  import { STAGE3_ATOMIC_ENTRIES_ENABLED, createAtomicEntryPoster } from '$lib/contractor/atomic-entry-client.js';
+  const postEntry = createAtomicEntryPoster(supabase);
+  let savingProfile = false;
+  let savingAttendance = false;
+  let savingPayment = false;
+  let paymentRow = null;
+  let paymentAmount = '';
+  let paymentFunding = 'Cash';
 
   let dataError = '';
   let mutationError = '';
@@ -31,7 +39,8 @@
     work_task: 'పునాది తవ్వకం & రాతి కట్టడం బేస్‌మెంట్',
     days: 1,
     daily_rate: 800,
-    advance_paid: 0
+    advance_paid: 0,
+    funding_source: 'Cash'
   };
 
   onMount(async () => {
@@ -66,11 +75,14 @@
   }
 
   async function saveProfile() {
+    if (savingProfile) return;
+    savingProfile = true; mutationError = '';
     try {
-      await runFinancialMutation('worker-profile', profileForm);
-    } catch (error) {
-      mutationError = dataErrorMessage(error);
-    }
+      await postEntry('worker_profile', profileForm);
+      showProfileModal = false;
+      await fetchAll();
+    } catch (error) { mutationError = dataErrorMessage(error); }
+    finally { savingProfile = false; }
   }
 
   function handleProfileSelect(e) {
@@ -85,11 +97,28 @@
   }
 
   async function addAttendance() {
+    if (savingAttendance) return;
+    savingAttendance = true; mutationError = '';
     try {
-      await runFinancialMutation('attendance', form);
-    } catch (error) {
-      mutationError = dataErrorMessage(error);
-    }
+      await postEntry('attendance', form);
+      showAttendanceModal = false;
+      await fetchAll();
+    } catch (error) { mutationError = dataErrorMessage(error); }
+    finally { savingAttendance = false; }
+  }
+
+  async function saveLabourPayment() {
+    if (!paymentRow || savingPayment) return;
+    savingPayment = true; mutationError = '';
+    try {
+      await postEntry('labour_payment', {
+        labour_id: paymentRow.id, date: projectToday(),
+        amount: paymentAmount, funding_source: paymentFunding
+      });
+      paymentRow = null;
+      await fetchAll();
+    } catch (error) { mutationError = dataErrorMessage(error); }
+    finally { savingPayment = false; }
   }
 
   async function deleteLabour(id) {
@@ -201,7 +230,9 @@
                   <td class="p-3 text-right font-mono text-emerald-700">₹ {Number(l.advance_paid || 0).toLocaleString('en-IN')}</td>
                   <td class="p-3 text-right font-mono font-black text-rose-600">₹ {balanceDue.toLocaleString('en-IN')}</td>
                   <td class="p-3 text-center">
-                    <button disabled={!FINANCIAL_WRITES_ENABLED} on:click={() => deleteLabour(l.id)} class="text-rose-500 font-bold hover:text-rose-700">✕</button>
+                    <button on:click={() => { paymentRow = l; paymentAmount = ''; paymentFunding = 'Cash'; }}
+                    class="mr-2 rounded bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-800">చెల్లింపు</button>
+                  <button disabled={!FINANCIAL_WRITES_ENABLED} on:click={() => deleteLabour(l.id)} class="text-rose-500 font-bold hover:text-rose-700">✕</button>
                   </td>
                 </tr>
               {/each}
@@ -263,7 +294,7 @@
           </div>
         </div>
 
-        <button disabled={!FINANCIAL_WRITES_ENABLED} title="భద్రతా ధృవీకరణ పూర్తయ్యే వరకు నమోదు నిలిపివేయబడింది" type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 rounded-2xl shadow transition cursor-pointer">
+        <button disabled={!STAGE3_ATOMIC_ENTRIES_ENABLED || savingProfile} type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 rounded-2xl shadow transition cursor-pointer">
           ప్రొఫైల్ సేవ్ చేయండి ➔
         </button>
       </form>
@@ -333,12 +364,46 @@
           <label class="block font-bold text-slate-700 mb-1">ఇచ్చిన అడ్వాన్స్ (Advance ₹ - ఆటో లెడ్జర్ లింక్)</label>
           <input type="number" bind:value={form.advance_paid} class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-mono font-bold text-emerald-700" />
         </div>
+        {#if Number(form.advance_paid || 0) > 0}
+          <label class="block font-bold text-slate-700">అడ్వాన్స్ చెల్లింపు ఖాతా
+            <select bind:value={form.funding_source} class="mt-1 w-full rounded-xl border p-2">
+              <option value="Cash">Cash</option><option value="Bank">Bank</option><option value="UPI">UPI</option>
+            </select>
+          </label>
+        {/if}
 
-        <button disabled={!FINANCIAL_WRITES_ENABLED} title="భద్రతా ధృవీకరణ పూర్తయ్యే వరకు నమోదు నిలిపివేయబడింది" type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-2xl shadow transition cursor-pointer">
+        <button disabled={!STAGE3_ATOMIC_ENTRIES_ENABLED || savingAttendance} type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-2xl shadow transition cursor-pointer">
           హాజరు నమోదు చేయండి ➔
         </button>
       </form>
     </div>
   </div>
 {/if}
+{/if}
+
+
+{#if paymentRow}
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3">
+    <div class="w-full max-w-sm space-y-4 rounded-2xl bg-white p-5 text-slate-900">
+      <div class="flex justify-between font-black"><span>కూలీ చెల్లింపు — {paymentRow.worker_name}</span>
+        <button type="button" on:click={() => paymentRow=null}>✕</button>
+      </div>
+      <p class="text-xs text-slate-500">హాజరు # {paymentRow.id} · చెల్లించాల్సిన మొత్తం మించకూడదు.</p>
+      <form class="space-y-3" on:submit|preventDefault={saveLabourPayment}>
+        <label class="block text-xs font-bold">మొత్తం ₹
+          <input type="number" min="0.01" step="0.01" required bind:value={paymentAmount}
+            class="mt-1 w-full rounded-lg border p-2" />
+        </label>
+        <label class="block text-xs font-bold">Payment Account
+          <select bind:value={paymentFunding} class="mt-1 w-full rounded-lg border p-2">
+            <option value="Cash">Cash</option><option value="Bank">Bank</option><option value="UPI">UPI</option>
+          </select>
+        </label>
+        <button disabled={!STAGE3_ATOMIC_ENTRIES_ENABLED || savingPayment} type="submit"
+          class="w-full rounded-lg bg-emerald-700 p-3 font-black text-white disabled:opacity-50">
+          {savingPayment ? 'Saving...' : 'Atomic Payment Save'}
+        </button>
+      </form>
+    </div>
+  </div>
 {/if}
