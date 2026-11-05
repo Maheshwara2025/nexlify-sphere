@@ -1,11 +1,12 @@
 /**
  * Staged atomic payment RPC adapters for A.S.V. Contractor 360.
- * IMPORTANT: INACTIVE until the Stage 2 migration passes independent review.
+ * Only two reviewed Stage 2 RPCs are allowed to post after migration.
+ * The legacy financial write gate remains disabled for every other operation.
  * These adapters never issue sequential browser-side writes.
  */
 import { moneyToPaise } from './financial-write-gate.js';
 
-export const STAGE2_ATOMIC_PAYMENTS_ENABLED = false;
+export const STAGE2_ATOMIC_PAYMENTS_ENABLED = true;
 
 const KEY_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
 const ACCOUNTS = new Set(['Cash', 'Bank', 'UPI']);
@@ -103,7 +104,7 @@ export function prepareLoanRepaymentRpc(draft) {
 }
 
 /** Never calls the database until the separate Stage 2 approval switch is enabled.
- * The legacy global financial write gate remains permanently disabled, so
+ * The legacy global financial write gate remains disabled, so
  * unsupported expense/material/attendance mutations cannot become active.
 
  * @param {{rpc:Function}} client
