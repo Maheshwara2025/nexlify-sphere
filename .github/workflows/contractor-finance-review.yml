@@ -1,0 +1,35 @@
+name: Contractor finance review
+
+on:
+  pull_request:
+    paths:
+      - 'src/lib/contractor/**'
+      - 'src/routes/admin/contractor/**'
+      - 'supabase/proposals/**'
+      - 'tests/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/contractor-finance-review.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact PR commit
+        uses: actions/checkout@v4
+      - name: Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Unit and fail-closed regression tests
+        run: npm test
+      - name: Production build validation
+        run: npm run build
