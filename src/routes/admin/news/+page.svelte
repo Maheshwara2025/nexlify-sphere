@@ -2,14 +2,15 @@
     import { supabase } from '$lib/supabaseClient';
     import { goto } from '$app/navigation';
     import { onMount } from 'svelte';
-    import { createVerifiedAccessGuard } from '$lib/verifiedAccess';
+    import { createContractorAccessGuard } from '$lib/verifiedAccess';
+    import { checkNewsFile, newNewsObjectPath, getYouTubeEmbedUrl, NEWS_EXTRA_PHOTO_LIMIT } from '$lib/newsMedia';
 
     let authChecking = true;
     let authUnavailable = false;
 
     onMount(() => {
         let active = true;
-        const stop = createVerifiedAccessGuard(supabase, {
+        const stop = createContractorAccessGuard(supabase, {
             onStateChange(state) {
                 authChecking = state !== 'allowed';
                 authUnavailable = state === 'unavailable';
@@ -23,6 +24,7 @@
         return () => {
             active = false;
             stop();
+            clearMediaPreviews();
         };
     });
 
@@ -43,9 +45,17 @@
     let custom_town = '';
     let headline = '';
     let alert_type = 'none';
-    let category = 'రాజకీయాలు';
+    let category = 'స్థానిక వార్తలు';
     let content = '';
     let youtube_url = '';
+    let videoMode = 'none';
+    /** @type {File | null} */
+    let videoFile = null;
+    /** @type {string | null} */
+    let videoPreview = null;
+    let video_caption = '';
+    /** @type {Array<{file:File, preview:string, caption:string}>} */
+    let extraImages = [];
     let show_in_ticker = true;
 
     // Photo Layout Options
@@ -77,7 +87,7 @@
     ];
 
     const categories = [
-        'రాజకీయాలు', 'వ్యాపారం & ఫైనాన్స్', 'టెక్నాలజీ', 'ఆరోగ్యం',
+        'స్థానిక వార్తలు', 'రాజకీయాలు', 'వ్యాపారం & ఫైనాన్స్', 'టెక్నాలజీ', 'ఆరోగ్యం',
         'వాతావరణం & పర్యావరణం', 'విద్య & ఉద్యోగాలు', 'సైన్స్ & పరిశోధనలు',
         'క్రీడలు & గేమ్స్', 'సంస్కృతి & సమాజం', 'ప్రపంచ వార్తలు'
     ];
@@ -150,47 +160,118 @@
      * @param {Event} e
      * @param {number} num
      */
+    function clearMediaPreviews() {
+        if (imagePreview1) URL.revokeObjectURL(imagePreview1);
+        if (imagePreview2) URL.revokeObjectURL(imagePreview2);
+        if (videoPreview) URL.revokeObjectURL(videoPreview);
+        for (const item of extraImages) URL.revokeObjectURL(item.preview);
+    }
+
+    /** @param {Event} e @param {number} num */
     function handleImageSelect(e, num) {
-        const target = /** @type {HTMLInputElement} */ (e.target);
-        if (target && target.files && target.files[0]) {
+        const input = /** @type {HTMLInputElement} */ (e.currentTarget);
+        const file = input.files?.[0];
+        if (!file) return;
+        try {
+            checkNewsFile(file, 'image');
             if (num === 1) {
-                imageFile1 = target.files[0];
-                imagePreview1 = URL.createObjectURL(imageFile1);
+                if (imagePreview1) URL.revokeObjectURL(imagePreview1);
+                imageFile1 = file;
+                imagePreview1 = URL.createObjectURL(file);
             } else {
-                imageFile2 = target.files[0];
-                imagePreview2 = URL.createObjectURL(imageFile2);
-                if (image_layout === 'full') {
-                    image_layout = 'grid';
-                }
+                if (imagePreview2) URL.revokeObjectURL(imagePreview2);
+                imageFile2 = file;
+                imagePreview2 = URL.createObjectURL(file);
+                if (image_layout === 'full') image_layout = 'grid';
             }
+            statusMsg = '';
+        } catch (/** @type {any} */ error) {
+            input.value = '';
+            statusType = 'error';
+            statusMsg = error.message;
+        }
+    }
+
+    /** @param {Event} e */
+    function handleExtraImages(e) {
+        const input = /** @type {HTMLInputElement} */ (e.currentTarget);
+        const files = Array.from(input.files || []);
+        if (!files.length) return;
+        try {
+            if (extraImages.length + files.length > NEWS_EXTRA_PHOTO_LIMIT) {
+                throw new Error('అదనపు ఫోటోలు గరిష్టంగా 6 మాత్రమే. మొత్తం 8 ఫోటోలు జోడించవచ్చు.');
+            }
+            files.forEach(file => checkNewsFile(file, 'image'));
+            extraImages = [...extraImages, ...files.map(file => ({
+                file,
+                preview: URL.createObjectURL(file),
+                caption: ''
+            }))];
+            statusMsg = '';
+        } catch (/** @type {any} */ error) {
+            statusType = 'error';
+            statusMsg = error.message;
+        }
+        input.value = '';
+    }
+
+    /** @param {number} index */
+    function removeExtraImage(index) {
+        const photo = extraImages[index];
+        if (photo) URL.revokeObjectURL(photo.preview);
+        extraImages = extraImages.filter((_, i) => i !== index);
+    }
+
+    /** @param {Event} e */
+    function handleVideoSelect(e) {
+        const input = /** @type {HTMLInputElement} */ (e.currentTarget);
+        const file = input.files?.[0];
+        if (!file) return;
+        try {
+            checkNewsFile(file, 'video');
+            if (videoPreview) URL.revokeObjectURL(videoPreview);
+            videoFile = file;
+            videoPreview = URL.createObjectURL(file);
+            statusMsg = '';
+        } catch (/** @type {any} */ error) {
+            input.value = '';
+            statusType = 'error';
+            statusMsg = error.message;
         }
     }
 
     /**
      * @param {File} file
+     * @param {'news-images'|'ns-news-videos'} bucket
+     * @param {'photos'|'videos'} kind
      */
-    async function uploadSingleImage(file) {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
-        const filePath = `articles/${fileName}`;
-
+    async function uploadNewsMedia(file, bucket, kind) {
+        const filePath = newNewsObjectPath(bucket, kind, file);
         const { error: uploadError } = await supabase.storage
-            .from('news-images')
-            .upload(filePath, file, { cacheControl: '3600', upsert: true });
-
+            .from(bucket)
+            .upload(filePath, file, { cacheControl: '3600', upsert: false, contentType: file.type });
         if (uploadError) throw uploadError;
-
-        const { data } = supabase.storage.from('news-images').getPublicUrl(filePath);
-        return data.publicUrl;
+        const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
+        return { url: data.publicUrl, filePath, bucket };
     }
 
     async function handleSubmit() {
-        if (!headline || !content) {
-            statusMsg = 'Dayachesi headline mariyu content vivaralu enter cheyandi.';
+        if (!headline.trim() || !content.trim()) {
+            statusMsg = 'హెడ్‌లైన్, పూర్తి కథనం తప్పనిసరిగా నమోదు చేయండి.';
             statusType = 'error';
             return;
         }
 
+        if (videoMode === 'youtube' && youtube_url.trim() && !getYouTubeEmbedUrl(youtube_url)) {
+            statusType = 'error';
+            statusMsg = 'సరైన YouTube వీడియో URL ఇవ్వండి.';
+            return;
+        }
+        if (videoMode === 'upload' && !videoFile) {
+            statusType = 'error';
+            statusMsg = 'వీడియో ఫైల్ ఎంచుకోండి లేదా YouTube ఎంపిక ఉపయోగించండి.';
+            return;
+        }
         isUploading = true;
         statusMsg = '';
 
@@ -198,47 +279,58 @@
             ? (custom_town.trim() || 'తెలంగాణ') 
             : location_town;
 
+        /** @type {Array<{url:string,filePath:string,bucket:string}>} */
+        const uploaded = [];
         try {
             let imageUrl1 = null;
             let imageUrl2 = null;
-
+            let videoUrl = null;
+            /** @type {Array<{url:string,caption:string}>} */
+            const gallery = [];
             if (imageFile1) {
-                imageUrl1 = await uploadSingleImage(imageFile1);
+                const result = await uploadNewsMedia(imageFile1, 'news-images', 'photos');
+                uploaded.push(result); imageUrl1 = result.url;
             }
             if (imageFile2) {
-                imageUrl2 = await uploadSingleImage(imageFile2);
+                const result = await uploadNewsMedia(imageFile2, 'news-images', 'photos');
+                uploaded.push(result); imageUrl2 = result.url;
+            }
+            for (const item of extraImages) {
+                const result = await uploadNewsMedia(item.file, 'news-images', 'photos');
+                uploaded.push(result);
+                gallery.push({url: result.url, caption: item.caption.trim().slice(0,300)});
+            }
+            if (videoMode === 'upload' && videoFile) {
+                const result = await uploadNewsMedia(videoFile, 'ns-news-videos', 'videos');
+                uploaded.push(result); videoUrl = result.url;
             }
 
-            // Layout code safe format
             const layoutStyleCode = `${image_layout}|${is_rounded ? 'rounded' : 'sharp'}`;
-
-            const { error } = await supabase.from('news_articles').insert([
-                {
-                    location_town: finalLocation,
-                    headline,
-                    // subline_1 lo layoutStyleCode save avuthundi (Constraint errors raavu)
-                    subline_1: layoutStyleCode,
-                    subline_2: '',
-                    subline_3: '',
-                    // news_tone ki eppatilaage 'soft' pampadam valla constraint error raadu
-                    news_tone: 'soft',
-                    alert_type,
-                    category,
-                    content,
-                    image_url: imageUrl1,
-                    image_caption_1: image_caption_1 || '',
-                    image_url_2: imageUrl2,
-                    image_caption_2: image_caption_2 || '',
-                    youtube_url: youtube_url || null,
-                    show_in_ticker
-                }
-            ]);
-
+            const { error } = await supabase.from('news_articles').insert([{
+                location_town: finalLocation,
+                headline: headline.trim(),
+                subline_1: layoutStyleCode,
+                subline_2: '',
+                subline_3: '',
+                news_tone: 'soft',
+                alert_type,
+                category,
+                content: content.trim(),
+                image_url: imageUrl1,
+                image_caption_1: image_caption_1 || '',
+                image_url_2: imageUrl2,
+                image_caption_2: image_caption_2 || '',
+                media_gallery: gallery,
+                video_url: videoUrl,
+                video_caption: video_caption.trim().slice(0,300),
+                youtube_url: videoMode === 'youtube' ? youtube_url.trim() || null : null,
+                show_in_ticker
+            }]);
             if (error) throw error;
 
-            statusMsg = 'వార్త విజయవంతంగా పబ్లిష్ అయ్యింది!';
+            statusMsg = 'వార్త, ఫోటోలు మరియు వీడియో విజయవంతంగా పబ్లిష్ అయ్యాయి!';
             statusType = 'success';
-
+            clearMediaPreviews();
             rawNewsInput = '';
             headline = '';
             content = '';
@@ -248,11 +340,18 @@
             imageFile2 = null;
             imagePreview2 = null;
             image_caption_2 = '';
+            extraImages = [];
+            videoFile = null;
+            videoPreview = null;
+            video_caption = '';
+            videoMode = 'none';
             youtube_url = '';
             custom_town = '';
             image_layout = 'full';
         } catch (/** @type {any} */ err) {
             console.error('Submit Error:', err);
+            // Remove objects uploaded during a failed publish; database remains unchanged.
+            await Promise.allSettled(uploaded.map(item => supabase.storage.from(item.bucket).remove([item.filePath])));
             statusMsg = `లోపం: ${err.message || 'మళ్లీ ప్రయత్నించండి'}`;
             statusType = 'error';
         } finally {
