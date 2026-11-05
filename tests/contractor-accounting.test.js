@@ -265,3 +265,41 @@ test('reconciles operating income, client receipts and owner self-capital across
 	assert.equal(summary.totalReceipts, 850000); // 450000 + 400000
 	assert.equal(summary.bankBalance, 850000);
 });
+
+
+test('Stage 3 labour advances and settlements reconcile once using labour_id FK', () => {
+  const summary = calculateFinancialSummary({
+    labour: [{id:11, worker_id:'LBR-11', worker_name:'Worker 11', days:1,
+      daily_rate:800, advance_paid:200}],
+    transactions: [
+      {id:21,category:'Labour & Mestri',entry_type:'labour_advance',
+        labour_id:11,amount:200,source:'Cash'},
+      {id:22,category:'Labour & Mestri',entry_type:'labour_payment',
+        labour_id:11,amount:600,source:'Bank'}
+    ]
+  });
+  assert.equal(summary.labourPayablesDue, 0);
+  assert.equal(summary.totalPaidExpenses, 800);
+  assert.equal(summary.cashBalance, -200);
+  assert.equal(summary.bankBalance, -600);
+  assert.equal(summary.balancesReliable, true);
+  assert.ok(!summary.warnings.some(x=>x.code==='UNALLOCATED_PAYMENT'));
+});
+
+test('Stage 3 piecework with partial payment stays out of orphan ledger and does not double-count', () => {
+  const summary = calculateFinancialSummary({
+    piecework: [{id:33, total_amount:1000, advance_paid:100}],
+    transactions: [
+      {id:34, category:'Centring',entry_type:'piecework_advance',
+       piecework_id:33,amount:100,source:'Cash'},
+      {id:35, category:'Centring',entry_type:'piecework_payment',
+       piecework_id:33,amount:400,source:'UPI'}
+    ]
+  });
+  assert.equal(summary.pieceworkPayablesDue, 500);
+  assert.equal(summary.totalPaidExpenses, 500);
+  assert.equal(summary.cashBalance, -100);
+  assert.equal(summary.bankBalance, -400);
+  assert.equal(summary.balancesReliable, true);
+  assert.ok(!summary.warnings.some(x=>x.code==='UNALLOCATED_PAYMENT'));
+});
