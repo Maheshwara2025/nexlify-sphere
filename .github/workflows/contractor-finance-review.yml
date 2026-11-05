@@ -6,6 +6,7 @@ on:
       - 'src/lib/contractor/**'
       - 'src/routes/admin/contractor/**'
       - 'supabase/proposals/**'
+      - 'supabase/releases/**'
       - 'tests/**'
       - 'package.json'
       - 'package-lock.json'
