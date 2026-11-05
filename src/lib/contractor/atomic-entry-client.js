@@ -3,7 +3,7 @@
  * Server RPC owns the single PostgreSQL transaction, authorization,
  * idempotency and linked ledger records. NEVER post separate browser writes.
  */
-export const STAGE3_ATOMIC_ENTRIES_ENABLED = false;
+export const STAGE3_ATOMIC_ENTRIES_ENABLED = true;
 
 export const STAGE3_OPERATIONS = Object.freeze([
   'expense','receipt','transfer','material_purchase','loan_create',
