@@ -37,6 +37,35 @@ column_checks AS (
    AND c.table_name=r.table_name
    AND c.column_name=r.column_name
 ),
+rls_table_status AS (
+  -- The API's anon/authenticated roles are not table owners. Their safety
+  -- depends on RLS + restrictive owner policy and no anon table grants.
+  -- FORCE ROW LEVEL SECURITY is not a prerequisite; forcing it can break
+  -- owner/SECURITY DEFINER migrations and needs a separate security review.
+  SELECT
+    c.relname,
+    c.relrowsecurity AS rls_enabled,
+    has_table_privilege('anon', c.oid, 'SELECT,INSERT,UPDATE,DELETE') AS anon_any_crud,
+    EXISTS (
+      SELECT 1 FROM pg_policies p
+      WHERE p.schemaname = 'public'
+        AND p.tablename = c.relname
+        AND p.policyname = 'contractor_owner_gate'
+        AND p.permissive = 'RESTRICTIVE'
+        AND p.cmd = 'ALL'
+        AND 'authenticated' = ANY(p.roles)
+        AND coalesce(p.qual,'') ILIKE '%contractor_access_status%'
+        AND coalesce(p.with_check,'') ILIKE '%contractor_access_status%'
+    ) AS owner_gate_present
+  FROM pg_class c
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE n.nspname = 'public' AND c.relkind IN ('r','p')
+    AND c.relname = ANY(ARRAY[
+      'contractor_transactions','contractor_loans','contractor_materials',
+      'contractor_labour','contractor_labour_profiles','contractor_piecework',
+      'contractor_daily_works','contractor_mbook','contractor_parties'
+    ])
+),
 result AS (
   SELECT
     'Required base columns and types (19)'::text AS check_name,
@@ -62,22 +91,16 @@ result AS (
 
   UNION ALL
 
-  SELECT 'RLS on all nine contractor tables',
-    CASE WHEN count(*)=9
-            AND bool_and(c.relrowsecurity)
-            AND bool_and(c.relforcerowsecurity)
+  SELECT 'RLS + restrictive owner gate + no anon CRUD (nine tables)',
+    CASE WHEN count(*)=9 AND bool_and(rls_enabled)
+            AND count(*) FILTER (WHERE owner_gate_present)=9
+            AND count(*) FILTER (WHERE anon_any_crud)=0
          THEN 'READY' ELSE 'BLOCK' END,
     count(*)::text || ' tables found; '
-    || count(*) FILTER (WHERE c.relrowsecurity AND c.relforcerowsecurity)::text
-    || ' have FORCE RLS'
-  FROM pg_class c
-  JOIN pg_namespace n ON n.oid=c.relnamespace
-  WHERE n.nspname='public' AND c.relkind IN ('r','p')
-    AND c.relname=ANY(ARRAY[
-       'contractor_transactions','contractor_loans','contractor_materials',
-       'contractor_labour','contractor_labour_profiles','contractor_piecework',
-       'contractor_daily_works','contractor_mbook','contractor_parties'
-    ])
+      || count(*) FILTER (WHERE rls_enabled)::text || ' with RLS; '
+      || count(*) FILTER (WHERE owner_gate_present)::text || ' with restrictive owner policy; '
+      || count(*) FILTER (WHERE anon_any_crud)::text || ' with anon CRUD grants'
+  FROM rls_table_status
 
   UNION ALL
 
