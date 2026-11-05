@@ -581,6 +581,34 @@
                         </div>
                     </div>
 
+                    <!-- Related photo gallery; part of the same text story -->
+                    <section class="rounded-2xl border border-red-100 bg-white p-4 sm:p-5 space-y-4" aria-label="వార్తకు సంబంధించిన ఫోటోలు">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                                <h3 class="font-black text-slate-900 text-sm sm:text-base">📷 వార్తకు సంబంధించిన ఫోటో గ్యాలరీ</h3>
+                                <p class="text-xs text-slate-600 mt-1">ప్రధాన రెండు ఫోటోలతో కలిపి గరిష్టంగా 8 ఫోటోలు; ఒక్కొక్కటి 8 MB లోపు (JPG, PNG, WebP)</p>
+                            </div>
+                            <span class="rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-800">
+                                {(imageFile1 ? 1 : 0) + (imageFile2 ? 1 : 0) + extraImages.length} / 8
+                            </span>
+                        </div>
+                        <label class="block w-full cursor-pointer rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-center text-sm font-bold text-slate-700 hover:border-red-400">
+                            ＋ మరిన్ని ఫోటోలు ఎంచుకోండి
+                            <input class="mt-2 block w-full text-xs font-normal" type="file" accept="image/jpeg,image/png,image/webp" multiple on:change={handleExtraImages} />
+                        </label>
+                        {#if extraImages.length}
+                            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                {#each extraImages as item, idx}
+                                    <div class="rounded-xl border border-slate-200 p-2 bg-slate-50 space-y-2">
+                                        <img src={item.preview} alt="ఫోటో {idx + 3} ప్రివ్యూ" class="h-28 w-full object-cover rounded-lg" />
+                                        <input type="text" bind:value={item.caption} maxlength="300" placeholder="ఈ ఫోటో క్యాప్షన్" class="w-full px-2 py-2 border border-slate-300 rounded-lg text-xs" />
+                                        <button type="button" on:click={() => removeExtraImage(idx)} class="text-xs font-bold text-red-700 underline">ఫోటో తీసివేయండి</button>
+                                    </div>
+                                {/each}
+                            </div>
+                        {/if}
+                    </section>
+
                     <!-- Photo Design Selection -->
                     <div class="bg-gradient-to-r from-red-50/50 via-slate-50 to-amber-50/50 p-4 rounded-2xl border-2 border-red-200 space-y-3">
                         <div class="flex flex-wrap items-center justify-between gap-2">
@@ -652,27 +680,51 @@
                         ></textarea>
                     </div>
 
-                    <!-- Ticker Check & YouTube -->
-                    <div class="flex flex-wrap items-center justify-between gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                        <div class="flex items-center gap-2">
-                            <input
-                                id="ticker-check"
-                                type="checkbox"
-                                bind:checked={show_in_ticker}
-                                class="w-4 h-4 text-red-600 rounded border-slate-300 focus:ring-0 cursor-pointer"
-                            />
-                            <label for="ticker-check" class="text-xs font-bold text-slate-700 cursor-pointer">లైవ్ న్యూస్ టిక్కర్‌లో చూపించు</label>
+                    <!-- Video augments the text news, never a separate video-news category -->
+                    <section class="rounded-2xl bg-slate-50 border border-slate-200 p-4 sm:p-5 space-y-4" aria-label="వార్త వీడియో">
+                        <div>
+                            <h3 class="text-sm sm:text-base font-black text-slate-900">🎥 వార్తకు సంబంధించిన వీడియో (ఐచ్ఛికం)</h3>
+                            <p class="mt-1 text-xs text-slate-600">మీ పూర్తి వార్తలోనే వీడియో కనిపిస్తుంది. వేరే వీడియో వార్తల కేటగిరీ సృష్టించబడదు.</p>
                         </div>
-
-                        <div class="flex-1 max-w-xs">
-                            <input
-                                type="url"
-                                bind:value={youtube_url}
-                                placeholder="యూట్యూబ్ వీడియో లింక్ (ఐచ్ఛికం)"
-                                class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-red-500"
-                            />
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <label class="rounded-xl border border-slate-300 p-3 bg-white text-xs font-bold">
+                                <input type="radio" bind:group={videoMode} value="none" class="mr-2 accent-red-600" />వీడియో వద్దు
+                            </label>
+                            <label class="rounded-xl border border-slate-300 p-3 bg-white text-xs font-bold">
+                                <input type="radio" bind:group={videoMode} value="upload" class="mr-2 accent-red-600" />వీడియో అప్‌లోడ్
+                            </label>
+                            <label class="rounded-xl border border-slate-300 p-3 bg-white text-xs font-bold">
+                                <input type="radio" bind:group={videoMode} value="youtube" class="mr-2 accent-red-600" />YouTube లింక్
+                            </label>
                         </div>
-                    </div>
+                        {#if videoMode === 'upload'}
+                            <div class="space-y-2">
+                                <label for="ns-video" class="block text-xs font-bold text-slate-700">MP4 / WebM వీడియో (40 MB లోపు)</label>
+                                <input id="ns-video" type="file" accept="video/mp4,video/webm" on:change={handleVideoSelect} class="w-full rounded-xl border bg-white border-slate-300 p-3 text-xs" />
+                                {#if videoPreview}
+                                    <video controls playsinline preload="metadata" class="rounded-xl w-full max-h-80 bg-black" src={videoPreview}>
+                                        మీ బ్రౌజర్‌లో వీడియో ప్లేబ్యాక్ అందుబాటులో లేదు.
+                                    </video>
+                                {/if}
+                                <p class="text-[11px] text-slate-500">పెద్ద వీడియోలకు YouTube ఉపయోగించండి. మొబైల్ నెట్‌వర్క్‌పై అప్‌లోడ్ మధ్యలో ఆగవచ్చు.</p>
+                            </div>
+                        {:else if videoMode === 'youtube'}
+                            <div class="space-y-2">
+                                <label for="ns-youtube" class="block text-xs font-bold text-slate-700">YouTube వీడియో లింక్</label>
+                                <input id="ns-youtube" type="url" bind:value={youtube_url} placeholder="https://www.youtube.com/watch?v=..." class="w-full rounded-xl border bg-white border-slate-300 p-3 text-sm" />
+                                {#if youtube_url && !getYouTubeEmbedUrl(youtube_url)}
+                                    <p role="alert" class="text-xs font-bold text-red-700">YouTube URL సరిగా లేదు.</p>
+                                {/if}
+                            </div>
+                        {/if}
+                        {#if videoMode !== 'none'}
+                            <input type="text" maxlength="300" bind:value={video_caption} placeholder="వీడియో క్యాప్షన్ / వివరణ (ఐచ్ఛికం)" class="w-full rounded-xl border bg-white border-slate-300 p-3 text-xs sm:text-sm" />
+                        {/if}
+                        <label class="flex items-center gap-2 rounded-xl bg-white p-3 border border-slate-200">
+                            <input type="checkbox" bind:checked={show_in_ticker} class="w-4 h-4 accent-red-600" />
+                            <span class="text-xs sm:text-sm font-bold text-slate-700">వార్తను న్యూస్ టిక్కర్‌లో చూపించు</span>
+                        </label>
+                    </section>
 
                     <button
                         type="submit"
