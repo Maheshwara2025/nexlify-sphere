@@ -3,6 +3,9 @@
   import { supabase } from '$lib/supabaseClient';
   import { readAllRows, dataErrorMessage, projectToday } from '$lib/contractor/data.js';
   import { runFinancialMutation, FINANCIAL_WRITES_ENABLED } from '$lib/contractor/financial-write-gate.js';
+  import { STAGE3_ATOMIC_ENTRIES_ENABLED, createAtomicEntryPoster } from '$lib/contractor/atomic-entry-client.js';
+  const postEntry = createAtomicEntryPoster(supabase);
+  let savingSiteDiary = false;
 
   let dataError = '';
   let mutationError = '';
@@ -84,11 +87,14 @@
   }
 
   async function saveDailyWork() {
+    if (savingSiteDiary) return;
+    savingSiteDiary = true; mutationError = '';
     try {
-      await runFinancialMutation('site-diary', form);
-    } catch (error) {
-      mutationError = dataErrorMessage(error);
-    }
+      await postEntry('site_diary', form);
+      showModal = false;
+      await fetchLogs();
+    } catch (error) { mutationError = dataErrorMessage(error); }
+    finally { savingSiteDiary = false; }
   }
 
   async function deleteLog(id) {
@@ -279,7 +285,7 @@
           <textarea bind:value={form.notes} rows="2" placeholder="ఉదా: పునాది తవ్వకం పూర్తి చేసి బెడ్ కాంక్రీట్ ప్రారంభించాము..." class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2"></textarea>
         </div>
 
-        <button disabled={!FINANCIAL_WRITES_ENABLED} title="భద్రతా ధృవీకరణ పూర్తయ్యే వరకు నమోదు నిలిపివేయబడింది" type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-2xl shadow transition cursor-pointer text-xs">
+        <button disabled={!STAGE3_ATOMIC_ENTRIES_ENABLED || savingSiteDiary} type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-2xl shadow transition cursor-pointer text-xs">
           సైట్ డైరీలో భద్రపరచండి ➔
         </button>
       </form>
