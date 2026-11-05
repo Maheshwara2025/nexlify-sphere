@@ -115,7 +115,24 @@ test('loan and supplier UI uses staged atomic request adapters without legacy on
   assert.match(source, /prepareSupplierSettlementRpc\(/);
   assert.match(source, /prepareLoanRepaymentRpc\(/);
   assert.match(source, /submitStage2AtomicPayment\(supabase, command\)/);
-  assert.match(source, /disabled=\{!FINANCIAL_WRITES_ENABLED \|\| !STAGE2_ATOMIC_PAYMENTS_ENABLED \|\| paymentBusy\}/);
+  assert.match(source, /disabled=\{!STAGE2_ATOMIC_PAYMENTS_ENABLED \|\| paymentBusy\}/);
   assert.doesNotMatch(source, /runFinancialMutation\('loan-repayment'/);
   assert.doesNotMatch(source, /runFinancialMutation\('supplier-payment'/);
+});
+
+
+test('Stage 2 is separately gated; enabling it will not enable legacy expense and labour writes', () => {
+  const adapter = readFileSync(
+    new URL('../src/lib/contractor/atomic-payment-client.js', import.meta.url),
+    'utf8'
+  );
+  const oldGate = readFileSync(
+    new URL('../src/lib/contractor/financial-write-gate.js', import.meta.url),
+    'utf8'
+  );
+  assert.match(adapter, /export const STAGE2_ATOMIC_PAYMENTS_ENABLED = false/);
+  assert.match(adapter, /if \(!STAGE2_ATOMIC_PAYMENTS_ENABLED\)/);
+  assert.doesNotMatch(adapter, /if \(!FINANCIAL_WRITES_ENABLED/);
+  assert.match(oldGate, /export const FINANCIAL_WRITES_ENABLED = false/);
+  assert.match(oldGate, /throw error;/);
 });
