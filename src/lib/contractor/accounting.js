@@ -154,8 +154,17 @@ export function calculateFinancialSummary({
 		if (!settlementKinds.has(kind)) return;
 		const key = `transaction:${recordId(tx, index)}`;
 		const paid = amount(tx.amount, warnings, key);
-		if (!present(tx.obligation_id)) {
-			warn(warnings, 'UNALLOCATED_PAYMENT', 'Payment has no immutable obligation ID.', key);
+		// Stage 2 supplier obligations link to transaction IDs. Stage 3
+		// labour/piecework payments link to their own immutable table IDs,
+		// since obligation_id has a FK to contractor_transactions (not labour).
+		const linkedId =
+			kind === 'supplier_payment'
+				? tx.obligation_id
+				: kind === 'labour_payment'
+					? tx.labour_id
+					: tx.piecework_id;
+		if (!present(linkedId)) {
+			warn(warnings, 'UNALLOCATED_PAYMENT', 'Payment has no verified parent record ID.', key);
 			return;
 		}
 		const target =
@@ -164,7 +173,7 @@ export function calculateFinancialSummary({
 				: kind === 'labour_payment'
 					? labourPayments
 					: pieceworkPayments;
-		const id = String(tx.obligation_id);
+		const id = String(linkedId);
 		target.set(id, add(target.get(id) || 0, paid));
 	});
 
@@ -213,13 +222,16 @@ export function calculateFinancialSummary({
 		}
 		if (settlementKinds.has(kind)) {
 			move(tx.source, paid, -1, key);
-			// Settlements are included once through the obligation below. An orphan
-			// is explicitly flagged rather than silently treated as an expense.
+			// Settlement cash movement happens once; expenses come from linked
+			// supplier obligation or labour/piecework accrual below.
 			const records =
 				kind === 'supplier_payment' ? transactions : kind === 'labour_payment' ? labour : piecework;
+			const linkedId =
+				kind === 'supplier_payment' ? tx.obligation_id
+					: kind === 'labour_payment' ? tx.labour_id : tx.piecework_id;
 			if (
 				!records.some(
-					(record) => present(record.id) && String(record.id) === String(tx.obligation_id)
+					(record) => present(record.id) && String(record.id) === String(linkedId)
 				)
 			) {
 				warn(warnings, 'UNALLOCATED_PAYMENT', 'No matching payable obligation was loaded.', key);
