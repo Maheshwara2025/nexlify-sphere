@@ -2,7 +2,13 @@
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
   import { readAllRows, dataErrorMessage, projectToday } from '$lib/contractor/data.js';
-  import { runFinancialMutation, FINANCIAL_WRITES_ENABLED } from '$lib/contractor/financial-write-gate.js';
+  import { STAGE3_ATOMIC_ENTRIES_ENABLED, createAtomicEntryPoster } from '$lib/contractor/atomic-entry-client.js';
+  const postEntry = createAtomicEntryPoster(supabase);
+  let savingContract = false;
+  let savingPayment = false;
+  let payContract = null;
+  let payAmount = '';
+  let payFunding = 'Cash';
 
   let dataError = '';
   let mutationError = '';
@@ -20,7 +26,8 @@
     length_ft: 100,
     height_ft: 6,
     rate_per_unit: 35, // Rs. 35 per Sft
-    advance_paid: 5000,
+    advance_paid: 0,
+    funding_source: 'Cash',
     notes: 'కాంపౌండ్ వాల్ సెంట్రింగ్ & ప్లేట్స్'
   };
 $: lengthVal = form.length_ft ? Number(form.length_ft) : 0;
@@ -44,8 +51,30 @@ $: lengthVal = form.length_ft ? Number(form.length_ft) : 0;
   }
 
   async function saveContract() {
-    try { await runFinancialMutation('piecework', form); }
-    catch (error) { mutationError=dataErrorMessage(error); }
+    if (savingContract) return;
+    savingContract = true; mutationError = '';
+    try {
+      await postEntry('piecework', form);
+      showModal = false;
+      await fetchContracts();
+    } catch (error) { mutationError=dataErrorMessage(error); }
+    finally { savingContract = false; }
+  }
+
+  async function settlePiecework() {
+    if (!payContract || savingPayment) return;
+    savingPayment = true; mutationError = '';
+    try {
+      await postEntry('piecework_payment', {
+        piecework_id: payContract.id,
+        amount: payAmount,
+        funding_source: payFunding,
+        date: projectToday()
+      });
+      payContract = null;
+      await fetchContracts();
+    } catch (error) { mutationError=dataErrorMessage(error); }
+    finally { savingPayment = false; }
   }
 </script>
 
@@ -96,6 +125,7 @@ $: lengthVal = form.length_ft ? Number(form.length_ft) : 0;
                 <th class="p-3 text-right">మొత్తం కాంట్రాక్ట్ (₹)</th>
                 <th class="p-3 text-right">అడ్వాన్స్ (₹)</th>
                 <th class="p-3 text-right font-black text-rose-300">మిగిలిన బాకీ (₹)</th>
+                <th class="p-3">Payment</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100 font-medium">
@@ -110,6 +140,13 @@ $: lengthVal = form.length_ft ? Number(form.length_ft) : 0;
                   <td class="p-3 text-right font-mono font-bold">₹ {Number(c.total_amount).toLocaleString('en-IN')}</td>
                   <td class="p-3 text-right font-mono text-emerald-700">₹ {Number(c.advance_paid || 0).toLocaleString('en-IN')}</td>
                   <td class="p-3 text-right font-mono font-black text-rose-600">₹ {Number(c.balance_due).toLocaleString('en-IN')}</td>
+                  <td class="p-3">
+                    <button type="button" disabled={Number(c.balance_due || 0) <= 0}
+                      on:click={() => { payContract = c; payAmount = ''; payFunding = 'Cash'; }}
+                      class="rounded bg-emerald-50 px-2 py-1 font-bold text-emerald-800 disabled:opacity-40">
+                      చెల్లింపు
+                    </button>
+                  </td>
                 </tr>
               {/each}
             </tbody>
@@ -186,11 +223,18 @@ $: lengthVal = form.length_ft ? Number(form.length_ft) : 0;
 
         <div>
           <label class="block font-bold text-slate-700 mb-1">ఇచ్చిన అడ్వాన్స్ (Advance ₹)</label>
-          <input type="number" bind:value={form.advance_paid} class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-mono font-bold text-emerald-700" />
+          <input type="number" min="0" step="0.01" bind:value={form.advance_paid} class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-mono font-bold text-emerald-700" />
           <span class="text-[10px] text-slate-400 block mt-0.5">మిగిలిన బాకీ: ₹ {balanceDue.toLocaleString('en-IN')}</span>
+          {#if Number(form.advance_paid || 0) > 0}
+            <label class="mt-2 block text-xs font-bold">అడ్వాన్స్ చెల్లింపు ఖాతా
+              <select bind:value={form.funding_source} class="mt-1 w-full rounded-lg border p-2">
+                <option value="Cash">Cash</option><option value="Bank">Bank</option><option value="UPI">UPI</option>
+              </select>
+            </label>
+          {/if}
         </div>
 
-        <button disabled={!FINANCIAL_WRITES_ENABLED} type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-2xl shadow transition cursor-pointer">
+        <button disabled={!STAGE3_ATOMIC_ENTRIES_ENABLED || savingContract} type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-2xl shadow transition cursor-pointer">
           సేవ్ చేయండి & లెడ్జర్‌లో నమోదు చేయండి ➔
         </button>
       </form>
@@ -198,4 +242,31 @@ $: lengthVal = form.length_ft ? Number(form.length_ft) : 0;
   </div>
 {/if}
 
+{/if}
+
+
+{#if payContract}
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3">
+    <div class="w-full max-w-sm space-y-4 rounded-2xl bg-white p-5 text-slate-900">
+      <div class="flex justify-between font-black"><span>పీస్‌వర్క్ చెల్లింపు — {payContract.contractor_name}</span>
+        <button type="button" on:click={() => payContract=null}>✕</button>
+      </div>
+      <p class="text-xs text-slate-500">Contract #{payContract.id} · బాకీ ₹{payContract.balance_due}</p>
+      <form class="space-y-3" on:submit|preventDefault={settlePiecework}>
+        <label class="block text-xs font-bold">మొత్తం ₹
+          <input type="number" min="0.01" step="0.01" required bind:value={payAmount}
+            class="mt-1 w-full rounded-lg border p-2" />
+        </label>
+        <label class="block text-xs font-bold">Payment Account
+          <select bind:value={payFunding} class="mt-1 w-full rounded-lg border p-2">
+            <option value="Cash">Cash</option><option value="Bank">Bank</option><option value="UPI">UPI</option>
+          </select>
+        </label>
+        <button disabled={!STAGE3_ATOMIC_ENTRIES_ENABLED || savingPayment} type="submit"
+          class="w-full rounded-lg bg-emerald-700 p-3 font-black text-white disabled:opacity-50">
+          {savingPayment ? 'Saving...' : 'Atomic Payment Save'}
+        </button>
+      </form>
+    </div>
+  </div>
 {/if}
