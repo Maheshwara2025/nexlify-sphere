@@ -296,7 +296,7 @@
         {paymentKind === 'supplier' ? paymentTarget.recipient : paymentTarget.lender_name}
         · Ref #{paymentTarget.id}
       </p>
-      {#if !FINANCIAL_WRITES_ENABLED || !STAGE2_ATOMIC_PAYMENTS_ENABLED}
+      {#if !STAGE2_ATOMIC_PAYMENTS_ENABLED}
         <p role="status" class="mb-4 rounded-lg border border-amber-400 bg-amber-50 p-3 text-xs text-amber-900">
           ఈ చెల్లింపు ఫారమ్ సిద్ధంగా ఉంది. Server-side Atomic Payment Approval వరకు Save నిలిపివేయబడింది.
         </p>
@@ -330,7 +330,7 @@
         <label class="block font-bold">వివరాలు
           <input class="mt-1 w-full rounded-lg border p-2" type="text" maxlength="2000" bind:value={paymentDraft.notes} />
         </label>
-        <button type="submit" disabled={!FINANCIAL_WRITES_ENABLED || !STAGE2_ATOMIC_PAYMENTS_ENABLED || paymentBusy}
+        <button type="submit" disabled={!STAGE2_ATOMIC_PAYMENTS_ENABLED || paymentBusy}
           class="w-full rounded-xl bg-emerald-700 p-3 font-black text-white disabled:cursor-not-allowed disabled:opacity-50">
           {paymentBusy ? 'సేవ్ అవుతోంది...' : 'Atomic Payment Save'}
         </button>
