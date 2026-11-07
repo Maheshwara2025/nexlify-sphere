@@ -19,6 +19,14 @@
   let profiles = [];
   let loading = true;
   let showAttendanceModal = false;
+  let editRow = null;
+  let editSaving = false;
+  let editError = '';
+  let editSuccess = '';
+  let editForm = { date: '', work_task: '', days: 1, daily_rate: 800, reason: '' };
+  $: editDateConflict = editRow && labourRecords.find(row =>
+    row.id !== editRow.id && row.worker_id === editRow.worker_id && row.date === editForm.date
+  ) || null;
   let attendanceWarning = '';
   let attendanceSaveError = '';
 
@@ -108,6 +116,10 @@
   async function addAttendance() {
     if (savingAttendance) return;
     attendanceSaveError = '';
+    if (form.date > projectToday()) {
+      attendanceSaveError = 'భవిష్యత్తు తేదీకి హాజరు నమోదు చేయలేరు. తేదీని సరిచూడండి.';
+      return;
+    }
     if (!form.worker_id || !form.date) {
       attendanceSaveError = 'తేదీ మరియు కార్మికుడిని ఎంచుకోండి.';
       return;
@@ -142,6 +154,67 @@
     } finally { savingAttendance = false; }
   }
 
+  function openEditAttendance(row) {
+    editRow = {...row};
+    editForm = {
+      date: row.date,
+      work_task: row.work_task || '',
+      days: Number(row.days || 1),
+      daily_rate: Number(row.daily_rate || 0),
+      reason: ''
+    };
+    editError = '';
+    editSuccess = '';
+  }
+
+  async function saveAttendanceEdit() {
+    if (!editRow || editSaving) return;
+    editError = '';
+    if (!editForm.date || editForm.date > projectToday()) {
+      editError = 'భవిష్యత్తు తేదీకి హాజరు నమోదు చేయలేరు. అసలు పని తేదీని ఎంచుకోండి.';
+      return;
+    }
+    if (editDateConflict) {
+      editError = 'ఈ కార్మికుడికి ఎంచుకున్న తేదీన హాజరు ఇప్పటికే ఉంది (Already Entered).';
+      return;
+    }
+    if (!editForm.reason.trim() || editForm.reason.trim().length < 5) {
+      editError = 'సవరణ ఎందుకు చేస్తున్నారో కారణం నమోదు చేయండి.';
+      return;
+    }
+    editSaving = true;
+    try {
+      const {data, error} = await supabase.rpc('contractor_edit_attendance_v1', {
+        p_attendance_id: editRow.id,
+        p_patch: {
+          date: editForm.date, work_task: editForm.work_task.trim(),
+          days: Number(editForm.days), daily_rate: Number(editForm.daily_rate)
+        },
+        p_expected: {
+          date: editRow.date, work_task: editRow.work_task,
+          days: Number(editRow.days), daily_rate: Number(editRow.daily_rate)
+        },
+        p_reason: editForm.reason.trim()
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error('Database సవరణ నిర్ధారించలేదు.');
+      editRow = null;
+      await fetchAll();
+      editSuccess = 'హాజరు సవరణ పూర్తయింది. పాత–కొత్త వివరాలు Audit Historyలో భద్రపరచబడ్డాయి.';
+    } catch (error) {
+      const message = error?.message || '';
+      if (error?.code === '23505' || /contractor_labour_worker_date_unique|duplicate key/i.test(message))
+        editError = 'ఈ కార్మికుడికి ఎంచుకున్న తేదీన హాజరు ఇప్పటికే ఉంది (Already Entered).';
+      else if (/FUTURE_ATTENDANCE_NOT_ALLOWED/.test(message))
+        editError = 'భవిష్యత్తు తేదీకి హాజరు నమోదు చేయలేరు.';
+      else if (/ATTENDANCE_HAS_PAYMENTS/.test(message))
+        editError = 'ఈ హాజరుకు చెల్లింపు/అడ్వాన్స్ ఉంది. నేరుగా మార్చలేరు; లెక్కలు పరిశీలించాలి.';
+      else editError = dataErrorMessage(error);
+    } finally {
+      editSaving = false;
+    }
+  }
+
   async function saveLabourPayment() {
     if (!paymentRow || savingPayment) return;
     savingPayment = true; mutationError = '';
@@ -170,6 +243,9 @@
 </svelte:head>
 {#if dataError}
   <div role="alert" class="m-4 rounded-xl border border-rose-300 bg-rose-50 p-4 text-sm text-rose-900">{dataError} <button type="button" on:click={fetchAll} class="ml-3 font-bold underline">మళ్లీ ప్రయత్నించండి</button></div>
+{/if}
+{#if editSuccess}
+  <p role="status" class="m-4 rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900">{editSuccess}</p>
 {/if}
 {#if mutationError}
   <p role="alert" class="m-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">{mutationError}</p>
@@ -223,7 +299,7 @@
     <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
       <div class="p-3 bg-slate-900 text-white flex justify-between items-center text-xs font-bold">
         <span>📜 రోజువారీ లేబర్ హాజరు & వారు చేసిన పని రికార్డులు</span>
-        <span class="text-amber-300 font-mono">మొత్తం రికార్డులు: {labourRecords.length}</span>
+        <span class="text-amber-300 font-mono">మొత్తం: {labourRecords.length} · <span class="text-rose-300">భవిష్యత్తు తేదీలు: {labourRecords.filter(row => row.date > projectToday()).length}</span></span>
       </div>
 
       {#if loading}
@@ -252,7 +328,12 @@
                 {@const totalEarned = (l.days ? Number(l.days) : 1) * (l.daily_rate ? Number(l.daily_rate) : 0)}
                 {@const balanceDue = totalEarned - (l.advance_paid ? Number(l.advance_paid) : 0)}
                 <tr class="hover:bg-slate-50 transition">
-                  <td class="p-3 font-mono text-slate-500">{l.date}</td>
+                  <td class="p-3 font-mono text-slate-500">
+                    {l.date}
+                    {#if l.date > projectToday()}
+                      <span class="mt-1 block whitespace-nowrap rounded bg-rose-50 px-2 py-1 text-[10px] font-bold text-rose-700">⚠️ భవిష్యత్తు తేదీ — సవరించండి</span>
+                    {/if}
+                  </td>
                   <td class="p-3">
                     <span class="font-mono text-[10px] bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-bold mr-1">{l.worker_id || 'LBR'}</span>
                     <strong class="text-slate-900">{l.worker_name}</strong>
@@ -264,7 +345,9 @@
                   <td class="p-3 text-right font-mono font-bold">₹ {totalEarned.toLocaleString('en-IN')}</td>
                   <td class="p-3 text-right font-mono text-emerald-700">₹ {Number(l.advance_paid || 0).toLocaleString('en-IN')}</td>
                   <td class="p-3 text-right font-mono font-black text-rose-600">₹ {balanceDue.toLocaleString('en-IN')}</td>
-                  <td class="p-3 text-center">
+                  <td class="p-3 text-center whitespace-nowrap">
+                    <button type="button" on:click={() => openEditAttendance(l)}
+                      class="mr-2 rounded bg-blue-50 px-2 py-1 text-xs font-bold text-blue-800" aria-label="{l.worker_name} హాజరు సవరించండి">✎ సవరించు</button>
                     <button on:click={() => { paymentRow = l; paymentAmount = ''; paymentFunding = 'Cash'; }}
                     class="mr-2 rounded bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-800">చెల్లింపు</button>
                   <button disabled={!FINANCIAL_WRITES_ENABLED} on:click={() => deleteLabour(l.id)} class="text-rose-500 font-bold hover:text-rose-700">✕</button>
@@ -352,7 +435,8 @@
         {/if}
         <div>
           <label class="block font-bold text-slate-700 mb-1">పని తేదీ *</label>
-          <input type="date" bind:value={form.date} required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-mono font-bold" />
+          <input type="date" bind:value={form.date} max={projectToday()} required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-mono font-bold" />
+          <p class="mt-1 text-[11px] text-slate-500">ఈరోజు లేదా గత తేదీ మాత్రమే. తేదీని సేవ్ చేసే ముందు సరిచూసుకోండి.</p>
         </div>
 
         <!-- RELIABLE SELECT DROPDOWN INSTEAD OF DATALIST -->
@@ -425,6 +509,77 @@
 {/if}
 {/if}
 
+
+<!-- Modal 3: Audited daily attendance correction -->
+{#if editRow}
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3">
+    <div class="w-full max-w-md max-h-[92vh] overflow-y-auto space-y-4 rounded-2xl bg-white p-5 text-slate-900 shadow-xl">
+      <div class="flex items-start justify-between gap-2 border-b pb-3">
+        <div>
+          <h3 class="font-black text-base">✎ హాజరు సవరించండి (Edit Attendance)</h3>
+          <p class="mt-1 text-xs text-slate-600">{editRow.worker_name} · {editRow.worker_id} · Record #{editRow.id}</p>
+        </div>
+        <button type="button" on:click={() => { editRow = null; editError = ''; }} class="rounded-lg px-2 py-1 text-slate-600" aria-label="మూసివేయండి">✕</button>
+      </div>
+      <div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
+        <strong>ముందుగా నమోదైన తేదీ: {editRow.date}</strong>
+        {#if editRow.date > projectToday()}
+          <p class="mt-1 font-bold text-red-700">⚠️ డిసెంబర్ వంటి భవిష్యత్తు తేదీ నమోదైంది. అసలు పని జరిగిన తేదీని ఎంచుకోండి.</p>
+        {/if}
+        <p class="mt-1">సవరణ పూర్తయిన తర్వాత పాత/కొత్త వివరాలు Auditలో నిల్వ ఉంటాయి. Worker ID మార్చలేరు.</p>
+      </div>
+      {#if editError}
+        <p role="alert" class="rounded-xl border border-red-300 bg-red-50 p-3 text-sm font-bold text-red-800">{editError}</p>
+      {/if}
+      {#if editDateConflict}
+        <p role="alert" class="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-950">
+          ఈ కార్మికుడికి ఎంచుకున్న తేదీన హాజరు ఇప్పటికే నమోదైంది (Already Entered).
+        </p>
+      {/if}
+      <form class="space-y-3" on:submit|preventDefault={saveAttendanceEdit}>
+        <label class="block text-xs font-bold text-slate-700">సరైన పని తేదీ *
+          <input type="date" bind:value={editForm.date} min="2000-01-01" max={projectToday()} required
+            class="mt-1 w-full rounded-xl border border-slate-300 p-3 font-mono text-sm" />
+        </label>
+        <p class="text-[11px] text-slate-500">ఎంచుకున్న తేదీ (YYYY-MM-DD): {editForm.date || '—'} · ఈరోజు దాటకూడదు.</p>
+        <label class="block text-xs font-bold text-slate-700">చేసిన పని *
+          <input type="text" bind:value={editForm.work_task} maxlength="500" required
+            class="mt-1 w-full rounded-xl border border-slate-300 p-3 text-sm" />
+        </label>
+        <div class="grid grid-cols-2 gap-3">
+          <label class="block text-xs font-bold text-slate-700">పనిచేసిన రోజులు *
+            <input type="number" bind:value={editForm.days} min="0.5" max="31" step="0.5" required
+              class="mt-1 w-full rounded-xl border border-slate-300 p-3 text-sm" />
+          </label>
+          <label class="block text-xs font-bold text-slate-700">రోజువారీ రేటు (₹) *
+            <input type="number" bind:value={editForm.daily_rate} min="0.01" step="0.01" required
+              class="mt-1 w-full rounded-xl border border-slate-300 p-3 text-sm" />
+          </label>
+        </div>
+        <label class="block text-xs font-bold text-slate-700">సవరణకు కారణం *
+          <textarea bind:value={editForm.reason} minlength="5" maxlength="400" required rows="2"
+            placeholder="ఉదా: తేదీ పొరపాటున డిసెంబర్‌గా నమోదైంది"
+            class="mt-1 w-full rounded-xl border border-slate-300 p-3 text-sm"></textarea>
+        </label>
+        <p class="rounded-lg bg-slate-100 p-3 text-xs text-slate-700">
+          సవరించిన వేతనం: ₹{(Number(editForm.days || 0) * Number(editForm.daily_rate || 0)).toLocaleString('en-IN')}
+        </p>
+        <div class="flex gap-2">
+          <button type="button" on:click={() => { editRow = null; editError = ''; }}
+            class="flex-1 rounded-xl border border-slate-300 px-3 py-3 font-bold">రద్దు</button>
+          <button type="submit"
+            disabled={editSaving || !!editDateConflict || !editForm.date || editForm.date > projectToday() || Number(editRow.advance_paid || 0) > 0}
+            class="flex-1 rounded-xl bg-indigo-700 px-3 py-3 font-black text-white disabled:cursor-not-allowed disabled:opacity-50">
+            {editSaving ? 'సేవ్ అవుతోంది…' : 'సవరణ సేవ్ చేయండి'}
+          </button>
+        </div>
+        {#if Number(editRow.advance_paid || 0) > 0}
+          <p class="text-xs font-bold text-red-700">ఈ హాజరుకు Advance ఉంది. లెక్కలు పరిశీలించే వరకు సవరించలేరు.</p>
+        {/if}
+      </form>
+    </div>
+  </div>
+{/if}
 
 {#if paymentRow}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3">
