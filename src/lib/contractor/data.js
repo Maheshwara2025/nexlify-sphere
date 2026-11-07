@@ -1,5 +1,5 @@
 /** Read complete, checked pages. Never display a silently truncated financial report. */
-export const CONTRACTOR_TABLES = Object.freeze(['contractor_transactions','contractor_loans','contractor_labour_profiles','contractor_piecework','contractor_mbook','contractor_daily_works','contractor_labour','contractor_materials','contractor_parties']);
+export const CONTRACTOR_TABLES = Object.freeze(['contractor_transactions','contractor_loans','contractor_labour_profiles','contractor_piecework','contractor_mbook','contractor_daily_works','contractor_labour','contractor_materials','contractor_parties','contractor_purchase_bills','contractor_purchase_bill_items','contractor_material_stock_usage']);
 /** @param {import('@supabase/supabase-js').SupabaseClient} client @param {string} table @param {{orderBy?:string,ascending?:boolean,maxRows?:number}} [options] */
 export async function readAllRows(client, table, options = {}) {
   if (!CONTRACTOR_TABLES.includes(table)) throw new Error('తెలియని డేటా విభాగం.');
