@@ -121,9 +121,24 @@
         <p class="text-xs text-slate-500">సిమెంట్, ఇసుక, స్టీల్ పరిమాణం, ధర, కిరాయి & ట్రేడర్ సంప్రదింపుల వివరాలు</p>
       </div>
 
-      <button on:click={() => showModal = true} class="bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black px-3.5 py-2 rounded-xl shadow transition cursor-pointer">
-        ➕ మెటీరియల్ కొనుగోలు నమోదు
-      </button>
+      <div class="flex flex-wrap gap-2">
+        <a href="/admin/contractor/materials/multi" class="rounded-xl bg-amber-500 px-3.5 py-2.5 text-xs font-black text-slate-950 shadow hover:bg-amber-600">
+          🧾 కొత్త Multi-Item Bill
+        </a>
+        <a href="/admin/contractor/materials/suppliers" class="rounded-xl bg-indigo-700 px-3.5 py-2.5 text-xs font-black text-white shadow">
+          🏪 Supplier Bill 360° & Stock
+        </a>
+        <button on:click={() => showModal = true} class="rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-xs font-black text-slate-700">
+          పాత Single-Item Entry
+        </button>
+      </div>
+    </div>
+
+    <div class="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-xs text-indigo-900">
+      <strong>కొత్త సౌకర్యం:</strong> సిమెంట్, 6mm/8mm/10mm/12mm Steel Rods, Binding Wire మొదలైనవి ఒకే బిల్లులో నమోదు చేయడానికి
+      <a class="font-black underline" href="/admin/contractor/materials/multi">Multi-Item Bill</a> ఉపయోగించండి.
+      సైజుల వారీ స్టాక్ కోసం <a class="font-black underline" href="/admin/contractor/materials/suppliers">Supplier Bill 360°</a> తెరవండి.
+      ఈ పేజీలోని పాత Single-Item Summaryలో కొత్త Multi-Item Bill వివరాలు విడిగా చూపించబడవు.
     </div>
 
     <!-- Live Stock Totals Summary Strip -->
