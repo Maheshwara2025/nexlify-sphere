@@ -396,6 +396,7 @@
   <span>🏗️</span>
   <span>Contractor 360°</span>
 </a>
+<a href="/admin/news/magnet" class="bg-violet-700 hover:bg-violet-800 text-white text-xs px-3 py-1.5 rounded-xl font-black shadow">✨ Magnet News</a>
 <a href="/admin/card-maker"
   class="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white text-xs px-3 py-1.5 rounded-xl font-black transition shadow flex items-center gap-1.5"
 >
