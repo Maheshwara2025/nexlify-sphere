@@ -1,3 +1,5 @@
+/** @typedef {{title:string, description:string}} MagnetPoint */
+/** @typedef {{headline:string, points:MagnetPoint[], body:string, ending_line?:string, location_town?:string}} MagnetDraft */
 /** NS Magnet News: conservative formatting, never invent facts or rewrite copy. */
 export const MAGNET_THEMES = [
   { key:'crimson', name:'Crimson Gold', primary:'#b91c1c', highlight:'#ffd24d', dark:'#3b0a16' },
@@ -17,32 +19,40 @@ export const IMPACT_COLORS = [
 ];
 export const MAGNET_DEFAULT_ENDING = 'మరిన్ని వార్తల కోసం NS NEWS ను అనుసరించండి.';
 
+/** @param {unknown} s */
 const strip = (s) => String(s || '').replace(/&#x20;|&nbsp;/gi,' ').replace(/[\u200b-\u200d\uFEFF]/g,'').trim();
+/** @param {unknown} text */
 export function newsWordCount(text) {
   return strip(text).split(/\s+/u).filter(Boolean).length;
 }
+/** @param {unknown} text */
 export function shortenCardText(text, limit=95) {
   const value = strip(text);
   if (value.length <= limit) return value;
   return value.slice(0,limit).replace(/\s+\S*$/u,'').trimEnd() + '…';
 }
+/** @param {string} key @param {string} headline */
 export function magnetTheme(key, headline='') {
   return MAGNET_THEMES.find(x=>x.key===key) || MAGNET_THEMES[hashText(headline)%MAGNET_THEMES.length];
 }
+/** @param {string} text */
 function hashText(text) {
   let hash=0;
-  for (const char of String(text || '')) hash = (Math.imul(hash,31)+char.codePointAt(0))>>>0;
+  for (const char of String(text || '')) hash = (Math.imul(hash,31)+(char.codePointAt(0) ?? 0))>>>0;
   return hash;
 }
+/** @param {number} index @param {string} headline */
 export function impactColor(index, headline='') {
   return IMPACT_COLORS[(index + hashText(headline)%IMPACT_COLORS.length)%IMPACT_COLORS.length];
 }
+/** @param {string} headline */
 export function splitHighlight(headline) {
   const words=strip(headline).split(/\s+/u).filter(Boolean);
   if (words.length<3) return [headline,''];
   const start=Math.max(0,Math.floor(words.length/2)-1);
   return [words.slice(0,start).join(' '), words.slice(start,start+2).join(' '), words.slice(start+2).join(' ')];
 }
+/** @param {string} raw @returns {MagnetPoint} */
 function parsePoint(raw) {
   const line = strip(raw).replace(/^[-*•]\s+/u,'');
   let match=line.match(/^\*\*([^*]+)\*\*\s*[:：–-]?\s*(.*)$/u);
@@ -51,6 +61,7 @@ function parsePoint(raw) {
   if (match) return {title:strip(match[1]),description:strip(match[2])};
   return {title:strip(line.replace(/\*\*/g,'')),description:''};
 }
+/** @param {string} line */
 function cleanLine(line) {
   return strip(line).replace(/^(?:>\s*)?#+\s*/u,'').trim();
 }
@@ -58,6 +69,7 @@ function cleanLine(line) {
  * Parse first heading, exactly six bullet candidates and remaining paragraphs.
  * Keep invalid/unrecognized source text for editorial review; do not fabricate bullets.
  */
+/** @param {string} input @returns {{headline:string,points:MagnetPoint[],body:string,ending_line:string,wordCount:number,warnings:string[]}} */
 export function parseMagnetNews(input) {
   const normalized=String(input||'').replace(/\r\n?/g,'\n').replace(/&#x20;|&nbsp;/gi,' ');
   const lines=normalized.split('\n').map(cleanLine).filter(line=>
@@ -66,6 +78,7 @@ export function parseMagnetNews(input) {
   );
   if (!lines.length) return {headline:'',points:[],body:'',ending_line:MAGNET_DEFAULT_ENDING,wordCount:0, warnings:['వార్తను నమోదు చేయండి.']};
   const headline=strip(lines[0].replace(/^\*\*(.*?)\*\*$/u,'$1').replace(/^[*#]+/u,'').replace(/[*#]+$/u,''));
+  /** @type {MagnetPoint[]} */
   const points=[];
   const bodyParts=[];
   for (const line of lines.slice(1)) {
@@ -86,6 +99,7 @@ export function parseMagnetNews(input) {
   if(points.some(p=>!p.title)) warnings.push('ప్రతి పాయింట్‌కు శీర్షిక ఉండాలి.');
   return {headline,points,body,ending_line:MAGNET_DEFAULT_ENDING,wordCount,warnings};
 }
+/** @param {MagnetDraft} draft @param {boolean} hasPhoto */
 export function validateMagnetNews(draft, hasPhoto=false) {
   const errors=[];
   if(!draft?.headline?.trim()) errors.push('Headline అవసరం.');
@@ -95,6 +109,7 @@ export function validateMagnetNews(draft, hasPhoto=false) {
   if(!hasPhoto) errors.push('Photo Upload తప్పనిసరి.');
   return errors;
 }
+/** @param {MagnetDraft} article @param {string} url */
 export function magnetShareText(article, url) {
   const headline=strip(article?.headline);
   const location=strip(article?.location_town);
