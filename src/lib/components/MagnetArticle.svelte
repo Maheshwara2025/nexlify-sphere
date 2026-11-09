@@ -1,9 +1,10 @@
 <script>
-  import { impactColor, magnetTheme, shortenCardText } from '$lib/magnetNews.js';
+  import { impactColor, magnetTheme, shortenCardText, splitHighlight } from '$lib/magnetNews.js';
   export let article;
   export let card = false;
   $: theme = magnetTheme(article?.theme_key,article?.headline);
   $: points = Array.isArray(article?.points) ? article.points : [];
+  $: headingParts = splitHighlight(article?.headline || '');
   $: location = article?.location_town || 'తెలంగాణ';
   $: photo = article?.image_url || article?.preview_url || '';
 </script>
@@ -23,7 +24,7 @@
     </div>
     <div class="hero-bottom">
       <div class="eyebrow">{location} • NS NEWS</div>
-      <h1>{article?.headline || 'మీ ప్రధాన శీర్షిక ఇక్కడ కనిపిస్తుంది'}</h1>
+      <h1>{headingParts[0] || 'మీ ప్రధాన శీర్షిక ఇక్కడ కనిపిస్తుంది'} <span class="highlight">{headingParts[1] || ''}</span> {headingParts[2] || ''}</h1>
     </div>
   </div>
 
@@ -67,6 +68,7 @@
   .hero-bottom {position:absolute; z-index:2; bottom:22px; left:25px; right:25px;}
   .eyebrow {color:#ffdf67; font-size:12px; font-weight:800; margin-bottom:10px;}
   h1 {color:#fff; font-size:clamp(26px,3.3vw,42px); font-weight:900; line-height:1.48; text-shadow:0 2px 9px #0009; margin:0;}
+  .highlight {color:var(--magnet-highlight);}
   .content {padding:24px clamp(14px,3vw,30px);}
   .strips {display:grid; grid-template-columns:1fr; gap:11px;}
   .strip {display:flex; align-items:flex-start; gap:12px; background:var(--strip-bg); border-left:4px solid var(--strip); border-radius:13px; padding:13px 15px; min-width:0; }
