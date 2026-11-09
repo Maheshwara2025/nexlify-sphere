@@ -85,14 +85,14 @@
   .sharecard .hero {height:214px;}
   .sharecard .hero-top {top:13px; left:15px; right:15px;}
   .sharecard .hero-bottom {left:21px; right:21px; bottom:15px;}
-  .sharecard h1 {font-size:27px; line-height:1.42; display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical; overflow:hidden;}
+  .sharecard h1 {font-size:27px; line-height:1.42; display:-webkit-box;-webkit-line-clamp:3;line-clamp:3;-webkit-box-orient:vertical; overflow:hidden;}
   .sharecard .eyebrow {font-size:10px; margin-bottom:6px;}
   .sharecard .content {padding:12px 17px;}
   .sharecard .strips {gap:6px;}
   .sharecard .strip {height:62px; min-height:62px; padding:7px 9px; gap:9px; border-radius:9px;}
   .sharecard .number {width:28px; height:28px; flex-basis:28px; font-size:10px; border-radius:7px;}
   .sharecard h2 {font-size:13px; line-height:1.3; margin-bottom:2px;}
-  .sharecard .strip p {font-size:11px; line-height:1.45; display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical; overflow:hidden;}
+  .sharecard .strip p {font-size:11px; line-height:1.45; display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical; overflow:hidden;}
   .sharecard .closing {padding:6px 9px; font-size:10px; margin:8px 0 6px; line-height:1.3;}
   .sharecard footer {padding-top:7px; font-size:9px;}
   @media (max-width:640px) {
