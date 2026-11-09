@@ -46,7 +46,11 @@
   function autoFormat() {
     const result = parseMagnetNews(rawInput);
     draft = {headline:result.headline, points:result.points, body:result.body, ending_line:result.ending_line};
-    status = result.warnings.length ? result.warnings.join(' | ') : 'వార్త ఫార్మాటింగ్ పూర్తయింది. Preview పరిశీలించండి.';
+    status = result.warnings.length
+      ? result.warnings.join(' | ')
+      : result.recognitionMode === 'paragraphs' || result.recognitionMode === 'lines'
+        ? '✅ 6 రంగుల Impact Points ఆటోమేటిక్‌గా గుర్తించాం! విభజనను Previewలో పరిశీలించండి.'
+        : '✅ 6 రంగుల Impact Points సిద్ధమయ్యాయి. Preview పరిశీలించండి.';
     savedId = null; savedSlug = ''; savedUrl = '';
     previewTab='article';
   }
