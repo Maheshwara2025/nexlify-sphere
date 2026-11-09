@@ -1,3 +1,4 @@
+// @ts-nocheck -- Node test environment typings are not part of Svelte's jsconfig.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
