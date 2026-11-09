@@ -227,7 +227,7 @@
     <label class="block text-xs font-bold">చెల్లింపు మొత్తం ₹
      <input type="number" step="0.01" min="0.01" max={payBill.obligation.balance} bind:value={payAmount} required class="mt-1 w-full rounded-lg border p-3"/>
     </label>
-    <label class="block text-xs font-bold">చెల్లింపు తేదీ
+    <label class="block text-xs font-bold">Payment Date / చెల్లింపు తేదీ
      <input type="date" max={projectToday()} bind:value={payDate} required class="mt-1 w-full rounded-lg border p-3"/>
     </label>
     <label class="block text-xs font-bold">Payment Mode
