@@ -24,6 +24,7 @@
   let paymentTarget = null;
   let paymentBusy = false;
   let paymentDraft = {};
+  let paymentSuccess = '';
 
 
   let loanForm = {
@@ -89,7 +90,7 @@
     paymentKind = 'supplier';
     paymentTarget = bill;
     paymentDraft = {
-      amount: '',
+      amount: String(bill.balance || bill.amount),
       materialId: bill.material_id == null ? '' : String(bill.material_id),
       fundingSource: 'Bank',
       date: projectToday(),
@@ -101,6 +102,15 @@
   async function submitStage2Payment() {
     mutationError = '';
     if (!paymentKind || !paymentTarget || paymentBusy) return;
+    if (!paymentDraft.date || paymentDraft.date > projectToday()) {
+      mutationError = 'నిజంగా చెల్లించిన తేదీని ఎంచుకోండి; భవిష్యత్తు తేదీ వద్దు.';
+      return;
+    }
+    if(paymentKind==='supplier' && (Number(paymentDraft.amount)<=0 ||
+       Number(paymentDraft.amount)>Number(paymentTarget.balance||0))){
+      mutationError='Supplier బాకీ కన్నా ఎక్కువ మొత్తం ఇవ్వలేరు.';
+      return;
+    }
     paymentBusy = true;
     try {
       const command = paymentKind === 'supplier'
@@ -122,7 +132,9 @@
             idempotencyKey: paymentDraft.idempotencyKey,
             notes: paymentDraft.notes
           });
-      await submitStage2AtomicPayment(supabase, command);
+      const confirmation = await submitStage2AtomicPayment(supabase, command);
+      paymentSuccess = (paymentKind==='supplier' ? 'Supplier Payment' : 'Loan Repayment') +
+        ' విజయవంతంగా నమోదైంది · Voucher: ' + String(confirmation.voucher_no || confirmation.payment_tx_id || confirmation.repayment_id || 'Saved');
       paymentKind = null;
       paymentTarget = null;
       await fetchLoansAndDues();
@@ -139,6 +151,9 @@
 </svelte:head>
 {#if dataError}
   <div role="alert" class="m-4 rounded-xl border border-rose-300 bg-rose-50 p-4 text-sm text-rose-900">{dataError} <button type="button" on:click={fetchLoansAndDues} class="ml-3 font-bold underline">మళ్లీ ప్రయత్నించండి</button></div>
+{/if}
+{#if paymentSuccess}
+  <p role="status" class="m-4 rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-900">{paymentSuccess}</p>
 {/if}
 {#if mutationError}
   <p role="alert" class="m-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">{mutationError}</p>
@@ -238,7 +253,7 @@
                   <td class="p-2.5 font-bold text-slate-900">{b.recipient}</td>
                   <td class="p-2.5 text-slate-700">{b.description}</td>
                   <td class="p-2.5 text-right font-mono">₹ {Number(b.amount).toLocaleString('en-IN')}</td>
-                  <td class="p-2.5 text-right font-mono font-black text-rose-600">₹ {Number(b.balance || b.amount).toLocaleString('en-IN')}</td>
+                  <td class="p-2.5 text-right font-mono font-black text-rose-600">₹ {Number(b.balance ?? b.amount).toLocaleString('en-IN')}</td>
                   <td class="p-2.5 text-center">
                     <button on:click={() => openSupplierSettlement(b)} class="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded-lg text-[10.5px] font-bold shadow">
                       చెల్లింపు నమోదు
@@ -324,11 +339,12 @@
       <form class="space-y-3 text-xs" on:submit|preventDefault={submitStage2Payment}>
         {#if paymentKind === 'supplier'}
           <label class="block font-bold">చెల్లించవలసిన మొత్తం (₹)
-            <input class="mt-1 w-full rounded-lg border p-2" type="number" min="0.01" step="0.01" required bind:value={paymentDraft.amount} />
+            <input class="mt-1 w-full rounded-lg border p-2" type="number" min="0.01" max={paymentTarget.balance} step="0.01" required bind:value={paymentDraft.amount} />
           </label>
-          <label class="block font-bold">Verified Material ID (if linked)
-            <input class="mt-1 w-full rounded-lg border p-2" type="number" min="1" step="1" bind:value={paymentDraft.materialId} />
-          </label>
+          <p class="rounded-lg bg-slate-50 p-2 text-xs text-slate-700">
+            Material Link: <strong>{paymentDraft.materialId || 'General Credit Expense (No Material)'}</strong>
+            · ఈ లింక్ మార్చలేరు.
+          </p>
         {:else}
           <label class="block font-bold">అప్పు అసలు (Principal ₹)
             <input class="mt-1 w-full rounded-lg border p-2" type="number" min="0" step="0.01" required bind:value={paymentDraft.principalAmount} />
@@ -345,10 +361,11 @@
           </select>
         </label>
         <label class="block font-bold">తేదీ
-          <input class="mt-1 w-full rounded-lg border p-2" type="date" required bind:value={paymentDraft.date} />
+          <input class="mt-1 w-full rounded-lg border p-2" type="date" max={projectToday()} required bind:value={paymentDraft.date} />
         </label>
-        <label class="block font-bold">వివరాలు
-          <input class="mt-1 w-full rounded-lg border p-2" type="text" maxlength="2000" bind:value={paymentDraft.notes} />
+        <label class="block font-bold">Payment వివరాలు / UPI Transaction Reference (ఉంటే)
+          <input class="mt-1 w-full rounded-lg border p-2" type="text" maxlength="2000"
+            placeholder="ఉదా: UPI Ref 123456789 · Weekly payment" bind:value={paymentDraft.notes} />
         </label>
         <button type="submit" disabled={!STAGE2_ATOMIC_PAYMENTS_ENABLED || paymentBusy}
           class="w-full rounded-xl bg-emerald-700 p-3 font-black text-white disabled:cursor-not-allowed disabled:opacity-50">

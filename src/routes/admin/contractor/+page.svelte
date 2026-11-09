@@ -698,10 +698,16 @@
                   <option value="Tools & Equipment">🔧 పనిముట్లు, బైండింగ్ వైర్</option>
                   <option value="General Overheads">📝 జనరల్ సైట్ ఖర్చులు</option>
                 </select>
+                {#if ['Materials','Labour & Mestri','Centring'].includes(expForm.category)}
+                  <p class="mt-1 text-[10px] font-bold text-amber-800">
+                    ⚠️ Supplier Bill, Labour Attendance లేదా Piecework బాకీ చెల్లింపును Expenseలో మళ్లీ Save చేయవద్దు.
+                    సంబంధించిన Payment Option ఉపయోగించండి. ప్రత్యేకంగా ఇచ్చిన Site ఖర్చులు మాత్రమే ఇక్కడ నమోదు చేయండి.
+                  </p>
+                {/if}
               </div>
               <div>
                 <label class="block font-bold text-slate-700 mb-1">తేదీ</label>
-                <input type="date" bind:value={expForm.date} required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-mono font-bold" />
+                <input type="date" bind:value={expForm.date} max={projectToday()} required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-mono font-bold" />
               </div>
             </div>
 
@@ -793,12 +799,13 @@
                 <select bind:value={inForm.target} class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold">
                   <option value="Bank">బ్యాంక్</option>
                   <option value="Cash">క్యాష్</option>
+                  <option value="UPI">UPI (PhonePe/GPay)</option>
                 </select>
               </div>
             </div>
             <div>
               <label class="block font-bold text-slate-700 mb-1">తేదీ</label>
-              <input type="date" bind:value={inForm.date} required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold" />
+              <input type="date" bind:value={inForm.date} max={projectToday()} required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold" />
             </div>
             <button disabled={!STAGE3_ATOMIC_ENTRIES_ENABLED || savingMoneyIn} type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3 rounded-2xl shadow cursor-pointer">
               సేవ్ చేయండి & రసీదు పొందండి ➔

@@ -8,7 +8,20 @@
   let savingPayment = false;
   let payContract = null;
   let payAmount = '';
-  let payFunding = 'Cash';
+  let payFunding = 'UPI';
+  let payDate = projectToday();
+  let pieceworkPayments = [];
+  let paymentError = '';
+  let paymentSuccess = '';
+  $: pieceworkPaid = pieceworkPayments.reduce((map,entry)=>{
+    if(entry.piecework_id != null && entry.entry_type==='piecework_payment')
+      map.set(String(entry.piecework_id),(map.get(String(entry.piecework_id)||0)+Number(entry.amount||0)));
+    return map;
+  },new Map());
+  function remainingPiecework(c){
+    return Math.max(0,Math.round((Number(c.total_amount||0)-Number(c.advance_paid||0)-
+      Number(pieceworkPaid.get(String(c.id))||0))*100)/100);
+  }
 
   let dataError = '';
   let mutationError = '';
@@ -45,7 +58,12 @@ $: lengthVal = form.length_ft ? Number(form.length_ft) : 0;
   async function fetchContracts() {
     loading=true; dataError='';
     try {
-      contracts=await readAllRows(supabase,'contractor_piecework',{orderBy:'date'});
+      const [rows,tx]=await Promise.all([
+        readAllRows(supabase,'contractor_piecework',{orderBy:'date'}),
+        readAllRows(supabase,'contractor_transactions',{orderBy:'date'})
+      ]);
+      contracts=rows;
+      pieceworkPayments=tx.filter(t=>t.entry_type==='piecework_payment');
     } catch(error) { dataError=dataErrorMessage(error); }
     finally { loading=false; }
   }
@@ -63,18 +81,24 @@ $: lengthVal = form.length_ft ? Number(form.length_ft) : 0;
 
   async function settlePiecework() {
     if (!payContract || savingPayment) return;
-    savingPayment = true; mutationError = '';
-    try {
-      await postEntry('piecework_payment', {
-        piecework_id: payContract.id,
-        amount: payAmount,
-        funding_source: payFunding,
-        date: projectToday()
+    paymentError='';
+    const amount=Number(payAmount);
+    if(!Number.isFinite(amount)||amount<=0||amount>remainingPiecework(payContract)){
+      paymentError='పీస్‌వర్క్ మిగిలిన బాకీ కన్నా ఎక్కువ మొత్తం చెల్లించలేరు.';return;
+    }
+    if(!payDate||payDate>projectToday()||payDate<payContract.date){
+      paymentError='Payment Date పని తేదీ తర్వాత, ఈరోజు లేదా గత తేదీగా ఉండాలి.';return;
+    }
+    savingPayment=true;mutationError='';
+    try{
+      await postEntry('piecework_payment',{
+        piecework_id:payContract.id,amount,funding_source:payFunding,date:payDate
       });
-      payContract = null;
+      payContract=null;
       await fetchContracts();
-    } catch (error) { mutationError=dataErrorMessage(error); }
-    finally { savingPayment = false; }
+      paymentSuccess='పీస్‌వర్క్ Payment సేవ్ అయింది. బాకీ నవీకరించబడింది.';
+    }catch(error){paymentError=dataErrorMessage(error);}
+    finally{savingPayment=false;}
   }
 </script>
 
@@ -83,6 +107,9 @@ $: lengthVal = form.length_ft ? Number(form.length_ft) : 0;
 </svelte:head>
 {#if dataError}
   <div role="alert" class="m-4 rounded-xl border border-rose-300 bg-rose-50 p-4 text-sm text-rose-900">{dataError} <button type="button" on:click={fetchContracts} class="ml-3 font-bold underline">మళ్లీ ప్రయత్నించండి</button></div>
+{/if}
+{#if paymentSuccess}
+  <p role="status" class="m-4 rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-800">{paymentSuccess}</p>
 {/if}
 {#if mutationError}
   <p role="alert" class="m-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">{mutationError}</p>
@@ -139,10 +166,10 @@ $: lengthVal = form.length_ft ? Number(form.length_ft) : 0;
                   <td class="p-3 text-right font-mono">₹ {c.rate_per_unit}</td>
                   <td class="p-3 text-right font-mono font-bold">₹ {Number(c.total_amount).toLocaleString('en-IN')}</td>
                   <td class="p-3 text-right font-mono text-emerald-700">₹ {Number(c.advance_paid || 0).toLocaleString('en-IN')}</td>
-                  <td class="p-3 text-right font-mono font-black text-rose-600">₹ {Number(c.balance_due).toLocaleString('en-IN')}</td>
+                  <td class="p-3 text-right font-mono font-black text-rose-600">₹ {remainingPiecework(c).toLocaleString('en-IN')}</td>
                   <td class="p-3">
-                    <button type="button" disabled={Number(c.balance_due || 0) <= 0}
-                      on:click={() => { payContract = c; payAmount = ''; payFunding = 'Cash'; }}
+                    <button type="button" disabled={remainingPiecework(c) <= 0}
+                      on:click={() => {payContract=c;payAmount=String(remainingPiecework(c));payFunding='UPI';payDate=projectToday();paymentError='';}}
                       class="rounded bg-emerald-50 px-2 py-1 font-bold text-emerald-800 disabled:opacity-40">
                       చెల్లింపు
                     </button>
@@ -251,18 +278,22 @@ $: lengthVal = form.length_ft ? Number(form.length_ft) : 0;
       <div class="flex justify-between font-black"><span>పీస్‌వర్క్ చెల్లింపు — {payContract.contractor_name}</span>
         <button type="button" on:click={() => payContract=null}>✕</button>
       </div>
-      <p class="text-xs text-slate-500">Contract #{payContract.id} · బాకీ ₹{payContract.balance_due}</p>
+      <p class="text-xs text-slate-500">Contract #{payContract.id} · మిగిలిన బాకీ ₹{remainingPiecework(payContract).toLocaleString('en-IN')}</p>
+      {#if paymentError}<p role="alert" class="rounded-lg bg-red-50 p-3 text-xs font-bold text-red-800">{paymentError}</p>{/if}
       <form class="space-y-3" on:submit|preventDefault={settlePiecework}>
         <label class="block text-xs font-bold">మొత్తం ₹
-          <input type="number" min="0.01" step="0.01" required bind:value={payAmount}
+          <input type="number" min="0.01" max={remainingPiecework(payContract)} step="0.01" required bind:value={payAmount}
             class="mt-1 w-full rounded-lg border p-2" />
+        </label>
+        <label class="block text-xs font-bold">నిజంగా చెల్లించిన తేదీ
+          <input type="date" min={payContract.date} max={projectToday()} bind:value={payDate} required class="mt-1 w-full rounded-lg border p-2"/>
         </label>
         <label class="block text-xs font-bold">Payment Account
           <select bind:value={payFunding} class="mt-1 w-full rounded-lg border p-2">
             <option value="Cash">Cash</option><option value="Bank">Bank</option><option value="UPI">UPI</option>
           </select>
         </label>
-        <button disabled={!STAGE3_ATOMIC_ENTRIES_ENABLED || savingPayment} type="submit"
+        <button disabled={!STAGE3_ATOMIC_ENTRIES_ENABLED || savingPayment || remainingPiecework(payContract)<=0} type="submit"
           class="w-full rounded-lg bg-emerald-700 p-3 font-black text-white disabled:opacity-50">
           {savingPayment ? 'Saving...' : 'Atomic Payment Save'}
         </button>

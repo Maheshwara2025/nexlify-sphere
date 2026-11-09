@@ -416,6 +416,10 @@ function partyIndex({
 	const workerKey = (id) => `worker:${encodeURIComponent(String(id))}`;
 	/** @param {unknown} id */
 	const partyKey = (id) => `party:${encodeURIComponent(String(id))}`;
+	const attendanceWorkerIds = new Map(
+		labour.filter((row) => present(row.id) && present(row.worker_id))
+			.map((row) => [String(row.id), String(row.worker_id)])
+	);
 	profiles.forEach((profile) => {
 		if (present(profile.worker_id))
 			put(
@@ -432,9 +436,15 @@ function partyIndex({
 	const attach = (rows, type) =>
 		rows.forEach((row, index) => {
 			let key;
+			const linkedWorkerId = type === 'transaction' && present(row.labour_id) &&
+				['labour_payment','labour_advance'].includes(kindOf(row))
+				? attendanceWorkerIds.get(String(row.labour_id)) : null;
 			if (present(row.worker_id)) {
 				key = workerKey(row.worker_id);
 				put(key, `${row.worker_name || row.recipient || 'Worker'} (${row.worker_id})`, 'worker');
+			} else if (linkedWorkerId) {
+				key = workerKey(linkedWorkerId);
+				put(key, `${row.recipient || 'Worker'} (${linkedWorkerId})`, 'worker');
 			} else if (present(row.party_id) || present(row.contractor_id)) {
 				const id = row.party_id ?? row.contractor_id;
 				key = partyKey(id);

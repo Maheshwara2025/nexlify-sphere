@@ -10,7 +10,40 @@
   let savingPayment = false;
   let paymentRow = null;
   let paymentAmount = '';
-  let paymentFunding = 'Cash';
+  let paymentFunding = 'UPI';
+  let paymentDate = projectToday();
+  let dailyPaymentError = '';
+  let labourPayments = [];
+  let workerBatches = [];
+  let workerPaymentId = '';
+  let workerPaymentAmount = '';
+  let workerPaymentSource = 'UPI';
+  let workerPaymentDate = projectToday();
+  let workerPaymentRef = '';
+  let workerPaymentNotes = '';
+  let workerPaymentKey = '';
+  let workerPaymentFingerprint = '';
+  let workerPaymentSaving = false;
+  let workerPaymentError = '';
+  let workerPaymentSuccess = '';
+  let showWorkerPaymentModal = false;
+  $: labourPaymentTotals = labourPayments.reduce((map, tx) => {
+    if (tx.entry_type === 'labour_payment' && tx.labour_id != null)
+      map.set(String(tx.labour_id), (map.get(String(tx.labour_id)) || 0) + Number(tx.amount || 0));
+    return map;
+  }, new Map());
+  function paymentDue(row) {
+    return Math.max(0, Math.round((Number(row.days || 0)*Number(row.daily_rate || 0) -
+      Number(row.advance_paid || 0)-Number(labourPaymentTotals.get(String(row.id)) || 0))*100)/100);
+  }
+  $: workerRows = labourRecords.filter(row => row.worker_id === workerPaymentId);
+  $: workerEarned = workerRows.reduce((sum,row) => sum + Number(row.days || 0)*Number(row.daily_rate || 0),0);
+  $: workerAdvances = workerRows.reduce((sum,row) => sum + Number(row.advance_paid || 0),0);
+  $: workerPaid = workerRows.reduce((sum,row) => sum + Number(labourPaymentTotals.get(String(row.id)) || 0),0);
+  $: workerOutstanding = Math.max(0,Math.round((workerEarned-workerAdvances-workerPaid)*100)/100);
+  $: workerHistory = workerBatches.filter(b => b.worker_id === workerPaymentId);
+  $: workerName = profiles.find(p=>p.worker_id===workerPaymentId)?.name || '';
+
 
   let dataError = '';
   let mutationError = '';
@@ -68,8 +101,14 @@
     loading = true;
     dataError = '';
     try {
-      const [workers, attendance] = await Promise.all([readAllRows(supabase,'contractor_labour_profiles',{ascending:true}),readAllRows(supabase,'contractor_labour',{orderBy:'date'})]);
+      const [workers, attendance, tx, batches] = await Promise.all([
+        readAllRows(supabase,'contractor_labour_profiles',{ascending:true}),
+        readAllRows(supabase,'contractor_labour',{orderBy:'date'}),
+        readAllRows(supabase,'contractor_transactions',{orderBy:'date'}),
+        readAllRows(supabase,'contractor_worker_payments',{orderBy:'payment_date'})
+      ]);
       profiles=workers; labourRecords=attendance;
+      labourPayments=tx.filter(t=>t.entry_type==='labour_payment'); workerBatches=batches;
     } catch (error) {
       dataError = dataErrorMessage(error);
     } finally {
@@ -217,16 +256,76 @@
 
   async function saveLabourPayment() {
     if (!paymentRow || savingPayment) return;
-    savingPayment = true; mutationError = '';
+    dailyPaymentError = '';
+    const amount=Number(paymentAmount);
+    if (!Number.isFinite(amount)||amount<=0||amount>paymentDue(paymentRow)) {
+      dailyPaymentError='ఈ Attendance మిగిలిన బాకీ కన్నా ఎక్కువ Payment ఇవ్వలేరు.'; return;
+    }
+    if (!paymentDate || paymentDate>projectToday()) {
+      dailyPaymentError='నిజమైన Payment Date ఎంచుకోండి; భవిష్యత్తు తేదీ వద్దు.'; return;
+    }
+    savingPayment=true;
     try {
-      await postEntry('labour_payment', {
-        labour_id: paymentRow.id, date: projectToday(),
-        amount: paymentAmount, funding_source: paymentFunding
+      await postEntry('labour_payment',{
+        labour_id:paymentRow.id,date:paymentDate,amount,funding_source:paymentFunding
       });
-      paymentRow = null;
+      paymentRow=null;
       await fetchAll();
-    } catch (error) { mutationError = dataErrorMessage(error); }
-    finally { savingPayment = false; }
+      workerPaymentSuccess='ఒక్కరోజు Attendance Payment నమోదైంది; Balance నవీకరించబడింది.';
+    } catch(error){dailyPaymentError=dataErrorMessage(error);}
+    finally{savingPayment=false;}
+  }
+
+  function openWorkerPayment(worker=null) {
+    workerPaymentId=worker?.worker_id||'';
+    workerPaymentAmount='';
+    workerPaymentSource='UPI';
+    workerPaymentDate=projectToday();
+    workerPaymentRef='';workerPaymentNotes='';
+    workerPaymentKey='';workerPaymentFingerprint='';
+    workerPaymentError='';
+    showWorkerPaymentModal=true;
+  }
+
+  async function saveWorkerPayment() {
+    if(workerPaymentSaving)return;
+    workerPaymentError='';
+    const amount=Number(workerPaymentAmount);
+    if(!workerPaymentId||!Number.isFinite(amount)||amount<=0||amount>workerOutstanding){
+      workerPaymentError='Labour ID, చెల్లించిన మొత్తం, మిగిలిన బాకీ సరిచూడండి.';return;
+    }
+    if(!workerPaymentDate||workerPaymentDate>projectToday()){
+      workerPaymentError='అసలు UPI/Bank/Cash Payment తేదీ ఇవ్వండి.';return;
+    }
+    const draft={workerId:workerPaymentId,amount,source:workerPaymentSource,date:workerPaymentDate,
+      reference:workerPaymentRef.trim(),notes:workerPaymentNotes.trim()};
+    const fingerprint=JSON.stringify(draft);
+    if(!workerPaymentKey||fingerprint!==workerPaymentFingerprint){
+      workerPaymentKey='asv_worker_'+crypto.randomUUID().replaceAll('-','');
+      workerPaymentFingerprint=fingerprint;
+    }
+    workerPaymentSaving=true;
+    try {
+      const {data,error}=await supabase.rpc('contractor_pay_worker_v1',{
+        p_worker_id:draft.workerId,p_amount:draft.amount,p_funding_source:draft.source,
+        p_payment_date:draft.date,p_payment_reference:draft.reference,p_notes:draft.notes,
+        p_idempotency_key:workerPaymentKey
+      });
+      if(error)throw error;
+      if(!data?.success||!data?.voucher_no)throw new Error('Payment సేవ్ నిర్ధారణ కాలేదు.');
+      workerPaymentKey='';workerPaymentFingerprint='';
+      const voucher=data.voucher_no;
+      showWorkerPaymentModal=false;
+      await fetchAll();
+      workerPaymentSuccess='₹'+amount.toLocaleString('en-IN')+' Payment నమోదైంది · Voucher: '+voucher;
+    }catch(error){
+      const msg=String(error?.message||'Payment Save కాలేదు.');
+      workerPaymentError=/PAYMENT_EXCEEDS_DUE/.test(msg)
+        ? 'చెల్లింపు మొత్తం మిగిలిన బాకీ కన్నా ఎక్కువ. Reload చేసి ప్రయత్నించండి.'
+        : /worker_payment_upi_reference_unique|duplicate key/i.test(msg)
+        ? 'UPI Reference ఇప్పటికే ఈ Worker IDలో నమోదైంది (Already Entered).'
+        : msg;
+    }finally{workerPaymentSaving=false;}
   }
 
   async function deleteLabour(id) {
@@ -267,6 +366,10 @@
         <button on:click={openNewProfileModal} class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black px-3 py-2 rounded-xl shadow transition cursor-pointer">
           👤 కొత్త వర్కర్ ప్రొఫైల్ (DBMS ID)
         </button>
+        <button type="button" on:click={() => openWorkerPayment()}
+          class="rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white">
+          ₹ Labour ID-wise Payment (UPI/Bank/Cash)
+        </button>
         <button on:click={() => showAttendanceModal = true} class="bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black px-3.5 py-2 rounded-xl shadow transition cursor-pointer">
           ➕ రోజువారీ హాజరు నమోదు
         </button>
@@ -289,11 +392,19 @@
               <strong class="block text-slate-900 truncate mt-1">{p.name}</strong>
               <span class="text-[10px] text-slate-500 block truncate">{p.role}</span>
               <span class="text-[10.5px] font-mono font-bold text-emerald-700">₹{p.daily_rate}/రోజు</span>
+              <button type="button" on:click={() => openWorkerPayment(p)}
+                class="mt-2 block w-full rounded-lg bg-emerald-100 px-2 py-1.5 text-[10px] font-bold text-emerald-900">
+                ₹ ఖాతా / Payment
+              </button>
             </div>
           {/each}
         </div>
       {/if}
     </div>
+
+    {#if workerPaymentSuccess}
+      <p role="status" class="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-bold text-emerald-900">{workerPaymentSuccess}</p>
+    {/if}
 
     <!-- Attendance Table -->
     <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
@@ -326,7 +437,8 @@
             <tbody class="divide-y divide-slate-100 font-medium">
               {#each labourRecords as l}
                 {@const totalEarned = (l.days ? Number(l.days) : 1) * (l.daily_rate ? Number(l.daily_rate) : 0)}
-                {@const balanceDue = totalEarned - (l.advance_paid ? Number(l.advance_paid) : 0)}
+                {@const alreadyPaid = Number(labourPaymentTotals.get(String(l.id)) || 0)}
+                 {@const balanceDue = paymentDue(l)}
                 <tr class="hover:bg-slate-50 transition">
                   <td class="p-3 font-mono text-slate-500">
                     {l.date}
@@ -343,13 +455,19 @@
                   <td class="p-3 text-center font-mono">{l.days}</td>
                   <td class="p-3 text-right font-mono">₹ {l.daily_rate}</td>
                   <td class="p-3 text-right font-mono font-bold">₹ {totalEarned.toLocaleString('en-IN')}</td>
-                  <td class="p-3 text-right font-mono text-emerald-700">₹ {Number(l.advance_paid || 0).toLocaleString('en-IN')}</td>
+                  <td class="p-3 text-right font-mono text-emerald-700">
+                    ₹ {Number(l.advance_paid || 0).toLocaleString('en-IN')}
+                    {#if alreadyPaid > 0}<span class="mt-1 block text-[10px] text-indigo-700">Paid ₹{alreadyPaid.toLocaleString('en-IN')}</span>{/if}
+                   </td>
                   <td class="p-3 text-right font-mono font-black text-rose-600">₹ {balanceDue.toLocaleString('en-IN')}</td>
                   <td class="p-3 text-center whitespace-nowrap">
                     <button type="button" on:click={() => openEditAttendance(l)}
                       class="mr-2 rounded bg-blue-50 px-2 py-1 text-xs font-bold text-blue-800" aria-label="{l.worker_name} హాజరు సవరించండి">✎ సవరించు</button>
-                    <button on:click={() => { paymentRow = l; paymentAmount = ''; paymentFunding = 'Cash'; }}
-                    class="mr-2 rounded bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-800">చెల్లింపు</button>
+                    <button type="button" disabled={balanceDue<=0}
+                    on:click={() => { paymentRow=l; paymentAmount=String(balanceDue); paymentFunding='UPI'; paymentDate=projectToday(); dailyPaymentError=''; }}
+                    class="mr-2 rounded bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-800 disabled:opacity-30">
+                    {balanceDue<=0?'✓ Paid':'ఒక్కరోజు Payment'}
+                    </button>
                   <button disabled={!FINANCIAL_WRITES_ENABLED} on:click={() => deleteLabour(l.id)} class="text-rose-500 font-bold hover:text-rose-700">✕</button>
                   </td>
                 </tr>
@@ -587,22 +705,118 @@
       <div class="flex justify-between font-black"><span>కూలీ చెల్లింపు — {paymentRow.worker_name}</span>
         <button type="button" on:click={() => paymentRow=null}>✕</button>
       </div>
-      <p class="text-xs text-slate-500">హాజరు # {paymentRow.id} · చెల్లించాల్సిన మొత్తం మించకూడదు.</p>
+      <p class="text-xs text-slate-500">Attendance #{paymentRow.id} · {paymentRow.date} · మిగిలిన బాకీ ₹{paymentDue(paymentRow).toLocaleString('en-IN')}</p>
+      {#if dailyPaymentError}<p role="alert" class="rounded-lg bg-red-50 p-3 text-xs font-bold text-red-800">{dailyPaymentError}</p>{/if}
+      <p class="text-xs text-indigo-700">అనేక రోజుల బాకీకి కలిపి Payment చేయాలంటే "Labour ID-wise Payment" ఉపయోగించండి.</p>
       <form class="space-y-3" on:submit|preventDefault={saveLabourPayment}>
         <label class="block text-xs font-bold">మొత్తం ₹
-          <input type="number" min="0.01" step="0.01" required bind:value={paymentAmount}
+          <input type="number" min="0.01" max={paymentDue(paymentRow)} step="0.01" required bind:value={paymentAmount}
             class="mt-1 w-full rounded-lg border p-2" />
+        </label>
+        <label class="block text-xs font-bold">నిజంగా చెల్లించిన తేదీ
+          <input type="date" max={projectToday()} required bind:value={paymentDate} class="mt-1 w-full rounded-lg border p-2"/>
         </label>
         <label class="block text-xs font-bold">Payment Account
           <select bind:value={paymentFunding} class="mt-1 w-full rounded-lg border p-2">
             <option value="Cash">Cash</option><option value="Bank">Bank</option><option value="UPI">UPI</option>
           </select>
         </label>
-        <button disabled={!STAGE3_ATOMIC_ENTRIES_ENABLED || savingPayment} type="submit"
+        <button disabled={!STAGE3_ATOMIC_ENTRIES_ENABLED || savingPayment || paymentDue(paymentRow)<=0} type="submit"
           class="w-full rounded-lg bg-emerald-700 p-3 font-black text-white disabled:opacity-50">
           {savingPayment ? 'Saving...' : 'Atomic Payment Save'}
         </button>
       </form>
+    </div>
+  </div>
+{/if}
+
+
+<!-- Worker-ID running account: one real UPI/Bank/Cash transfer, many attendance allocations. -->
+{#if showWorkerPaymentModal}
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3">
+    <div class="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 text-slate-900 shadow-xl space-y-4">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <h3 class="text-lg font-black">₹ Labour ID-wise Payment / ఖాతా</h3>
+          <p class="mt-1 text-xs text-slate-600">అనేక విడతల చెల్లింపులు · పాత Attendance నుంచి ఆటో సర్దుబాటు</p>
+        </div>
+        <button type="button" on:click={() => showWorkerPaymentModal=false} class="text-xl" aria-label="మూసివేయండి">✕</button>
+      </div>
+      {#if workerPaymentError}<p role="alert" class="rounded-lg bg-red-50 p-3 text-sm font-bold text-red-800">{workerPaymentError}</p>{/if}
+      <label class="block text-xs font-bold">Labour ID ఎంచుకోండి *
+        <select bind:value={workerPaymentId}
+          on:change={() => {workerPaymentAmount='';workerPaymentRef='';workerPaymentError='';workerPaymentKey='';workerPaymentFingerprint='';}}
+          class="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm" required>
+          <option value="">-- Worker ID --</option>
+          {#each profiles as p}<option value={p.worker_id}>{p.worker_id} — {p.name}</option>{/each}
+        </select>
+      </label>
+      {#if workerPaymentId}
+        <div class="rounded-xl border border-indigo-200 bg-indigo-50 p-3">
+          <strong class="text-sm">{workerName} ({workerPaymentId})</strong>
+          <div class="mt-2 grid grid-cols-2 gap-2 text-xs">
+            <span>మొత్తం వేతనం: <strong>₹{workerEarned.toLocaleString('en-IN')}</strong></span>
+            <span>అడ్వాన్స్: <strong>₹{workerAdvances.toLocaleString('en-IN')}</strong></span>
+            <span>చేసిన Payments: <strong>₹{workerPaid.toLocaleString('en-IN')}</strong></span>
+            <span class="font-black text-red-700">మిగిలిన బాకీ: ₹{workerOutstanding.toLocaleString('en-IN')}</span>
+          </div>
+        </div>
+        {#if workerOutstanding>0}
+          <form class="space-y-3" on:submit|preventDefault={saveWorkerPayment}>
+            <label class="block text-xs font-bold">ఈ విడత చెల్లించిన మొత్తం ₹ *
+              <input type="number" min="0.01" max={workerOutstanding} step="0.01" required bind:value={workerPaymentAmount}
+                class="mt-1 w-full rounded-xl border border-slate-300 p-3 text-sm" placeholder="UPIలో ఇచ్చిన నిజమైన మొత్తం"/>
+            </label>
+            <div class="grid grid-cols-2 gap-2">
+              <label class="block text-xs font-bold">చెల్లించిన తేదీ *
+                <input type="date" max={projectToday()} required bind:value={workerPaymentDate}
+                  class="mt-1 w-full rounded-xl border border-slate-300 p-3 text-sm"/>
+              </label>
+              <label class="block text-xs font-bold">Payment Mode *
+                <select bind:value={workerPaymentSource}
+                  class="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm">
+                  <option value="UPI">UPI (GPay/PhonePe)</option>
+                  <option value="Bank">Bank Transfer</option>
+                  <option value="Cash">Cash</option>
+                </select>
+              </label>
+            </div>
+            <label class="block text-xs font-bold">UPI Transaction ID / UTR (ఉంటే)
+              <input type="text" maxlength="100" bind:value={workerPaymentRef}
+                placeholder="UPI Reference" class="mt-1 w-full rounded-xl border border-slate-300 p-3 text-sm"/>
+            </label>
+            <label class="block text-xs font-bold">Payment Notes (Optional)
+              <textarea rows="2" maxlength="500" bind:value={workerPaymentNotes}
+                placeholder="వారపు కూలీ చెల్లింపు" class="mt-1 w-full rounded-xl border border-slate-300 p-3 text-sm"></textarea>
+            </label>
+            <p class="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
+              ఇచ్చిన డబ్బు పాత Attendanceల బాకీకి క్రమంగా సర్దుబాటు అవుతుంది.
+              ఇక్కడ Save చేయడం వలన బ్యాంకులో మరో UPI Transfer జరగదు; Ledgerలో మాత్రమే నమోదవుతుంది.
+            </p>
+            <button type="submit" disabled={workerPaymentSaving}
+              class="w-full rounded-xl bg-emerald-700 p-3 text-sm font-black text-white disabled:opacity-50">
+              {workerPaymentSaving?'సేవ్ అవుతోంది…':'Worker Payment Save & Ledger Update'}
+            </button>
+          </form>
+        {:else}
+          <p class="rounded-lg bg-emerald-50 p-3 text-sm font-bold text-emerald-800">ఈ Labour IDకి బాకీ లేదు.</p>
+        {/if}
+        <section class="space-y-2 border-t pt-3">
+          <h4 class="text-sm font-black">Payment Installments ({workerHistory.length})</h4>
+          {#if workerHistory.length===0}
+            <p class="text-xs text-slate-500">Worker ID-wise Payments ఇంకా నమోదు కాలేదు.</p>
+          {:else}
+            <div class="max-h-48 space-y-2 overflow-y-auto">
+              {#each workerHistory as payment}
+                <div class="flex justify-between gap-2 rounded-lg border p-2 text-xs">
+                  <span>{payment.payment_date} · {payment.funding_source} · {payment.payment_reference||payment.voucher_no}</span>
+                  <strong>₹{Number(payment.amount).toLocaleString('en-IN')}</strong>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </section>
+      {/if}
     </div>
   </div>
 {/if}
