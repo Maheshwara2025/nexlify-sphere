@@ -62,7 +62,7 @@ test('CSV exposes names, worker IDs, UPI references and safe numeric amount',()=
  assert.match(csv,/LBR-008/);
  assert.match(csv,/UTR-TWO/);
  assert.match(csv,/1700\.00/);
- assert.match(balances,/2200\\.00/);
+ assert.ok(balances.includes('"2200.00"'));
  const malicious=labourPaymentCsv([{workerId:'LBR-007',name:'=1+2',date:'2026-10-12',amount:1,notes:'@bad'}]);
  assert.ok(malicious.includes("'=1+2"));
  assert.ok(malicious.includes("'@bad"));
