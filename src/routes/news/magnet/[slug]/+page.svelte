@@ -5,9 +5,11 @@
   import MagnetArticle from '$lib/components/MagnetArticle.svelte';
   import { magnetShareText } from '$lib/magnetNews.js';
   import { toPng } from 'html-to-image';
+  /** @type {any|null} */
   let article=null;
   let loading=true;
   let message='';
+  /** @type {HTMLDivElement|undefined} */
   let cardNode;
   let actionStatus='';
   $: pageUrl='https://www.nexlifynucleus.in/news/magnet/'+$page.params.slug;
@@ -30,7 +32,7 @@
       const dataUrl=await generatePng();
       const a=document.createElement('a');a.href=dataUrl;a.download='ns-magnet-'+$page.params.slug+'.png';a.click();
       actionStatus='PNG సేవ్ అయింది.';
-    }catch(err){actionStatus=err?.message||'PNG Export విఫలమైంది.';}
+    }catch(err){actionStatus=err instanceof Error ? err.message : 'PNG Export విఫలమైంది.';}
   }
   async function shareCard(){
     try{
@@ -39,7 +41,7 @@
       const f=new File([blob],'ns-magnet.png',{type:'image/png'});
       if(navigator.canShare?.({files:[f]})) await navigator.share({files:[f],title:article.headline,text:'NS NEWS'});
       else {await downloadCard();actionStatus='PNG డౌన్‌లోడ్ అయ్యింది. WhatsAppలో ఫొటో జతచేయండి.';}
-    }catch(err){ actionStatus='Share సాధ్యం కాలేదు: '+(err?.message||'');}
+    }catch(err){ actionStatus='Share సాధ్యం కాలేదు: '+(err instanceof Error ? err.message : '');}
   }
   async function copyText(){
     try{await navigator.clipboard.writeText(text);actionStatus='వార్త టెక్స్ట్ కాపీ అయింది.';}
