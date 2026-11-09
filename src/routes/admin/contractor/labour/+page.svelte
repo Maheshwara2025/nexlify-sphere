@@ -25,6 +25,7 @@
   let workerPaymentFingerprint = '';
   let workerPaymentSaving = false;
   let workerPaymentError = '';
+  let workerPaymentAdvanceConfirmed = false;
   let workerPaymentSuccess = '';
   let showWorkerPaymentModal = false;
   $: labourPaymentTotals = labourPayments.reduce((map, tx) => {
@@ -41,6 +42,11 @@
   $: workerAdvances = workerRows.reduce((sum,row) => sum + Number(row.advance_paid || 0),0);
   $: workerPaid = workerRows.reduce((sum,row) => sum + Number(labourPaymentTotals.get(String(row.id)) || 0),0);
   $: workerOutstanding = Math.max(0,Math.round((workerEarned-workerAdvances-workerPaid)*100)/100);
+  // A historical payment cannot settle days worked *after* the payment date.
+  // Extra money needs explicit advance accounting, never silent future allocation.
+  $: workerDueAsOfPaymentDate = Math.round(workerRows.filter(row=>row.date<=workerPaymentDate)
+    .reduce((sum,row)=>sum+paymentDue(row),0)*100)/100;
+  $: workerAdvanceNeeded = Math.max(0,Math.round((Number(workerPaymentAmount||0)-workerDueAsOfPaymentDate)*100)/100);
   $: workerHistory = workerBatches.filter(b => b.worker_id === workerPaymentId);
   $: workerName = profiles.find(p=>p.worker_id===workerPaymentId)?.name || '';
 
@@ -284,6 +290,7 @@
     workerPaymentRef='';workerPaymentNotes='';
     workerPaymentKey='';workerPaymentFingerprint='';
     workerPaymentError='';
+    workerPaymentAdvanceConfirmed=false;
     showWorkerPaymentModal=true;
   }
 
@@ -297,8 +304,19 @@
     if(!workerPaymentDate||workerPaymentDate>projectToday()){
       workerPaymentError='అసలు UPI/Bank/Cash Payment తేదీ ఇవ్వండి.';return;
     }
+    if(workerAdvanceNeeded>0 && !workerPaymentAdvanceConfirmed){
+      workerPaymentError='ఈ తేదీ వరకు బాకీ ₹'+workerDueAsOfPaymentDate.toLocaleString('en-IN')+
+        ' మాత్రమే. అదనపు ₹'+workerAdvanceNeeded.toLocaleString('en-IN')+
+        'ను Advanceగా నమోదు చేయడానికి కింద Confirmation ఎంచుకోండి.';
+      return;
+    }
+    if(workerAdvanceNeeded>0 && workerDueAsOfPaymentDate<=0){
+      workerPaymentError='ఈ తేదీ వరకు వేతన బాకీ లేదు. పూర్తిగా Advance ఇచ్చినట్లయితే ప్రత్యేక Advance Entry అవసరం.';
+      return;
+    }
     const draft={workerId:workerPaymentId,amount,source:workerPaymentSource,date:workerPaymentDate,
-      reference:workerPaymentRef.trim(),notes:workerPaymentNotes.trim()};
+      reference:workerPaymentRef.trim(),notes:workerPaymentNotes.trim(),
+      advanceConfirmed:workerAdvanceNeeded>0 && workerPaymentAdvanceConfirmed};
     const fingerprint=JSON.stringify(draft);
     if(!workerPaymentKey||fingerprint!==workerPaymentFingerprint){
       workerPaymentKey='asv_worker_'+crypto.randomUUID().replaceAll('-','');
@@ -306,22 +324,31 @@
     }
     workerPaymentSaving=true;
     try {
-      const {data,error}=await supabase.rpc('contractor_pay_worker_v1',{
+      const rpcName=draft.advanceConfirmed
+        ? 'contractor_pay_worker_with_advance_v1' : 'contractor_pay_worker_v1';
+      const args={
         p_worker_id:draft.workerId,p_amount:draft.amount,p_funding_source:draft.source,
         p_payment_date:draft.date,p_payment_reference:draft.reference,p_notes:draft.notes,
         p_idempotency_key:workerPaymentKey
-      });
+      };
+      if(draft.advanceConfirmed) args.p_confirm_advance=true;
+      const {data,error}=await supabase.rpc(rpcName,args);
       if(error)throw error;
       if(!data?.success||!data?.voucher_no)throw new Error('Payment సేవ్ నిర్ధారణ కాలేదు.');
       workerPaymentKey='';workerPaymentFingerprint='';
       const voucher=data.voucher_no;
       showWorkerPaymentModal=false;
       await fetchAll();
-      workerPaymentSuccess='₹'+amount.toLocaleString('en-IN')+' Payment నమోదైంది · Voucher: '+voucher;
+      workerPaymentSuccess='₹'+amount.toLocaleString('en-IN')+' Payment నమోదైంది'+
+        (Number(data.advance_allocated||0)>0
+          ? ' (వేతనం ₹'+Number(data.wage_allocated||0).toLocaleString('en-IN')+
+            ' + Advance ₹'+Number(data.advance_allocated).toLocaleString('en-IN')+')':'')+
+        ' · Voucher: '+voucher;
     }catch(error){
       const msg=String(error?.message||'Payment Save కాలేదు.');
-      workerPaymentError=/PAYMENT_EXCEEDS_DUE/.test(msg)
-        ? 'చెల్లింపు మొత్తం మిగిలిన బాకీ కన్నా ఎక్కువ. Reload చేసి ప్రయత్నించండి.'
+      workerPaymentError=/PAYMENT_EXCEEDS_DUE|PAYMENT_SPLIT_INVALID/.test(msg)
+        ? 'ఈ Payment Date వరకు వేతన బాకీ ₹'+workerDueAsOfPaymentDate.toLocaleString('en-IN')+
+          ' మాత్రమే. అదనపు మొత్తాన్ని Advanceగా నిర్ధారించండి లేదా ఖాతా Refresh చేయండి.'
         : /worker_payment_upi_reference_unique|duplicate key/i.test(msg)
         ? 'UPI Reference ఇప్పటికే ఈ Worker IDలో నమోదైంది (Already Entered).'
         : msg;
@@ -738,7 +765,7 @@
       <div class="flex items-start justify-between gap-3">
         <div>
           <h3 class="text-lg font-black">₹ Labour ID-wise Payment / ఖాతా</h3>
-          <p class="mt-1 text-xs text-slate-600">అనేక విడతల చెల్లింపులు · పాత Attendance నుంచి ఆటో సర్దుబాటు</p>
+          <p class="mt-1 text-xs text-slate-600">అనేక విడతల చెల్లింపులు · అసలు Payment Date · వేతనం/Advance విడిగా లెక్కింపు</p>
         </div>
         <button type="button" on:click={() => showWorkerPaymentModal=false} class="text-xl" aria-label="మూసివేయండి">✕</button>
       </div>
@@ -759,17 +786,23 @@
             <span>అడ్వాన్స్: <strong>₹{workerAdvances.toLocaleString('en-IN')}</strong></span>
             <span>చేసిన Payments: <strong>₹{workerPaid.toLocaleString('en-IN')}</strong></span>
             <span class="font-black text-red-700">మిగిలిన బాకీ: ₹{workerOutstanding.toLocaleString('en-IN')}</span>
+            <span class="col-span-2 rounded-lg bg-white p-2 text-xs font-bold text-indigo-900">
+              {workerPaymentDate || 'ఎంచుకున్న తేదీ'} నాటికి వేతన బాకీ:
+              ₹{workerDueAsOfPaymentDate.toLocaleString('en-IN')}
+            </span>
           </div>
         </div>
         {#if workerOutstanding>0}
           <form class="space-y-3" on:submit|preventDefault={saveWorkerPayment}>
             <label class="block text-xs font-bold">ఈ విడత చెల్లించిన మొత్తం ₹ *
               <input type="number" min="0.01" max={workerOutstanding} step="0.01" required bind:value={workerPaymentAmount}
+                on:input={() => workerPaymentAdvanceConfirmed=false}
                 class="mt-1 w-full rounded-xl border border-slate-300 p-3 text-sm" placeholder="UPIలో ఇచ్చిన నిజమైన మొత్తం"/>
             </label>
             <div class="grid grid-cols-2 gap-2">
               <label class="block text-xs font-bold">చెల్లించిన తేదీ *
                 <input type="date" max={projectToday()} required bind:value={workerPaymentDate}
+                  on:change={() => workerPaymentAdvanceConfirmed=false}
                   class="mt-1 w-full rounded-xl border border-slate-300 p-3 text-sm"/>
               </label>
               <label class="block text-xs font-bold">Payment Mode *
@@ -789,6 +822,18 @@
               <textarea rows="2" maxlength="500" bind:value={workerPaymentNotes}
                 placeholder="వారపు కూలీ చెల్లింపు" class="mt-1 w-full rounded-xl border border-slate-300 p-3 text-sm"></textarea>
             </label>
+            {#if workerAdvanceNeeded>0}
+              <div class="space-y-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950">
+                <strong class="block text-sm">చెల్లింపు విభజన (Payment Split)</strong>
+                <div class="flex justify-between"><span>ఆ తేదీ వరకు వేతన బాకీ</span><strong>₹{workerDueAsOfPaymentDate.toLocaleString('en-IN')}</strong></div>
+                <div class="flex justify-between"><span>తర్వాతి Attendance కోసం ముందస్తు చెల్లింపు (Advance)</span><strong>₹{workerAdvanceNeeded.toLocaleString('en-IN')}</strong></div>
+                <label class="flex items-start gap-2 font-bold">
+                  <input type="checkbox" class="mt-0.5 h-4 w-4 shrink-0" bind:checked={workerPaymentAdvanceConfirmed}/>
+                  <span>అవును. అదనపు ₹{workerAdvanceNeeded.toLocaleString('en-IN')}ను Advanceగా నమోదు చేయడానికి అంగీకరిస్తున్నాను.</span>
+                </label>
+                <p>ఈ Advance ఇప్పటికే నమోదైన తర్వాతి Attendanceకు మాత్రమే సర్దుబాటు అవుతుంది. భవిష్యత్తు Attendance లేకపోతే Save కాదు.</p>
+              </div>
+            {/if}
             <p class="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
               ఇచ్చిన డబ్బు పాత Attendanceల బాకీకి క్రమంగా సర్దుబాటు అవుతుంది.
               ఇక్కడ Save చేయడం వలన బ్యాంకులో మరో UPI Transfer జరగదు; Ledgerలో మాత్రమే నమోదవుతుంది.
