@@ -167,7 +167,7 @@
       <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4 lg:sticky lg:top-4">
         <div><h1 class="text-xl font-black">వార్తను ఒకే బాక్స్‌లో Paste చేయండి</h1><p class="text-sm text-slate-500 mt-1">Headline + 6 Points + Body అన్నీ ఇక్కడే. Photo విడిగా Upload చేయండి.</p></div>
         <label class="block text-sm font-bold" for="raw-news">మొత్తం వార్త *</label>
-        <textarea id="raw-news" bind:value={rawInput} rows="12" class="w-full rounded-xl border border-slate-300 bg-slate-50 p-3 text-sm leading-7 focus:ring-2 focus:ring-red-500" placeholder="**ప్రధాన శీర్షిక**&#10;- **అంశం 1:** వివరాలు...&#10;...&#10;- **అంశం 6:** వివరాలు...&#10;&#10;వార్త కథనం..."></textarea>
+        <textarea id="raw-news" bind:value={rawInput} rows="12" class="w-full rounded-xl border border-slate-300 bg-slate-50 p-3 text-sm leading-7 focus:ring-2 focus:ring-red-500" placeholder="వార్త ప్రధాన శీర్షిక&#10;&#10;మొదటి ముఖ్యాంశం వివరాలు...&#10;&#10;రెండో ముఖ్యాంశం వివరాలు...&#10;&#10;ఇలా మొత్తం ఆరు ముఖ్యాంశాలు...&#10;&#10;తర్వాత పూర్తి వార్తా కథనం (150 పదాల లోపు)..."></textarea>
         <label class="block text-sm font-bold" for="magnet-photo">ఫొటో *</label>
         <input id="magnet-photo" type="file" accept="image/jpeg,image/png,image/webp" on:change={onFile} class="block w-full text-sm text-slate-700 file:rounded-xl file:border-0 file:bg-slate-800 file:px-4 file:py-2 file:text-white" />
         <button type="button" on:click={autoFormat} class="w-full bg-red-600 text-white font-bold py-3 rounded-xl hover:bg-red-700">✨ ఆటో ఫార్మాట్ + Preview</button>
