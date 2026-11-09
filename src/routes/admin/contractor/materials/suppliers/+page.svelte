@@ -6,7 +6,8 @@
  import {prepareSupplierSettlementRpc,submitStage2AtomicPayment} from '$lib/contractor/atomic-payment-client.js';
  let parties=[],bills=[],billItems=[],materials=[],transactions=[],usage=[];
  let loading=true,error='',success='',supplierId='';
- let payBill=null,payAmount=0,payFunding='Cash',payDate=projectToday(),paying=false;
+ let payBill=null,payAmount=0,payFunding='UPI',payDate=projectToday(),paying=false;
+ let payReference='';
  let paymentKey='',paymentFingerprint='';
  let usageModal=false,using=false,usageCode='',usageQuantity=1,usageSite='Mutharam',usageNotes='',usageDate=projectToday();
  let usageKey='',usageFingerprint='';
@@ -52,17 +53,27 @@
   if(!details.obligation||Number(details.obligation.balance)<=0){error='ఈ బిల్లులో చెల్లించాల్సిన బాకీ లేదు.';return;}
   payBill={bill:b,...details};
   payAmount=Number(details.obligation.balance);
-  payFunding='Cash';payDate=projectToday();
+  payFunding='UPI';payDate=projectToday();payReference='';
   paymentKey='';paymentFingerprint='';error='';
  }
  async function savePayment(){
   if(!payBill||paying)return;
-  paying=true;error='';success='';
+  error='';success='';
+  if(!payDate||payDate>projectToday()){
+    error='నిజంగా చెల్లించిన తేదీ ఇవ్వండి. భవిష్యత్తు తేదీ వద్దు.';return;
+  }
+  if(Number(payAmount)<=0||Number(payAmount)>Number(payBill.obligation.balance)){
+    error='Supplier Bill మిగిలిన బాకీ కన్నా ఎక్కువ మొత్తం నమోదు చేయలేరు.';return;
+  }
+  if(payReference.length>100){
+    error='UPI/Bank Reference 100 అక్షరాల లోపు ఉండాలి.';return;
+  }
+  paying=true;
   try{
    const draft={
     obligationId:payBill.obligation.id,materialId:payBill.material.id,
     amount:Number(payAmount),fundingSource:payFunding,paymentDate:payDate,
-    notes:'Supplier Bill #'+payBill.bill.id+' payment'
+    notes:'Supplier Bill #'+payBill.bill.id+' payment'+(payReference.trim()?' · Payment Ref: '+payReference.trim():'')
    };
    const finger=JSON.stringify(draft);
    if(!paymentKey||finger!==paymentFingerprint){
@@ -223,6 +234,10 @@
      <select bind:value={payFunding} class="mt-1 w-full rounded-lg border p-3">
       <option value="Cash">Cash</option><option value="Bank">Bank</option><option value="UPI">UPI</option>
      </select>
+    </label>
+    <label class="block text-xs font-bold">UPI UTR / Bank Transaction Reference (ఉంటే)
+     <input type="text" maxlength="100" bind:value={payReference}
+       placeholder="Payment Reference" class="mt-1 w-full rounded-lg border p-3"/>
     </label>
     <button type="submit" disabled={paying} class="w-full rounded-xl bg-emerald-600 p-3 font-black text-white disabled:opacity-50">{paying?'సేవ్ అవుతోంది…':'Payment Save చేయండి'}</button>
    </form>
