@@ -54,50 +54,108 @@ export function splitHighlight(headline) {
 }
 /** @param {string} raw @returns {MagnetPoint} */
 function parsePoint(raw) {
-  const line = strip(raw).replace(/^[-*•]\s+/u,'');
-  let match=line.match(/^\*\*([^*]+)\*\*\s*[:：–-]?\s*(.*)$/u);
-  if (match) return {title:strip(match[1]).replace(/[:：]+$/u,''), description:strip(match[2])};
-  match=line.match(/^([^:：]{2,45})[:：]\s*(.+)$/u);
-  if (match) return {title:strip(match[1]),description:strip(match[2])};
-  return {title:strip(line.replace(/\*\*/g,'')),description:''};
+  const line = strip(raw)
+    .replace(/^(?:[-•●▪■➤►✓✔→]|\*(?!\*)|\d{1,2}[.)])\s*/u, '');
+  let match = line.match(/^\*\*([^*]+)\*\*\s*[:：–—-]?\s*(.*)$/u);
+  if (match) return {title:strip(match[1]).replace(/[:：–—-]+$/u, ''), description:strip(match[2])};
+  match = line.match(/^([^:：]{2,48})[:：]\s*(.+)$/u);
+  if (match) return {title:strip(match[1]), description:strip(match[2])};
+  // Plain pasted points often lose Markdown list markers. Split a short leading phrase
+  // into a colored heading, keeping the exact remaining words as the description.
+  const words = strip(line.replace(/\*\*/g, '')).split(/\s+/u).filter(Boolean);
+  if (words.length <= 4) return {title:words.join(' '), description:''};
+  const titleLength = Math.min(5, Math.max(3, Math.floor(words.length / 3)));
+  return {title:words.slice(0, titleLength).join(' '), description:words.slice(titleLength).join(' ')};
 }
+
 /** @param {string} line */
 function cleanLine(line) {
-  return strip(line).replace(/^(?:>\s*)?#+\s*/u,'').trim();
+  return strip(line).replace(/^(?:>\s*)?#+\s*/u, '').trim();
 }
+
+/** @param {string} line */
+function isMediaMarker(line) {
+  return /^image_[\w.-]+\.(?:png|jpe?g|webp)(?:\s*\+\s*\d+)?$/iu.test(line)
+    || /^!\[[^\]]*\]\([^)]*\)$/u.test(line);
+}
+
+/** @param {string} line */
+function isExplicitPoint(line) {
+  return /^(?:[-•●▪■➤►✓✔→]|\*(?!\*)|\d{1,2}[.)])\s+/u.test(line)
+    || /^\*\*[^*]+[:：]\*\*/u.test(line)
+    || /^[^:：\n]{2,40}[:：]\s+\S+/u.test(line);
+}
+
+/** @param {string} line */
+function isCompactPoint(line) {
+  return newsWordCount(line) <= 35 && line.length <= 245;
+}
+
 /**
- * Parse first heading, exactly six bullet candidates and remaining paragraphs.
- * Keep invalid/unrecognized source text for editorial review; do not fabricate bullets.
+ * Parse a headline, six points and a separate body WITHOUT changing news facts.
+ * Support Markdown bullets, numbered points, bold labels, or six short unmarked
+ * paragraphs/lines before the story (as in pasted Telugu newsroom copy).
+ * Do not synthesize missing points or silently remove overflow content.
+ *
+ * @param {string} input
+ * @returns {{headline:string,points:MagnetPoint[],body:string,ending_line:string,wordCount:number,warnings:string[],recognitionMode:string}}
  */
-/** @param {string} input @returns {{headline:string,points:MagnetPoint[],body:string,ending_line:string,wordCount:number,warnings:string[]}} */
 export function parseMagnetNews(input) {
   const normalized=String(input||'').replace(/\r\n?/g,'\n').replace(/&#x20;|&nbsp;/gi,' ');
-  const lines=normalized.split('\n').map(cleanLine).filter(line=>
-    line && !/^image_[\w.-]+\.(?:png|jpe?g|webp)(?:\s*\+\s*\d+)?$/iu.test(line)
-      && !/^!\[[^\]]*\]\([^)]*\)$/u.test(line)
-  );
-  if (!lines.length) return {headline:'',points:[],body:'',ending_line:MAGNET_DEFAULT_ENDING,wordCount:0, warnings:['వార్తను నమోదు చేయండి.']};
-  const headline=strip(lines[0].replace(/^\*\*(.*?)\*\*$/u,'$1').replace(/^[*#]+/u,'').replace(/[*#]+$/u,''));
+  const allLines = normalized.split('\n').map(cleanLine)
+    .map(line => isMediaMarker(line) ? '' : line);
+  const headingIndex = allLines.findIndex(Boolean);
+  if (headingIndex<0) return {
+    headline:'',points:[],body:'',ending_line:MAGNET_DEFAULT_ENDING,
+    wordCount:0,warnings:['వార్తను నమోదు చేయండి.'],recognitionMode:'empty'
+  };
+  const headline=strip(allLines[headingIndex]
+    .replace(/^\*\*(.*?)\*\*$/u,'$1').replace(/^[*#]+/u,'').replace(/[*#]+$/u,''));
+  const rest = allLines.slice(headingIndex+1);
   /** @type {MagnetPoint[]} */
-  const points=[];
-  const bodyParts=[];
-  for (const line of lines.slice(1)) {
-    if (/^(?:[-*•]\s+|\d{1,2}[.)]\s+)/u.test(line)) {
-      if(points.length<6) points.push(parsePoint(line.replace(/^\d{1,2}[.)]\s+/u,'')));
-      else bodyParts.push(line); // Do not silently discard extra source content.
-    } else {
-      bodyParts.push(strip(line.replace(/\*\*/g,'')));
+  let points=[];
+  /** @type {string[]} */
+  let bodyParts=[];
+  let recognitionMode='explicit';
+
+  // 1. Respect explicit markdown/numbered point markers wherever they occur.
+  for (const line of rest) {
+    if (isExplicitPoint(line) && points.length<6) points.push(parsePoint(line));
+    else if (line) bodyParts.push(strip(line.replace(/\*\*/g,'')));
+  }
+
+  // 2. When the clipboard has stripped bullets, look for six compact paragraphs
+  //    followed by at least one paragraph of story text.
+  if (points.length<6) {
+    const paragraphs=rest.join('\n').split(/\n\s*\n+/u)
+      .map(block=>block.split('\n').map(strip).filter(Boolean).join(' '))
+      .filter(Boolean)
+      .filter(block=>!/^(?:ముఖ్యాంశాలు|ప్రధాన అంశాలు|వార్తా కథనం|పూర్తి కథనం)\s*[:：]?$/u.test(block));
+    const lines=rest.filter(Boolean)
+      .filter(line=>!/^(?:ముఖ్యాంశాలు|ప్రధాన అంశాలు|వార్తా కథనం|పూర్తి కథనం)\s*[:：]?$/u.test(line));
+
+    // A regular full article should not be arbitrarily split into points:
+    // require SIX short segments before a remaining narrative section.
+    const candidates = paragraphs.length>=7 && paragraphs.slice(0,6).every(isCompactPoint)
+      ? {parts:paragraphs,mode:'paragraphs'}
+      : lines.length>=7 && lines.slice(0,6).every(isCompactPoint)
+        ? {parts:lines,mode:'lines'} : null;
+    if(candidates) {
+      points=candidates.parts.slice(0,6).map(parsePoint);
+      bodyParts=candidates.parts.slice(6);
+      recognitionMode=candidates.mode;
     }
   }
+
   const body=bodyParts.join('\n\n').trim();
   const wordCount=newsWordCount(body);
   const warnings=[];
   if(!headline) warnings.push('ప్రధాన శీర్షిక అవసరం.');
-  if(points.length!==6) warnings.push('ఆరు ముఖ్యాంశాలు అవసరం. ప్రస్తుతం '+points.length+' మాత్రమే గుర్తించబడ్డాయి.');
+  if(points.length!==6) warnings.push('ఆరు ముఖ్యాంశాలు అవసరం. ప్రస్తుతం '+points.length+' మాత్రమే గుర్తించబడ్డాయి. పాయింట్లను ఒక్కొక్క ప్యారాగ్రాఫ్‌గా ఇవ్వండి.');
   if(!body) warnings.push('వార్తా కథనం అవసరం.');
   if(wordCount>150) warnings.push('కథనం 150 పదాలు మించింది ('+wordCount+'). సవరించండి.');
   if(points.some(p=>!p.title)) warnings.push('ప్రతి పాయింట్‌కు శీర్షిక ఉండాలి.');
-  return {headline,points,body,ending_line:MAGNET_DEFAULT_ENDING,wordCount,warnings};
+  return {headline,points,body,ending_line:MAGNET_DEFAULT_ENDING,wordCount,warnings,recognitionMode};
 }
 /** @param {MagnetDraft} draft @param {boolean} hasPhoto */
 export function validateMagnetNews(draft, hasPhoto=false) {

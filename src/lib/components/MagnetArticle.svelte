@@ -71,7 +71,7 @@
   .highlight {color:var(--magnet-highlight);}
   .content {padding:24px clamp(14px,3vw,30px);}
   .strips {display:grid; grid-template-columns:1fr; gap:11px;}
-  .strip {display:flex; align-items:flex-start; gap:12px; background:var(--strip-bg); border-left:4px solid var(--strip); border-radius:13px; padding:13px 15px; min-width:0; }
+  .strip {display:flex; align-items:flex-start; gap:12px; background:var(--strip-bg); border-left:5px solid var(--strip); border-radius:13px; padding:13px 15px; min-width:0; box-shadow:0 2px 9px #111a3010; }
   .number {display:grid; place-items:center; flex:0 0 35px; width:35px; height:35px; background:var(--strip); color:#fff; border-radius:10px; font-family:Arial,sans-serif; font-size:13px; font-weight:900;}
   .strip-copy {min-width:0;}
   h2 {color:var(--strip); font-size:16px; margin:0 0 4px; line-height:1.5; font-weight:900;}

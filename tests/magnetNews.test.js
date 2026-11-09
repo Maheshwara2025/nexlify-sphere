@@ -54,3 +54,76 @@ test('theme and impact colors deterministic across refreshes',()=>{
   assert.deepEqual(impactColor(2,'శీర్షిక'),impactColor(2,'శీర్షిక'));
   assert.deepEqual(magnetTheme('auto','శీర్షిక'),magnetTheme('auto','శీర్షిక'));
 });
+
+
+test('recognizes six colorful points from plain Telugu paragraphs without dash markers',()=>{
+  const input = [
+    'రంగారెడ్డి జిల్లా అధికారిపై హైకోర్టు ఆదేశాలు',
+    'తెలంగాణ హైకోర్టు అధికారికి సంబంధించిన అంశాన్ని పరిశీలించింది.',
+    'రంగారెడ్డి జిల్లా పరిధిలో జరిగిన పరిణామాలను కోర్టు ప్రస్తావించింది.',
+    'కోర్టు నిర్ణయం ప్రకారం సంబంధిత అధికారులు స్పందించాల్సి ఉంటుంది.',
+    'ప్రభుత్వం తరఫున తదుపరి చర్యలపై వివరణ ఇచ్చారు.',
+    'ప్రజలకు సంబంధించిన అంశాలపై ప్రత్యేక దృష్టి పెట్టాలని సూచించారు.',
+    'పూర్తి ఉత్తర్వుల వివరాలు అందుబాటులో ఉన్నాయని తెలిపారు.',
+    'తెలంగాణలో కోర్టు ఆదేశాలకు సంబంధించిన పరిణామం చర్చనీయాంశమైంది. ఈ విషయంలో సంబంధిత అధికారుల స్పందన కోసం ఎదురుచూస్తున్నారు.',
+    'అధికారిక సమాచారం అందిన తర్వాత మరిన్ని వివరాలు వెల్లడవుతాయి.'
+  ].join('\n\n');
+  const parsed=parseMagnetNews(input);
+  assert.equal(parsed.recognitionMode,'paragraphs');
+  assert.equal(parsed.points.length,6);
+  assert.equal(parsed.headline,'రంగారెడ్డి జిల్లా అధికారిపై హైకోర్టు ఆదేశాలు');
+  assert.ok(parsed.points[0].title.length>0);
+  assert.ok(parsed.points[0].description.length>0);
+  assert.ok(parsed.body.startsWith('తెలంగాణలో కోర్టు'));
+  assert.ok(!parsed.body.includes('ప్రభుత్వం తరఫున'));
+  assert.deepEqual(validateMagnetNews(parsed,true),[]);
+  assert.equal(new Set(parsed.points.map((_,i)=>impactColor(i,parsed.headline).ink)).size,6);
+});
+
+test('recognizes six unmarked text lines before body',()=>{
+  const input = [
+    'ఒక ముఖ్యమైన తెలంగాణ వార్త',
+    'మొదటి అంశంలో గ్రామానికి సంబంధించిన వివరాలు ఇచ్చారు.',
+    'రెండో అంశంలో అధికారుల సమీక్ష జరిగింది.',
+    'మూడో అంశంలో ప్రజల అభిప్రాయాలు వినిపించారు.',
+    'నాలుగో అంశంలో అభివృద్ధి పనులను ప్రస్తావించారు.',
+    'ఐదో అంశంలో పరిశీలన నిర్వహించారు.',
+    'ఆరో అంశంలో తదుపరి చర్యలు పేర్కొన్నారు.',
+    'మొత్తం మీద ఈ వార్తకు సంబంధించిన పూర్తి కథనం ఇక్కడ ఉంటుంది.'
+  ].join('\n');
+  const parsed=parseMagnetNews(input);
+  assert.equal(parsed.recognitionMode,'lines');
+  assert.equal(parsed.points.length,6);
+  assert.match(parsed.body,/పూర్తి కథనం/);
+});
+
+test('supports six bold Telugu labels without hyphen prefixes',()=>{
+  const input=[
+    '**వార్త ప్రధాన శీర్షిక**',
+    '**ముఖ్య నిర్ణయం:** మొదటి అంశం వివరణ.',
+    '**రెండో అంశం:** రెండో అంశం వివరణ.',
+    '**మూడో అంశం:** మూడో అంశం వివరణ.',
+    '**నాలుగో అంశం:** నాలుగో అంశం వివరణ.',
+    '**ఐదో అంశం:** ఐదో అంశం వివరణ.',
+    '**ఆరో అంశం:** ఆరో అంశం వివరణ.',
+    'ఈ వార్తకు సంబంధించిన పూర్తి వివరాలు ఇక్కడ ఇవ్వబడ్డాయి.'
+  ].join('\n\n');
+  const parsed=parseMagnetNews(input);
+  assert.equal(parsed.recognitionMode,'explicit');
+  assert.equal(parsed.points.length,6);
+  assert.equal(parsed.points[0].title,'ముఖ్య నిర్ణయం');
+  assert.equal(parsed.points[0].description,'మొదటి అంశం వివరణ.');
+});
+
+test('does not manufacture six points from an ordinary short article',()=>{
+  const input=[
+    'సాధారణ వార్త శీర్షిక',
+    'మొదటి పేరాగ్రాఫ్ వార్తా వివరణ.',
+    'రెండో పేరాగ్రాఫ్ మరిన్ని వివరాలు.',
+    'మూడో పేరాగ్రాఫ్ పూర్తి కథనం.'
+  ].join('\n\n');
+  const parsed=parseMagnetNews(input);
+  assert.equal(parsed.points.length,0);
+  assert.match(parsed.warnings.join(' '),/ఆరు/);
+  assert.ok(parsed.body.includes('పేరాగ్రాఫ్'));
+});
