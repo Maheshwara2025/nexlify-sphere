@@ -127,3 +127,55 @@ test('does not manufacture six points from an ordinary short article',()=>{
   assert.match(parsed.warnings.join(' '),/ఆరు/);
   assert.ok(parsed.body.includes('పేరాగ్రాఫ్'));
 });
+
+
+test('clipboard photo counters +1 +2 +3 are not mistaken for news text',()=>{
+  const input = [
+    '**తెలంగాణలో జనగణన 2027 సన్నాహాలు**',
+    '**ప్రణాళిక:** జనగణన షెడ్యూల్‌పై చర్చ జరిగింది.',
+    '**సన్నాహాలు:** అధికారులు ఏర్పాట్లను పరిశీలించారు.',
+    '**సమాచారం:** ప్రజలకు అవసరమైన వివరాలు అందించారు.',
+    'image_f3a178.png+ 1',
+    '+1',
+    '**మండలాలు:** జిల్లా స్థాయిలో వివరాలు సేకరిస్తున్నారు.',
+    '**తేదీలు:** 2027 జనవరి 25 నుంచి ఫిబ్రవరి 28 వరకు అని పేర్కొన్నారు.',
+    '• + 2',
+    '**ఆన్‌లైన్:** ప్రజలకు స్వీయ గణనపై మార్గదర్శకాలు ఇచ్చారు.',
+    '',
+    'జనగణన 2027కు సంబంధించిన ప్రధాన వివరాలు ప్రకటించారు.',
+    '+ 2',
+    '',
+    'ప్రజలకు సంబంధిత ఆన్‌లైన్ ప్రక్రియ వివరించారు.',
+    '• +3'
+  ].join('\n');
+  const parsed = parseMagnetNews(input);
+  assert.equal(parsed.points.length,6);
+  assert.equal(parsed.points[4].title,'తేదీలు');
+  assert.match(parsed.points[4].description,/2027 జనవరి 25/);
+  assert.match(parsed.body,/జనగణన 2027/);
+  assert.doesNotMatch(parsed.body,/(?:^|\n)\s*(?:[•●▪*]\s*)?\+\s*[123]\s*(?:\n|$)/u);
+  assert.doesNotMatch(parsed.body,/image_f3a178/);
+  const shared = magnetShareText(parsed,'https://www.nexlifynucleus.in/news/magnet/test');
+  assert.doesNotMatch(shared,/(?:^|\n)\s*\+\s*[123]\s*(?:\n|$)/u);
+});
+
+test('standalone attachment counters are filtered in plain-paragraph formatting',()=>{
+  const input = [
+    'తెలంగాణలో జనగణన సన్నాహాలపై సమీక్ష',
+    'మొదటి అంశంపై సమాచారం అందించారు.',
+    '+1',
+    'రెండో అంశంలో ఏర్పాట్లను చర్చించారు.',
+    'మూడో అంశంలో డిజిటల్ ప్రక్రియ వివరించారు.',
+    '+ 2',
+    'నాలుగో అంశంలో అధికారులు సూచనలు చేశారు.',
+    'ఐదో అంశంలో తేదీలను వెల్లడించారు.',
+    'ఆరో అంశంలో ప్రజలకు అవగాహన కల్పించారు.',
+    '+3',
+    'వివరాలు ప్రకటించిన తర్వాత సంబంధిత కార్యాలయాల్లో చర్యలు కొనసాగుతున్నాయి.'
+  ].join('\n\n');
+  const parsed=parseMagnetNews(input);
+  assert.equal(parsed.points.length,6);
+  assert.equal(parsed.recognitionMode,'paragraphs');
+  assert.match(parsed.body,/వివరాలు ప్రకటించిన/);
+  assert.doesNotMatch(parsed.body,/\+\s*[123]/u);
+});
