@@ -1,6 +1,6 @@
 -- One Worker ID = one running account, with unlimited installment payments.
 -- Keep existing per-attendance payment RPC; new worker payment atomically distributes
--- one Bank/UPI/Cash transfer over the oldest unpaid attendance rows.\n-- Historical payments may settle only work performed by the actual payment date.
+-- one Bank/UPI/Cash transfer over the oldest unpaid attendance rows.\n-- Each attendance allocation gets a unique invoice_no suffix because the ledger\n-- enforces globally unique voucher numbers; payment header retains shared prefix.\n-- Historical payments may settle only work performed by the actual payment date.
 BEGIN;
 SET LOCAL lock_timeout='7s';
 SET LOCAL statement_timeout='75s';
@@ -128,7 +128,8 @@ BEGIN
     (p_payment_date,'Labour & Mestri',
      'Worker ID '||p_worker_id||' payment for attendance '||v_att.date::text||
        CASE WHEN v_ref IS NULL THEN '' ELSE ' (Ref: '||v_ref||')' END,
-     v_alloc,p_funding_source,v_owner.name,0,0,'Paid',v_voucher,
+     v_alloc,p_funding_source,v_owner.name,0,0,'Paid',
+     v_voucher||'-'||lpad((v_count+1)::text,3,'0'),
      'labour_payment',v_att.id)
    RETURNING id INTO v_tx_id;
    v_count:=v_count+1;
