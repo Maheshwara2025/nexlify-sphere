@@ -6,7 +6,7 @@
   let { children } = $props();
   /** @type {import('$lib/verifiedAccess').AccessState} */
   let accessState = $state('checking');
-  const sections=[['','డాష్‌బోర్డ్'],['materials','మెటీరియల్స్ & బిల్లులు'],['daily-work','సైట్ డైరీ'],['labour','లేబర్ DBMS'],['piecework','పీస్ వర్క్'],['mbook','M-Book'],['party','Party 360°'],['ledger','లెడ్జర్'],['loans','అప్పులు & బాకీలు']];
+  const sections=[['','డాష్‌బోర్డ్'],['materials','మెటీరియల్స్ & బిల్లులు'],['daily-work','సైట్ డైరీ'],['labour','లేబర్ DBMS'],['labour/payments','Labour Payments 007–017'],['piecework','పీస్ వర్క్'],['mbook','M-Book'],['party','Party 360°'],['ledger','లెడ్జర్'],['loans','అప్పులు & బాకీలు']];
   onMount(() => {
     let active=true;
     const stop=createContractorAccessGuard(supabase,{

@@ -393,6 +393,10 @@
         <button on:click={openNewProfileModal} class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black px-3 py-2 rounded-xl shadow transition cursor-pointer">
           👤 కొత్త వర్కర్ ప్రొఫైల్ (DBMS ID)
         </button>
+        <a href="/admin/contractor/labour/payments"
+          class="rounded-xl bg-indigo-700 px-3 py-2 text-xs font-black text-white">
+          📋 LBR-007–017 Payments Register
+        </a>
         <button type="button" on:click={() => openWorkerPayment()}
           class="rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white">
           ₹ Labour ID-wise Payment (UPI/Bank/Cash)
