@@ -10,7 +10,40 @@
   let savingPayment = false;
   let paymentRow = null;
   let paymentAmount = '';
-  let paymentFunding = 'Cash';
+  let paymentFunding = 'UPI';
+  let paymentDate = projectToday();
+  let dailyPaymentError = '';
+  let labourPayments = [];
+  let workerBatches = [];
+  let workerPaymentId = '';
+  let workerPaymentAmount = '';
+  let workerPaymentSource = 'UPI';
+  let workerPaymentDate = projectToday();
+  let workerPaymentRef = '';
+  let workerPaymentNotes = '';
+  let workerPaymentKey = '';
+  let workerPaymentFingerprint = '';
+  let workerPaymentSaving = false;
+  let workerPaymentError = '';
+  let workerPaymentSuccess = '';
+  let showWorkerPaymentModal = false;
+  $: labourPaymentTotals = labourPayments.reduce((map, tx) => {
+    if (tx.entry_type === 'labour_payment' && tx.labour_id != null)
+      map.set(String(tx.labour_id), (map.get(String(tx.labour_id)) || 0) + Number(tx.amount || 0));
+    return map;
+  }, new Map());
+  function paymentDue(row) {
+    return Math.max(0, Math.round((Number(row.days || 0)*Number(row.daily_rate || 0) -
+      Number(row.advance_paid || 0)-Number(labourPaymentTotals.get(String(row.id)) || 0))*100)/100);
+  }
+  $: workerRows = labourRecords.filter(row => row.worker_id === workerPaymentId);
+  $: workerEarned = workerRows.reduce((sum,row) => sum + Number(row.days || 0)*Number(row.daily_rate || 0),0);
+  $: workerAdvances = workerRows.reduce((sum,row) => sum + Number(row.advance_paid || 0),0);
+  $: workerPaid = workerRows.reduce((sum,row) => sum + Number(labourPaymentTotals.get(String(row.id)) || 0),0);
+  $: workerOutstanding = Math.max(0,Math.round((workerEarned-workerAdvances-workerPaid)*100)/100);
+  $: workerHistory = workerBatches.filter(b => b.worker_id === workerPaymentId);
+  $: workerName = profiles.find(p=>p.worker_id===workerPaymentId)?.name || '';
+
 
   let dataError = '';
   let mutationError = '';
@@ -68,8 +101,14 @@
     loading = true;
     dataError = '';
     try {
-      const [workers, attendance] = await Promise.all([readAllRows(supabase,'contractor_labour_profiles',{ascending:true}),readAllRows(supabase,'contractor_labour',{orderBy:'date'})]);
+      const [workers, attendance, tx, batches] = await Promise.all([
+        readAllRows(supabase,'contractor_labour_profiles',{ascending:true}),
+        readAllRows(supabase,'contractor_labour',{orderBy:'date'}),
+        readAllRows(supabase,'contractor_transactions',{orderBy:'date'}),
+        readAllRows(supabase,'contractor_worker_payments',{orderBy:'payment_date'})
+      ]);
       profiles=workers; labourRecords=attendance;
+      labourPayments=tx.filter(t=>t.entry_type==='labour_payment'); workerBatches=batches;
     } catch (error) {
       dataError = dataErrorMessage(error);
     } finally {
@@ -217,16 +256,76 @@
 
   async function saveLabourPayment() {
     if (!paymentRow || savingPayment) return;
-    savingPayment = true; mutationError = '';
+    dailyPaymentError = '';
+    const amount=Number(paymentAmount);
+    if (!Number.isFinite(amount)||amount<=0||amount>paymentDue(paymentRow)) {
+      dailyPaymentError='ఈ Attendance మిగిలిన బాకీ కన్నా ఎక్కువ Payment ఇవ్వలేరు.'; return;
+    }
+    if (!paymentDate || paymentDate>projectToday()) {
+      dailyPaymentError='నిజమైన Payment Date ఎంచుకోండి; భవిష్యత్తు తేదీ వద్దు.'; return;
+    }
+    savingPayment=true;
     try {
-      await postEntry('labour_payment', {
-        labour_id: paymentRow.id, date: projectToday(),
-        amount: paymentAmount, funding_source: paymentFunding
+      await postEntry('labour_payment',{
+        labour_id:paymentRow.id,date:paymentDate,amount,funding_source:paymentFunding
       });
-      paymentRow = null;
+      paymentRow=null;
       await fetchAll();
-    } catch (error) { mutationError = dataErrorMessage(error); }
-    finally { savingPayment = false; }
+      workerPaymentSuccess='ఒక్కరోజు Attendance Payment నమోదైంది; Balance నవీకరించబడింది.';
+    } catch(error){dailyPaymentError=dataErrorMessage(error);}
+    finally{savingPayment=false;}
+  }
+
+  function openWorkerPayment(worker=null) {
+    workerPaymentId=worker?.worker_id||'';
+    workerPaymentAmount='';
+    workerPaymentSource='UPI';
+    workerPaymentDate=projectToday();
+    workerPaymentRef='';workerPaymentNotes='';
+    workerPaymentKey='';workerPaymentFingerprint='';
+    workerPaymentError='';
+    showWorkerPaymentModal=true;
+  }
+
+  async function saveWorkerPayment() {
+    if(workerPaymentSaving)return;
+    workerPaymentError='';
+    const amount=Number(workerPaymentAmount);
+    if(!workerPaymentId||!Number.isFinite(amount)||amount<=0||amount>workerOutstanding){
+      workerPaymentError='Labour ID, చెల్లించిన మొత్తం, మిగిలిన బాకీ సరిచూడండి.';return;
+    }
+    if(!workerPaymentDate||workerPaymentDate>projectToday()){
+      workerPaymentError='అసలు UPI/Bank/Cash Payment తేదీ ఇవ్వండి.';return;
+    }
+    const draft={workerId:workerPaymentId,amount,source:workerPaymentSource,date:workerPaymentDate,
+      reference:workerPaymentRef.trim(),notes:workerPaymentNotes.trim()};
+    const fingerprint=JSON.stringify(draft);
+    if(!workerPaymentKey||fingerprint!==workerPaymentFingerprint){
+      workerPaymentKey='asv_worker_'+crypto.randomUUID().replaceAll('-','');
+      workerPaymentFingerprint=fingerprint;
+    }
+    workerPaymentSaving=true;
+    try {
+      const {data,error}=await supabase.rpc('contractor_pay_worker_v1',{
+        p_worker_id:draft.workerId,p_amount:draft.amount,p_funding_source:draft.source,
+        p_payment_date:draft.date,p_payment_reference:draft.reference,p_notes:draft.notes,
+        p_idempotency_key:workerPaymentKey
+      });
+      if(error)throw error;
+      if(!data?.success||!data?.voucher_no)throw new Error('Payment సేవ్ నిర్ధారణ కాలేదు.');
+      workerPaymentKey='';workerPaymentFingerprint='';
+      const voucher=data.voucher_no;
+      showWorkerPaymentModal=false;
+      await fetchAll();
+      workerPaymentSuccess='₹'+amount.toLocaleString('en-IN')+' Payment నమోదైంది · Voucher: '+voucher;
+    }catch(error){
+      const msg=String(error?.message||'Payment Save కాలేదు.');
+      workerPaymentError=/PAYMENT_EXCEEDS_DUE/.test(msg)
+        ? 'చెల్లింపు మొత్తం మిగిలిన బాకీ కన్నా ఎక్కువ. Reload చేసి ప్రయత్నించండి.'
+        : /worker_payment_upi_reference_unique|duplicate key/i.test(msg)
+        ? 'UPI Reference ఇప్పటికే ఈ Worker IDలో నమోదైంది (Already Entered).'
+        : msg;
+    }finally{workerPaymentSaving=false;}
   }
 
   async function deleteLabour(id) {
