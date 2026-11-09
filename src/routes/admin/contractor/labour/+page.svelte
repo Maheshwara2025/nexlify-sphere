@@ -366,6 +366,10 @@
         <button on:click={openNewProfileModal} class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black px-3 py-2 rounded-xl shadow transition cursor-pointer">
           👤 కొత్త వర్కర్ ప్రొఫైల్ (DBMS ID)
         </button>
+        <button type="button" on:click={() => openWorkerPayment()}
+          class="rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white">
+          ₹ Labour ID-wise Payment (UPI/Bank/Cash)
+        </button>
         <button on:click={() => showAttendanceModal = true} class="bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black px-3.5 py-2 rounded-xl shadow transition cursor-pointer">
           ➕ రోజువారీ హాజరు నమోదు
         </button>
@@ -388,11 +392,19 @@
               <strong class="block text-slate-900 truncate mt-1">{p.name}</strong>
               <span class="text-[10px] text-slate-500 block truncate">{p.role}</span>
               <span class="text-[10.5px] font-mono font-bold text-emerald-700">₹{p.daily_rate}/రోజు</span>
+              <button type="button" on:click={() => openWorkerPayment(p)}
+                class="mt-2 block w-full rounded-lg bg-emerald-100 px-2 py-1.5 text-[10px] font-bold text-emerald-900">
+                ₹ ఖాతా / Payment
+              </button>
             </div>
           {/each}
         </div>
       {/if}
     </div>
+
+    {#if workerPaymentSuccess}
+      <p role="status" class="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-bold text-emerald-900">{workerPaymentSuccess}</p>
+    {/if}
 
     <!-- Attendance Table -->
     <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
@@ -425,7 +437,8 @@
             <tbody class="divide-y divide-slate-100 font-medium">
               {#each labourRecords as l}
                 {@const totalEarned = (l.days ? Number(l.days) : 1) * (l.daily_rate ? Number(l.daily_rate) : 0)}
-                {@const balanceDue = totalEarned - (l.advance_paid ? Number(l.advance_paid) : 0)}
+                {@const alreadyPaid = Number(labourPaymentTotals.get(String(l.id)) || 0)}
+                 {@const balanceDue = paymentDue(l)}
                 <tr class="hover:bg-slate-50 transition">
                   <td class="p-3 font-mono text-slate-500">
                     {l.date}
@@ -442,13 +455,19 @@
                   <td class="p-3 text-center font-mono">{l.days}</td>
                   <td class="p-3 text-right font-mono">₹ {l.daily_rate}</td>
                   <td class="p-3 text-right font-mono font-bold">₹ {totalEarned.toLocaleString('en-IN')}</td>
-                  <td class="p-3 text-right font-mono text-emerald-700">₹ {Number(l.advance_paid || 0).toLocaleString('en-IN')}</td>
+                  <td class="p-3 text-right font-mono text-emerald-700">
+                    ₹ {Number(l.advance_paid || 0).toLocaleString('en-IN')}
+                    {#if alreadyPaid > 0}<span class="mt-1 block text-[10px] text-indigo-700">Paid ₹{alreadyPaid.toLocaleString('en-IN')}</span>{/if}
+                   </td>
                   <td class="p-3 text-right font-mono font-black text-rose-600">₹ {balanceDue.toLocaleString('en-IN')}</td>
                   <td class="p-3 text-center whitespace-nowrap">
                     <button type="button" on:click={() => openEditAttendance(l)}
                       class="mr-2 rounded bg-blue-50 px-2 py-1 text-xs font-bold text-blue-800" aria-label="{l.worker_name} హాజరు సవరించండి">✎ సవరించు</button>
-                    <button on:click={() => { paymentRow = l; paymentAmount = ''; paymentFunding = 'Cash'; }}
-                    class="mr-2 rounded bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-800">చెల్లింపు</button>
+                    <button type="button" disabled={balanceDue<=0}
+                    on:click={() => { paymentRow=l; paymentAmount=String(balanceDue); paymentFunding='UPI'; paymentDate=projectToday(); dailyPaymentError=''; }}
+                    class="mr-2 rounded bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-800 disabled:opacity-30">
+                    {balanceDue<=0?'✓ Paid':'ఒక్కరోజు Payment'}
+                    </button>
                   <button disabled={!FINANCIAL_WRITES_ENABLED} on:click={() => deleteLabour(l.id)} class="text-rose-500 font-bold hover:text-rose-700">✕</button>
                   </td>
                 </tr>
@@ -686,18 +705,23 @@
       <div class="flex justify-between font-black"><span>కూలీ చెల్లింపు — {paymentRow.worker_name}</span>
         <button type="button" on:click={() => paymentRow=null}>✕</button>
       </div>
-      <p class="text-xs text-slate-500">హాజరు # {paymentRow.id} · చెల్లించాల్సిన మొత్తం మించకూడదు.</p>
+      <p class="text-xs text-slate-500">Attendance #{paymentRow.id} · {paymentRow.date} · మిగిలిన బాకీ ₹{paymentDue(paymentRow).toLocaleString('en-IN')}</p>
+      {#if dailyPaymentError}<p role="alert" class="rounded-lg bg-red-50 p-3 text-xs font-bold text-red-800">{dailyPaymentError}</p>{/if}
+      <p class="text-xs text-indigo-700">అనేక రోజుల బాకీకి కలిపి Payment చేయాలంటే "Labour ID-wise Payment" ఉపయోగించండి.</p>
       <form class="space-y-3" on:submit|preventDefault={saveLabourPayment}>
         <label class="block text-xs font-bold">మొత్తం ₹
-          <input type="number" min="0.01" step="0.01" required bind:value={paymentAmount}
+          <input type="number" min="0.01" max={paymentDue(paymentRow)} step="0.01" required bind:value={paymentAmount}
             class="mt-1 w-full rounded-lg border p-2" />
+        </label>
+        <label class="block text-xs font-bold">నిజంగా చెల్లించిన తేదీ
+          <input type="date" max={projectToday()} required bind:value={paymentDate} class="mt-1 w-full rounded-lg border p-2"/>
         </label>
         <label class="block text-xs font-bold">Payment Account
           <select bind:value={paymentFunding} class="mt-1 w-full rounded-lg border p-2">
             <option value="Cash">Cash</option><option value="Bank">Bank</option><option value="UPI">UPI</option>
           </select>
         </label>
-        <button disabled={!STAGE3_ATOMIC_ENTRIES_ENABLED || savingPayment} type="submit"
+        <button disabled={!STAGE3_ATOMIC_ENTRIES_ENABLED || savingPayment || paymentDue(paymentRow)<=0} type="submit"
           class="w-full rounded-lg bg-emerald-700 p-3 font-black text-white disabled:opacity-50">
           {savingPayment ? 'Saving...' : 'Atomic Payment Save'}
         </button>
