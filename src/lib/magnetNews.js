@@ -155,9 +155,6 @@ export function parseMagnetNews(input) {
   if(!body) warnings.push('వార్తా కథనం అవసరం.');
   if(wordCount>150) warnings.push('కథనం 150 పదాలు మించింది ('+wordCount+'). సవరించండి.');
   if(points.some(p=>!p.title)) warnings.push('ప్రతి పాయింట్‌కు శీర్షిక ఉండాలి.');
-  if(recognitionMode==='paragraphs' || recognitionMode==='lines') {
-    warnings.push('6 రంగుల పాయింట్లు ఆటోమేటిక్‌గా గుర్తించాం. Previewలో విభజన సరిగా ఉందో పరిశీలించండి.');
-  }
   return {headline,points,body,ending_line:MAGNET_DEFAULT_ENDING,wordCount,warnings,recognitionMode};
 }
 /** @param {MagnetDraft} draft @param {boolean} hasPhoto */
