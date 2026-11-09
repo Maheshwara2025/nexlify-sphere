@@ -63,7 +63,7 @@ function parsePoint(raw) {
   // Plain pasted points often lose Markdown list markers. Split a short leading phrase
   // into a colored heading, keeping the exact remaining words as the description.
   const words = strip(line.replace(/\*\*/g, '')).split(/\s+/u).filter(Boolean);
-  if (words.length <= 6) return {title:words.join(' '), description:''};
+  if (words.length <= 4) return {title:words.join(' '), description:''};
   const titleLength = Math.min(5, Math.max(3, Math.floor(words.length / 3)));
   return {title:words.slice(0, titleLength).join(' '), description:words.slice(titleLength).join(' ')};
 }
