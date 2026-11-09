@@ -729,3 +729,94 @@
     </div>
   </div>
 {/if}
+
+
+<!-- Worker-ID running account: one real UPI/Bank/Cash transfer, many attendance allocations. -->
+{#if showWorkerPaymentModal}
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3">
+    <div class="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 text-slate-900 shadow-xl space-y-4">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <h3 class="text-lg font-black">₹ Labour ID-wise Payment / ఖాతా</h3>
+          <p class="mt-1 text-xs text-slate-600">అనేక విడతల చెల్లింపులు · పాత Attendance నుంచి ఆటో సర్దుబాటు</p>
+        </div>
+        <button type="button" on:click={() => showWorkerPaymentModal=false} class="text-xl" aria-label="మూసివేయండి">✕</button>
+      </div>
+      {#if workerPaymentError}<p role="alert" class="rounded-lg bg-red-50 p-3 text-sm font-bold text-red-800">{workerPaymentError}</p>{/if}
+      <label class="block text-xs font-bold">Labour ID ఎంచుకోండి *
+        <select bind:value={workerPaymentId}
+          on:change={() => {workerPaymentAmount='';workerPaymentRef='';workerPaymentError='';workerPaymentKey='';workerPaymentFingerprint='';}}
+          class="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm" required>
+          <option value="">-- Worker ID --</option>
+          {#each profiles as p}<option value={p.worker_id}>{p.worker_id} — {p.name}</option>{/each}
+        </select>
+      </label>
+      {#if workerPaymentId}
+        <div class="rounded-xl border border-indigo-200 bg-indigo-50 p-3">
+          <strong class="text-sm">{workerName} ({workerPaymentId})</strong>
+          <div class="mt-2 grid grid-cols-2 gap-2 text-xs">
+            <span>మొత్తం వేతనం: <strong>₹{workerEarned.toLocaleString('en-IN')}</strong></span>
+            <span>అడ్వాన్స్: <strong>₹{workerAdvances.toLocaleString('en-IN')}</strong></span>
+            <span>చేసిన Payments: <strong>₹{workerPaid.toLocaleString('en-IN')}</strong></span>
+            <span class="font-black text-red-700">మిగిలిన బాకీ: ₹{workerOutstanding.toLocaleString('en-IN')}</span>
+          </div>
+        </div>
+        {#if workerOutstanding>0}
+          <form class="space-y-3" on:submit|preventDefault={saveWorkerPayment}>
+            <label class="block text-xs font-bold">ఈ విడత చెల్లించిన మొత్తం ₹ *
+              <input type="number" min="0.01" max={workerOutstanding} step="0.01" required bind:value={workerPaymentAmount}
+                class="mt-1 w-full rounded-xl border border-slate-300 p-3 text-sm" placeholder="UPIలో ఇచ్చిన నిజమైన మొత్తం"/>
+            </label>
+            <div class="grid grid-cols-2 gap-2">
+              <label class="block text-xs font-bold">చెల్లించిన తేదీ *
+                <input type="date" max={projectToday()} required bind:value={workerPaymentDate}
+                  class="mt-1 w-full rounded-xl border border-slate-300 p-3 text-sm"/>
+              </label>
+              <label class="block text-xs font-bold">Payment Mode *
+                <select bind:value={workerPaymentSource}
+                  class="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm">
+                  <option value="UPI">UPI (GPay/PhonePe)</option>
+                  <option value="Bank">Bank Transfer</option>
+                  <option value="Cash">Cash</option>
+                </select>
+              </label>
+            </div>
+            <label class="block text-xs font-bold">UPI Transaction ID / UTR (ఉంటే)
+              <input type="text" maxlength="100" bind:value={workerPaymentRef}
+                placeholder="UPI Reference" class="mt-1 w-full rounded-xl border border-slate-300 p-3 text-sm"/>
+            </label>
+            <label class="block text-xs font-bold">Payment Notes (Optional)
+              <textarea rows="2" maxlength="500" bind:value={workerPaymentNotes}
+                placeholder="వారపు కూలీ చెల్లింపు" class="mt-1 w-full rounded-xl border border-slate-300 p-3 text-sm"></textarea>
+            </label>
+            <p class="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
+              ఇచ్చిన డబ్బు పాత Attendanceల బాకీకి క్రమంగా సర్దుబాటు అవుతుంది.
+              ఇక్కడ Save చేయడం వలన బ్యాంకులో మరో UPI Transfer జరగదు; Ledgerలో మాత్రమే నమోదవుతుంది.
+            </p>
+            <button type="submit" disabled={workerPaymentSaving}
+              class="w-full rounded-xl bg-emerald-700 p-3 text-sm font-black text-white disabled:opacity-50">
+              {workerPaymentSaving?'సేవ్ అవుతోంది…':'Worker Payment Save & Ledger Update'}
+            </button>
+          </form>
+        {:else}
+          <p class="rounded-lg bg-emerald-50 p-3 text-sm font-bold text-emerald-800">ఈ Labour IDకి బాకీ లేదు.</p>
+        {/if}
+        <section class="space-y-2 border-t pt-3">
+          <h4 class="text-sm font-black">Payment Installments ({workerHistory.length})</h4>
+          {#if workerHistory.length===0}
+            <p class="text-xs text-slate-500">Worker ID-wise Payments ఇంకా నమోదు కాలేదు.</p>
+          {:else}
+            <div class="max-h-48 space-y-2 overflow-y-auto">
+              {#each workerHistory as payment}
+                <div class="flex justify-between gap-2 rounded-lg border p-2 text-xs">
+                  <span>{payment.payment_date} · {payment.funding_source} · {payment.payment_reference||payment.voucher_no}</span>
+                  <strong>₹{Number(payment.amount).toLocaleString('en-IN')}</strong>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </section>
+      {/if}
+    </div>
+  </div>
+{/if}
