@@ -18,8 +18,8 @@ const data={
  transactions:[
   {id:99,labour_id:11,date:'2026-10-04',amount:500,entry_type:'labour_advance',source:'Cash',invoice_no:'ASV-ADV-99'},
   {id:100,labour_id:11,date:'2026-10-12',amount:600,entry_type:'labour_payment',source:'UPI',invoice_no:'ASV-WPAY-ONE-001'},
-  {id:101,labour_id:12,date:'2026-10-12',amount:1000,entry_type:'labour_payment',source:'UPI',invoice_no:'ASV-WPAY-TWO-001'},
-  {id:102,labour_id:13,date:'2026-10-12',amount:700,entry_type:'labour_payment',source:'UPI',invoice_no:'ASV-WPAY-TWO-002'},
+  {id:101,labour_id:12,date:'2026-10-12',amount:1100,entry_type:'labour_payment',source:'UPI',invoice_no:'ASV-WPAY-TWO-001'},
+  {id:102,labour_id:13,date:'2026-10-12',amount:600,entry_type:'labour_payment',source:'UPI',invoice_no:'ASV-WPAY-TWO-002'},
   {id:103,labour_id:13,date:'2026-10-24',amount:500,entry_type:'labour_payment',source:'Bank',invoice_no:'ASV-DAILY-103'},
   {id:104,labour_id:14,date:'2026-10-12',amount:999,entry_type:'labour_payment',source:'Cash',invoice_no:'ASV-OUTSIDE-104'}
  ],
@@ -62,7 +62,7 @@ test('CSV exposes names, worker IDs, UPI references and safe numeric amount',()=
  assert.match(csv,/LBR-008/);
  assert.match(csv,/UTR-TWO/);
  assert.match(csv,/1700\.00/);
- assert.match(balances,/3300/);
+ assert.match(balances,/2200\\.00/);
  const malicious=labourPaymentCsv([{workerId:'LBR-007',name:'=1+2',date:'2026-10-12',amount:1,notes:'@bad'}]);
  assert.ok(malicious.includes("'=1+2"));
  assert.ok(malicious.includes("'@bad"));
