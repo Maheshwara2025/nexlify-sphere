@@ -698,6 +698,12 @@
                   <option value="Tools & Equipment">🔧 పనిముట్లు, బైండింగ్ వైర్</option>
                   <option value="General Overheads">📝 జనరల్ సైట్ ఖర్చులు</option>
                 </select>
+                {#if ['Materials','Labour & Mestri','Centring'].includes(expForm.category)}
+                  <p class="mt-1 text-[10px] font-bold text-amber-800">
+                    ⚠️ Supplier Bill, Labour Attendance లేదా Piecework బాకీ చెల్లింపును Expenseలో మళ్లీ Save చేయవద్దు.
+                    సంబంధించిన Payment Option ఉపయోగించండి. ప్రత్యేకంగా ఇచ్చిన Site ఖర్చులు మాత్రమే ఇక్కడ నమోదు చేయండి.
+                  </p>
+                {/if}
               </div>
               <div>
                 <label class="block font-bold text-slate-700 mb-1">తేదీ</label>
