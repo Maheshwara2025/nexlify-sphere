@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
   import { impactColor } from '$lib/magnetNews.js';
+  /** @type {any[]} */
   let articles=[];
   let loading=true;
   let message='';
