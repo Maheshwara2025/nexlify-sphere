@@ -1,6 +1,6 @@
 -- One Worker ID = one running account, with unlimited installment payments.
 -- Keep existing per-attendance payment RPC; new worker payment atomically distributes
--- one Bank/UPI/Cash transfer over the oldest unpaid attendance rows.
+-- one Bank/UPI/Cash transfer over the oldest unpaid attendance rows.\n-- Historical payments may settle only work performed by the actual payment date.
 BEGIN;
 SET LOCAL lock_timeout='7s';
 SET LOCAL statement_timeout='75s';
@@ -111,7 +111,8 @@ BEGIN
  v_voucher:='ASV-WPAY-'||replace(pg_catalog.gen_random_uuid()::text,'-','');
 
  FOR v_att IN SELECT * FROM public.contractor_labour
-   WHERE worker_id=p_worker_id ORDER BY date,id FOR UPDATE
+   WHERE worker_id=p_worker_id AND date<=p_payment_date
+   ORDER BY date,id FOR UPDATE
  LOOP
    SELECT coalesce(sum(amount),0) INTO v_already_paid
    FROM public.contractor_transactions
