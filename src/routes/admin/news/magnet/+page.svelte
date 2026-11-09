@@ -10,18 +10,22 @@
 
   let access = 'checking';
   let rawInput = '';
+  /** @type {{headline:string,points:Array<{title:string,description:string}>,body:string,ending_line:string}} */
   let draft = {headline:'',points:[],body:'',ending_line:MAGNET_DEFAULT_ENDING};
   let locationTown = 'తెలంగాణ';
   let category = 'స్థానిక వార్తలు';
   let themeKey = 'auto';
+  /** @type {File|null} */
   let file = null;
   let previewUrl = '';
   let savedUrl = '';
+  /** @type {string|null} */
   let savedId = null;
   let savedSlug = '';
   let previewTab = 'article';
   let status = '';
   let saving = false;
+  /** @type {HTMLDivElement|undefined} */
   let cardNode;
   let clipboardState = '';
   const categories = ['స్థానిక వార్తలు','రాజకీయాలు','వ్యాపారం & ఫైనాన్స్','టెక్నాలజీ','ఆరోగ్యం','వాతావరణం & పర్యావరణం','విద్య & ఉద్యోగాలు','సంస్కృతి & సమాజం','ప్రపంచ వార్తలు'];
@@ -46,8 +50,10 @@
     savedId = null; savedSlug = ''; savedUrl = '';
     previewTab='article';
   }
+  /** @param {Event} e */
   function onFile(e) {
-    const selected=e.currentTarget.files?.[0];
+    const input = /** @type {HTMLInputElement} */ (e.currentTarget);
+    const selected=input.files?.[0];
     if(!selected) return;
     try {
       checkNewsFile(selected,'image');
@@ -56,10 +62,11 @@
       file=selected; savedUrl='';
       status='ఫొటో ఎంపికైంది.';
     } catch(err) {
-      e.currentTarget.value='';
-      status=err.message || 'ఫొటో చెల్లదు.';
+      input.value='';
+      status=err instanceof Error ? err.message : 'ఫొటో చెల్లదు.';
     }
   }
+  /** @param {boolean} publish */
   async function saveNews(publish) {
     if (saving || access!=='allowed') return;
     const errors = validateMagnetNews(draft,!!(file||savedUrl));
@@ -93,7 +100,7 @@
       savedId=data.id;savedSlug=data.slug;savedUrl=url;file=null;
       status=publish?'వార్త విజయవంతంగా ప్రచురించబడింది.':'Draft విజయవంతంగా సేవ్ అయింది.';
     } catch(err) {
-      status='Save Error: '+(err?.message || 'Unknown error');
+      status='Save Error: '+(err instanceof Error ? err.message : 'Unknown error');
       // If upload succeeded but record failed, remove the orphaned object where permitted.
       if(uploadedPath) await supabase.storage.from('news-images').remove([uploadedPath]).catch(()=>{});
     } finally { saving=false; }
@@ -110,7 +117,7 @@
       const url=await imageDataUrl();
       const a=document.createElement('a');a.href=url;a.download=(savedSlug || 'ns-magnet-news')+'.png';a.click();
       status='WhatsApp Card PNG సిద్ధమైంది.';
-    } catch(err) {status='Card Export Error: '+(err?.message||'Export failed');}
+    } catch(err) {status='Card Export Error: '+(err instanceof Error ? err.message : 'Export failed');}
   }
   async function shareCard() {
     try {
@@ -120,7 +127,7 @@
       if(navigator.canShare?.({files:[f]})) {
         await navigator.share({files:[f],title:draft.headline,text:'NS NEWS'});
       } else {await downloadPng(); status='PNG Download అయ్యింది. WhatsAppలో ఫొటోగా జతచేయండి.';}
-    } catch(err) { status='Sharing unavailable: '+(err?.message||'Download PNG instead.'); }
+    } catch(err) { status='Sharing unavailable: '+(err instanceof Error ? err.message : 'Download PNG instead.'); }
   }
   async function copyText() {
     try {await navigator.clipboard.writeText(magnetShareText(previewArticle,publishedUrl)); clipboardState='కాపీ అయింది';}
