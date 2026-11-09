@@ -89,6 +89,7 @@
 
       <!-- కుడివైపు బటన్లు -->
       <div class="flex items-center gap-2">
+        <a href="/news/magnet" class="text-xs bg-amber-500 hover:bg-amber-600 text-slate-950 px-3 py-1.5 rounded-xl font-black transition shadow">✨ మ్యాగ్నెట్ న్యూస్</a>
         <a 
           href="/admin/news" 
           class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-xl border border-slate-700 font-bold transition flex items-center gap-1"
