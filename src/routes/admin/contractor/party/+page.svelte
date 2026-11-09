@@ -13,6 +13,7 @@
   let profiles=[];
   let parties=[];
   let pieceworkRecords=[];
+  let workerPaymentBatches=[];
   let selectedParty = '';
   let loading = true;
 
@@ -21,8 +22,16 @@
   async function fetchPartyData() {
     loading=true; dataError='';
     try {
-      const [tx,labour,workers,suppliers,contracts]=await Promise.all([readAllRows(supabase,'contractor_transactions',{orderBy:'date'}),readAllRows(supabase,'contractor_labour',{orderBy:'date'}),readAllRows(supabase,'contractor_labour_profiles'),readAllRows(supabase,'contractor_parties'),readAllRows(supabase,'contractor_piecework')]);
-      transactions=tx; labourRecords=labour; profiles=workers; parties=suppliers; pieceworkRecords=contracts;
+      const [tx,labour,workers,suppliers,contracts,batches]=await Promise.all([
+        readAllRows(supabase,'contractor_transactions',{orderBy:'date'}),
+        readAllRows(supabase,'contractor_labour',{orderBy:'date'}),
+        readAllRows(supabase,'contractor_labour_profiles'),
+        readAllRows(supabase,'contractor_parties'),
+        readAllRows(supabase,'contractor_piecework'),
+        readAllRows(supabase,'contractor_worker_payments',{orderBy:'payment_date'})
+      ]);
+      transactions=tx; labourRecords=labour; profiles=workers; parties=suppliers;
+      pieceworkRecords=contracts; workerPaymentBatches=batches;
     } catch(error) { dataError=dataErrorMessage(error); }
     finally { loading=false; }
   }
@@ -40,6 +49,8 @@
   $: labTotalDays=account.totalDays;
   $: labTotalEarned=account.totalBilled;
   $: labAdvancePaid=account.totalPaid;
+  $: selectedWorkerId=selectedParty.startsWith('worker:')?decodeURIComponent(selectedParty.slice(7)):'';
+  $: workerHistory=workerPaymentBatches.filter(b=>b.worker_id===selectedWorkerId);
   $: labNetDue=account.totalDue;
   function shareWhatsApp() {
     let text = `*A.S.V. ENTERPRISES - వ్యక్తిగత ఖాతా నివేదిక*\n\n`;
@@ -48,7 +59,7 @@
       text += `హోదా: కూలీ / మేస్త్రి\n`;
       text += `మొత్తం పనిచేసిన రోజులు: ${labTotalDays} రోజులు\n`;
       text += `మొత్తం వేతనం: ₹ ${labTotalEarned.toLocaleString('en-IN')}\n`;
-      text += `ఇచ్చిన అడ్వాన్స్: ₹ ${labAdvancePaid.toLocaleString('en-IN')}\n`;
+      text += `చెల్లించిన మొత్తం (Advance + Payments): ₹ ${labAdvancePaid.toLocaleString('en-IN')}\n`;
       text += `*మిగిలిన నికర బాకీ: ₹ ${labNetDue.toLocaleString('en-IN')}*\n`;
     } else {
       text += `హోదా: సప్లయర్ / ట్రేడర్\n`;
@@ -115,7 +126,7 @@
           {/if}
         </div>
         <div class="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl shadow-sm">
-          <span class="text-[10px] text-emerald-700 font-bold uppercase block">{isWorker ? 'ఇచ్చిన అడ్వాన్స్ (Advance Paid)' : 'చెల్లించిన నగదు'}</span>
+          <span class="text-[10px] text-emerald-700 font-bold uppercase block">{isWorker ? 'చెల్లించిన మొత్తం (Advance + UPI/Bank/Cash)' : 'చెల్లించిన నగదు'}</span>
           <span class="text-lg font-black font-mono text-emerald-800">₹ {(isWorker ? labAdvancePaid : supPaid).toLocaleString('en-IN')}</span>
         </div>
         <div class="p-4 bg-rose-50 border border-rose-200 rounded-2xl shadow-sm">
@@ -123,6 +134,37 @@
           <span class="text-lg font-black font-mono text-rose-700">₹ {(isWorker ? labNetDue : supDue).toLocaleString('en-IN')}</span>
         </div>
       </div>
+
+      {#if isWorker}
+        <section class="mt-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <h2 class="text-sm font-black">💸 Labour ID-wise Payment History (Installments)</h2>
+            <a href="/admin/contractor/labour" class="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-black text-white">
+              ₹ Worker Payment నమోదు
+            </a>
+          </div>
+          {#if workerHistory.length===0}
+            <p class="text-xs text-slate-500">ఈ Labour IDకి Worker-wise Payments ఇంకా నమోదు కాలేదు.</p>
+          {:else}
+            <div class="overflow-x-auto">
+              <table class="w-full min-w-[450px] text-left text-xs">
+                <thead><tr class="border-b bg-slate-100"><th class="p-2">Payment Date</th><th class="p-2">Mode</th><th class="p-2">UPI/Bank Ref</th><th class="p-2 text-right">మొత్తం</th></tr></thead>
+                <tbody>
+                  {#each workerHistory as batch}
+                    <tr class="border-b">
+                      <td class="p-2">{batch.payment_date}</td>
+                      <td class="p-2 font-bold">{batch.funding_source}</td>
+                      <td class="p-2">{batch.payment_reference || batch.voucher_no}</td>
+                      <td class="p-2 text-right font-black">₹{Number(batch.amount).toLocaleString('en-IN')}</td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            </div>
+          {/if}
+          <p class="text-[11px] text-slate-600">ఒకే UPI Paymentను పలు Attendance తేదీలకు సర్దుబాటు చేసినా, పై పట్టికలో ఒక్క Paymentగా కనిపిస్తుంది. కింద Ledgerలో వాటి విడి Allocationలు ఉంటాయి.</p>
+        </section>
+      {/if}
 
       <!-- Labour Passbook Table -->
       {#if isWorker}
