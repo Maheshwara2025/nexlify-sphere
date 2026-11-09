@@ -39,7 +39,7 @@
       const dataUrl=await generatePng();
       const blob=await(await fetch(dataUrl)).blob();
       const f=new File([blob],'ns-magnet.png',{type:'image/png'});
-      if(navigator.canShare?.({files:[f]})) await navigator.share({files:[f],title:article.headline,text:'NS NEWS'});
+      if(navigator.canShare?.({files:[f]})) await navigator.share({files:[f],title:article.headline,text});
       else {await downloadCard();actionStatus='PNG డౌన్‌లోడ్ అయ్యింది. WhatsAppలో ఫొటో జతచేయండి.';}
     }catch(err){ actionStatus='Share సాధ్యం కాలేదు: '+(err instanceof Error ? err.message : '');}
   }
