@@ -75,7 +75,11 @@ function cleanLine(line) {
 
 /** @param {string} line */
 function isMediaMarker(line) {
-  return /^image_[\w.-]+\.(?:png|jpe?g|webp)(?:\s*\+\s*\d+)?$/iu.test(line)
+  // Clipboard attachment counters such as "+1", "+ 2" and "• +3" are
+  // metadata, not sentences or news bullet points. Only remove standalone
+  // markers so genuine counts (e.g. "2027", "₹1 crore", "+1%") are preserved.
+  return /^(?:[•●▪*]\s*)?\+\s*\d{1,2}$/u.test(line)
+    || /^image_[\w.-]+\.(?:png|jpe?g|webp)(?:\s*\+\s*\d+)?$/iu.test(line)
     || /^!\[[^\]]*\]\([^)]*\)$/u.test(line);
 }
 
