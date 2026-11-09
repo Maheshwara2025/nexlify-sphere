@@ -266,7 +266,7 @@
           </div>
           <div>
             <label class="block font-bold text-slate-700 mb-1">తేదీ</label>
-            <input type="date" bind:value={form.date} required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold" />
+            <input type="date" bind:value={form.date} max={projectToday()} required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold" />
           </div>
         </div>
 
@@ -302,7 +302,8 @@
             <select bind:value={form.payment_mode} class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold">
               <option value="Credit">ఉధార్ / బాకీ (Credit Due)</option>
               <option value="Cash">నగదు (Cash in Hand)</option>
-              <option value="Bank">బ్యాంక్ / ఆన్‌లైన్ (Bank/UPI)</option>
+              <option value="Bank">బ్యాంక్ ట్రాన్స్‌ఫర్ (Bank)</option>
+              <option value="UPI">PhonePe / Google Pay (UPI)</option>
             </select>
           </div>
         </div>
