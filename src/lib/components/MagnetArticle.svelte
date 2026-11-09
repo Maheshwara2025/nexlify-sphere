@@ -81,20 +81,26 @@
   .closing {font-size:14px; line-height:1.7; font-weight:800; background:#f3f6fb; border-left:4px solid var(--magnet-primary); border-radius:9px; margin:20px 0; padding:12px 15px;}
   footer {display:flex; justify-content:space-between; flex-wrap:wrap; gap:9px; border-top:1px solid #e7ebf1; padding-top:15px; font-size:11px; color:#617187;}
   footer b {color:#c91734;}
-  .sharecard {width:540px; height:675px; max-width:none; border-radius:0;}
-  .sharecard .hero {height:214px;}
-  .sharecard .hero-top {top:13px; left:15px; right:15px;}
-  .sharecard .hero-bottom {left:21px; right:21px; bottom:15px;}
-  .sharecard h1 {font-size:27px; line-height:1.42; display:-webkit-box;-webkit-line-clamp:3;line-clamp:3;-webkit-box-orient:vertical; overflow:hidden;}
-  .sharecard .eyebrow {font-size:10px; margin-bottom:6px;}
-  .sharecard .content {padding:12px 17px;}
-  .sharecard .strips {gap:6px;}
-  .sharecard .strip {height:62px; min-height:62px; padding:7px 9px; gap:9px; border-radius:9px;}
-  .sharecard .number {width:28px; height:28px; flex-basis:28px; font-size:10px; border-radius:7px;}
-  .sharecard h2 {font-size:13px; line-height:1.3; margin-bottom:2px;}
-  .sharecard .strip p {font-size:11px; line-height:1.45; display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical; overflow:hidden;}
-  .sharecard .closing {padding:6px 9px; font-size:10px; margin:8px 0 6px; line-height:1.3;}
-  .sharecard footer {padding-top:7px; font-size:9px;}
+  /*
+   * Exact 540x675 CSS pixels at pixelRatio=2 -> 1080x1350 WhatsApp PNG.
+   * Flex + six equally allocated grid rows prevent the sixth highlight
+   * and NS logo/footer from being cut off in the exported card.
+   */
+  .sharecard {box-sizing:border-box;display:flex;flex-direction:column;width:540px;height:675px;max-width:none;border-radius:0;}
+  .sharecard .hero {height:204px;flex:0 0 204px;}
+  .sharecard .hero-top {top:11px;left:15px;right:15px;}
+  .sharecard .hero-bottom {left:19px;right:19px;bottom:13px;}
+  .sharecard h1 {font-size:25px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:3;line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+  .sharecard .eyebrow {font-size:10px;margin-bottom:4px;}
+  .sharecard .content {box-sizing:border-box;flex:1 1 auto;min-height:0;padding:10px 15px 9px;display:flex;flex-direction:column;}
+  .sharecard .strips {display:grid;flex:1 1 auto;min-height:0;grid-template-rows:repeat(6,minmax(0,1fr));gap:5px;}
+  .sharecard .strip {box-sizing:border-box;height:auto;min-height:0;padding:5px 9px;gap:9px;border-radius:9px;overflow:hidden;box-shadow:none;}
+  .sharecard .number {width:28px;height:28px;flex-basis:28px;font-size:10px;border-radius:7px;}
+  .sharecard .strip-copy {align-self:center;overflow:hidden;}
+  .sharecard h2 {font-size:12.5px;line-height:1.35;margin-bottom:1px;display:-webkit-box;-webkit-line-clamp:1;line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;}
+  .sharecard .strip p {font-size:10.5px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .sharecard .closing {flex:0 0 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:6px 9px;font-size:10px;margin:7px 0 5px;line-height:1.25;}
+  .sharecard footer {flex:0 0 auto;margin-top:auto;padding-top:6px;font-size:9px;}
   @media (max-width:640px) {
     .hero {height:370px;}
     h1 {font-size:27px;}

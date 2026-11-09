@@ -110,6 +110,7 @@
     } finally { saving=false; }
   }
   async function imageDataUrl() {
+    if(issues.length) throw new Error('ముందుగా వార్త, 6 ముఖ్యాంశాలు, ఫొటో పూర్తిచేయండి: '+issues.join(' | '));
     if(!cardNode) throw new Error('Share Card ఇంకా సిద్ధం కాలేదు.');
     await document.fonts.ready;
     const img = cardNode.querySelector('img');
@@ -129,7 +130,7 @@
       const blob=await (await fetch(url)).blob();
       const f=new File([blob],(savedSlug || 'ns-magnet')+'.png',{type:'image/png'});
       if(navigator.canShare?.({files:[f]})) {
-        await navigator.share({files:[f],title:draft.headline,text:'NS NEWS'});
+        await navigator.share({files:[f],title:draft.headline,text:magnetShareText(previewArticle,publishedUrl)});
       } else {await downloadPng(); status='PNG Download అయ్యింది. WhatsAppలో ఫొటోగా జతచేయండి.';}
     } catch(err) { status='Sharing unavailable: '+(err instanceof Error ? err.message : 'Download PNG instead.'); }
   }
