@@ -701,7 +701,7 @@
               </div>
               <div>
                 <label class="block font-bold text-slate-700 mb-1">తేదీ</label>
-                <input type="date" bind:value={expForm.date} required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-mono font-bold" />
+                <input type="date" bind:value={expForm.date} max={projectToday()} required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-mono font-bold" />
               </div>
             </div>
 
@@ -793,12 +793,13 @@
                 <select bind:value={inForm.target} class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold">
                   <option value="Bank">బ్యాంక్</option>
                   <option value="Cash">క్యాష్</option>
+                  <option value="UPI">UPI (PhonePe/GPay)</option>
                 </select>
               </div>
             </div>
             <div>
               <label class="block font-bold text-slate-700 mb-1">తేదీ</label>
-              <input type="date" bind:value={inForm.date} required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold" />
+              <input type="date" bind:value={inForm.date} max={projectToday()} required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-bold" />
             </div>
             <button disabled={!STAGE3_ATOMIC_ENTRIES_ENABLED || savingMoneyIn} type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3 rounded-2xl shadow cursor-pointer">
               సేవ్ చేయండి & రసీదు పొందండి ➔
